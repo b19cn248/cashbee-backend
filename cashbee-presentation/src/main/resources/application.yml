@@ -47,7 +47,7 @@ spring:
           # Keycloak issuer URI - Spring Boot auto-downloads public keys for JWT validation
           # Format: {keycloak-url}/realms/{realm-name}
           # Example: http://localhost:8080/realms/cashbee
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.nguocchieuvangle.io.vn//realms/cashbee}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.nguocchieuvangle.io.vn/realms/cashbee}
           jwk-set-uri: https://auth.nguocchieuvangle.io.vn//realms/cashbee/protocol/openid-connect/certs
           # Alternative: JWK Set URI (if you want to specify directly)
           # jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/cashbee/protocol/openid-connect/certs}

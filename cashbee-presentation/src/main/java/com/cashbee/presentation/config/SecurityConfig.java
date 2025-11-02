@@ -160,32 +160,6 @@ public class SecurityConfig {
         return new CorsFilter(source);
     }
 
-    /**
-     * Custom Bearer Token Resolver that skips JWT validation for public endpoints.
-     * <p>
-     * For public endpoints (permitAll), we don't require JWT token.
-     * For protected endpoints, JWT token is required.
-     *
-     * @return BearerTokenResolver instance
-     */
-    private BearerTokenResolver customBearerTokenResolver() {
-        DefaultBearerTokenResolver defaultResolver = new DefaultBearerTokenResolver();
-
-        return (HttpServletRequest request) -> {
-            String requestUri = request.getRequestURI();
-
-            // Skip JWT validation for public endpoints
-            if (requestUri.startsWith("/actuator/") ||
-                    requestUri.startsWith("/v3/api-docs") ||
-                    requestUri.startsWith("/swagger-ui") ||
-                    requestUri.startsWith("/api/payouts")) {
-                return null;  // No token required
-            }
-
-            // For other endpoints, use default resolver (requires Bearer token)
-            return defaultResolver.resolve(request);
-        };
-    }
 
     @Bean
     JwtDecoder jwtDecoder() {
