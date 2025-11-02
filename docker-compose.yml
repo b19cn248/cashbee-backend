@@ -53,11 +53,11 @@ services:
       SPRING_LIQUIBASE_DEFAULT_SCHEMA: cashbee
 
       # Keycloak Configuration
-      KEYCLOAK_SERVER_URL: https://keycloak.openlearnhub.io.vn
+      KEYCLOAK_SERVER_URL: https://auth.nguocchieuvangle.io.vn
       KEYCLOAK_REALM: cashbee
       KEYCLOAK_CLIENT_ID: cashbee-backend
-      KEYCLOAK_CLIENT_SECRET: 5AYF2PUJmbiVugCdFHdBbzfyDXQsXBAx
-      KEYCLOAK_ISSUER_URI: https://keycloak.openlearnhub.io.vn/realms/cashbee
+      KEYCLOAK_CLIENT_SECRET: x7owaG4Wcilsdu6dbsVzfuk6D9Bevkrq
+      KEYCLOAK_ISSUER_URI: https://auth.nguocchieuvangle.io.vn/realms/cashbee
       KEYCLOAK_ADMIN_USERNAME: admin
       KEYCLOAK_ADMIN_PASSWORD: 1234
 
