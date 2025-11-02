@@ -1,9 +1,9 @@
 {
-  "auth-server-url": "https://keycloak.openlearnhub.io.vn",
+  "auth-server-url": "https://auth.nguocchieuvangle.io.vn/",
   "realm": "cashbee",
   "resource": "cashbee-backend",
   "credentials": {
-    "secret": "5AYF2PUJmbiVugCdFHdBbzfyDXQsXBAx"
+    "secret": "x7owaG4Wcilsdu6dbsVzfuk6D9Bevkrq"
   },
   "enforcement-mode": "PERMISSIVE",
   "http-method-as-scope": "true",
