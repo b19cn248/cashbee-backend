@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="014" author="cashbee">
+        <comment>Update Shopee affiliate ID and link template configuration</comment>
+
+        <!-- Update Shopee with affiliate ID and template -->
+        <update tableName="affiliate_platform">
+            <column name="affiliate_id" value="cashbee_vn_123456"/>
+            <column name="link_template" value="https://shopee.vn/universal-link/{product_id}?af_siteid=0&amp;pid={affiliate_id}&amp;af_sub1={tracking_code}"/>
+            <column name="tracking_enabled" value="1"/>
+            <where>code='shopee'</where>
+        </update>
+
+        <!-- Verify that affiliate_id is set (will fail if not found) -->
+        <sql>
+            SELECT affiliate_id
+            FROM affiliate_platform
+            WHERE code='shopee' AND affiliate_id IS NOT NULL;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

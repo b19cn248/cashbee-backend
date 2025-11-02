@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="002-create-user-wallet-table" author="cashbee-team">
+        <comment>Create user_wallet table for storing wallet balances and statistics</comment>
+
+        <createTable tableName="user_wallet">
+            <!-- Primary Key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Foreign Key to User -->
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <!-- Balance Information -->
+            <column name="balance" type="DECIMAL(12,2)" defaultValueNumeric="0.00">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="pending_balance" type="DECIMAL(12,2)" defaultValueNumeric="0.00">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="locked_balance" type="DECIMAL(12,2)" defaultValueNumeric="0.00">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Statistics -->
+            <column name="total_earned" type="DECIMAL(12,2)" defaultValueNumeric="0.00">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="total_withdrawn" type="DECIMAL(12,2)" defaultValueNumeric="0.00">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamps -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Foreign Key Constraint -->
+        <addForeignKeyConstraint
+            baseTableName="user_wallet"
+            baseColumnNames="user_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_wallet_user"
+            onDelete="CASCADE"
+            onUpdate="CASCADE"/>
+
+        <!-- Indexes for Performance -->
+        <createIndex indexName="idx_wallet_user_id" tableName="user_wallet" unique="true">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_wallet_balance" tableName="user_wallet">
+            <column name="balance"/>
+        </createIndex>
+
+        <createIndex indexName="idx_wallet_pending_balance" tableName="user_wallet">
+            <column name="pending_balance"/>
+        </createIndex>
+
+        <createIndex indexName="idx_wallet_locked_balance" tableName="user_wallet">
+            <column name="locked_balance"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="user_wallet"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

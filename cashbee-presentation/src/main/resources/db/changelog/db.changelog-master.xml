@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Master changelog file for CashBee database schema -->
+
+    <!-- Initial schema creation -->
+    <include file="db/changelog/001-create-user-table.xml"/>
+    <include file="db/changelog/002-create-user-wallet-table.xml"/>
+    <include file="db/changelog/003-create-transaction-table.xml"/>
+    <include file="db/changelog/004-create-payout-request-table.xml"/>
+
+    <!-- Affiliate module tables -->
+    <include file="db/changelog/005-create-affiliate-platform-table.xml"/>
+    <include file="db/changelog/006-seed-affiliate-platforms.xml"/>
+    <include file="db/changelog/007-create-cashback-policy-table.xml"/>
+    <include file="db/changelog/008-seed-cashback-policies.xml"/>
+    <include file="db/changelog/009-create-affiliate-order-table.xml"/>
+    <include file="db/changelog/010-create-affiliate-order-item-table.xml"/>
+    <include file="db/changelog/011-create-affiliate-click-table.xml"/>
+    <include file="db/changelog/012-create-import-batch-table.xml"/>
+    <include file="db/changelog/013-add-affiliate-config-to-platform.xml"/>
+    <include file="db/changelog/014-update-shopee-affiliate-id.xml"/>
+
+</databaseChangeLog>

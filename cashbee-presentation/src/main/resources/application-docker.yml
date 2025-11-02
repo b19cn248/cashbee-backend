@@ -1,0 +1,32 @@
+# Docker-specific configuration
+spring:
+  datasource:
+    url: jdbc:mysql://mysql:3306/cashbee?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    username: root
+    password: rootpassword
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+# Logging for Docker
+logging:
+  level:
+    root: INFO
+    com.cashbee: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+  file:
+    name: /app/logs/cashbee-backend.log
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 7

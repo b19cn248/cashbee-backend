@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="007" author="cashbee">
+        <comment>Create cashback_policy table for managing cashback calculation policies</comment>
+
+        <createTable tableName="cashback_policy">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="policy_name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="policy_code" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="platform_id" type="BIGINT">
+                <constraints nullable="true"
+                             foreignKeyName="fk_policy_platform"
+                             references="affiliate_platform(id)"/>
+            </column>
+
+            <column name="user_level" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="cashback_rate" type="DECIMAL(5,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="min_order_value" type="DECIMAL(12,2)" defaultValue="0.00">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="max_cashback_per_order" type="DECIMAL(12,2)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="is_active" type="TINYINT(1)" defaultValue="1">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="priority" type="INT" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="effective_from" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="effective_to" type="DATETIME">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for performance -->
+        <createIndex tableName="cashback_policy" indexName="idx_policy_code" unique="true">
+            <column name="policy_code"/>
+        </createIndex>
+
+        <createIndex tableName="cashback_policy" indexName="idx_policy_platform_user">
+            <column name="platform_id"/>
+            <column name="user_level"/>
+        </createIndex>
+
+        <createIndex tableName="cashback_policy" indexName="idx_policy_active">
+            <column name="is_active"/>
+        </createIndex>
+
+        <createIndex tableName="cashback_policy" indexName="idx_policy_effective">
+            <column name="effective_from"/>
+            <column name="effective_to"/>
+        </createIndex>
+
+        <createIndex tableName="cashback_policy" indexName="idx_policy_user_level">
+            <column name="user_level"/>
+        </createIndex>
+
+        <createIndex tableName="cashback_policy" indexName="idx_policy_priority">
+            <column name="priority"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

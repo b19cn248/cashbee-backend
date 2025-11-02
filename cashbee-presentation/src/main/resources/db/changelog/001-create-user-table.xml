@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="001-create-user-table" author="cashbee-team">
+        <comment>Create user table for storing user information synced from Keycloak</comment>
+
+        <createTable tableName="user">
+            <!-- Primary Key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Keycloak Integration -->
+            <column name="keycloak_id" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <!-- User Information -->
+            <column name="username" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="email" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="full_name" type="VARCHAR(255)"/>
+
+            <column name="phone" type="VARCHAR(20)"/>
+
+            <!-- Referral System -->
+            <column name="referral_code" type="VARCHAR(20)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="referred_by" type="VARCHAR(20)"/>
+
+            <!-- Status -->
+            <column name="status" type="VARCHAR(20)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamps -->
+            <column name="last_login_at" type="DATETIME"/>
+
+            <column name="last_sync_at" type="DATETIME"/>
+
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="deleted_at" type="DATETIME"/>
+        </createTable>
+
+        <!-- Indexes for Performance -->
+        <createIndex indexName="idx_user_keycloak_id" tableName="user" unique="true">
+            <column name="keycloak_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_user_username" tableName="user" unique="true">
+            <column name="username"/>
+        </createIndex>
+
+        <createIndex indexName="idx_user_email" tableName="user" unique="true">
+            <column name="email"/>
+        </createIndex>
+
+        <createIndex indexName="idx_user_referral_code" tableName="user" unique="true">
+            <column name="referral_code"/>
+        </createIndex>
+
+        <createIndex indexName="idx_user_referred_by" tableName="user">
+            <column name="referred_by"/>
+        </createIndex>
+
+        <createIndex indexName="idx_user_status" tableName="user">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex indexName="idx_user_deleted_at" tableName="user">
+            <column name="deleted_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="user"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

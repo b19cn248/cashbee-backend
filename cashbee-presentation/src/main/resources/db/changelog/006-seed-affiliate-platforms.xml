@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="006" author="cashbee">
+        <comment>Seed initial affiliate platforms (Shopee, Lazada, TikTok)</comment>
+
+        <!-- Shopee Platform - Active (primary platform for MVP) -->
+        <insert tableName="affiliate_platform">
+            <column name="name" value="Shopee"/>
+            <column name="code" value="shopee"/>
+            <column name="default_commission_rate" value="5.00"/>
+            <column name="status" value="ACTIVE"/>
+            <column name="created_at" valueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" valueComputed="CURRENT_TIMESTAMP"/>
+        </insert>
+
+        <!-- Lazada Platform - Inactive (for future expansion) -->
+        <insert tableName="affiliate_platform">
+            <column name="name" value="Lazada"/>
+            <column name="code" value="lazada"/>
+            <column name="default_commission_rate" value="4.50"/>
+            <column name="status" value="INACTIVE"/>
+            <column name="created_at" valueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" valueComputed="CURRENT_TIMESTAMP"/>
+        </insert>
+
+        <!-- TikTok Shop Platform - Inactive (for future expansion) -->
+        <insert tableName="affiliate_platform">
+            <column name="name" value="TikTok Shop"/>
+            <column name="code" value="tiktok"/>
+            <column name="default_commission_rate" value="6.00"/>
+            <column name="status" value="INACTIVE"/>
+            <column name="created_at" valueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" valueComputed="CURRENT_TIMESTAMP"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

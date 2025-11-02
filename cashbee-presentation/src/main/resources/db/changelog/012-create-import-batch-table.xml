@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="012" author="cashbee">
+        <comment>Create import_batch table for tracking CSV imports</comment>
+
+        <createTable tableName="import_batch">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="platform_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_batch_platform"
+                             references="affiliate_platform(id)"/>
+            </column>
+
+            <column name="file_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="total_rows" type="INT" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="success_count" type="INT" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="failed_count" type="INT" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="skipped_count" type="INT" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="status" type="VARCHAR(20)" defaultValue="PROCESSING">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="error_message" type="TEXT"/>
+
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="completed_at" type="DATETIME"/>
+
+            <column name="imported_by" type="BIGINT">
+                <constraints foreignKeyName="fk_batch_user"
+                             references="user(id)"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for performance -->
+        <createIndex tableName="import_batch" indexName="idx_batch_platform">
+            <column name="platform_id"/>
+        </createIndex>
+
+        <createIndex tableName="import_batch" indexName="idx_batch_status">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex tableName="import_batch" indexName="idx_batch_created_at">
+            <column name="created_at"/>
+        </createIndex>
+
+        <createIndex tableName="import_batch" indexName="idx_batch_imported_by">
+            <column name="imported_by"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

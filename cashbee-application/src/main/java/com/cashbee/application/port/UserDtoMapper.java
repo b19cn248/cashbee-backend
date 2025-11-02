@@ -1,0 +1,50 @@
+package com.cashbee.application.port;
+
+import com.cashbee.application.dto.user.UserResponse;
+import com.cashbee.domain.model.User;
+import org.mapstruct.*;
+
+import java.util.List;
+
+/**
+ * Mapper for converting between User domain model and application DTOs.
+ *
+ * This is used in the application layer to convert domain models to DTOs
+ * that are exposed to the presentation layer.
+ *
+ * @author CashBee Team
+ */
+@Mapper(
+    componentModel = "spring",
+    unmappedTargetPolicy = ReportingPolicy.ERROR
+)
+public interface UserDtoMapper {
+
+    /**
+     * Convert User domain model to UserResponse DTO.
+     *
+     * @param user Domain model
+     * @return Response DTO
+     */
+    @Mapping(target = "status", source = "status", qualifiedByName = "statusToString")
+    UserResponse toResponse(User user);
+
+    /**
+     * Convert list of User domain models to list of UserResponse DTOs.
+     *
+     * @param users List of domain models
+     * @return List of response DTOs
+     */
+    List<UserResponse> toResponseList(List<User> users);
+
+    /**
+     * Convert UserStatus enum to String for DTO.
+     *
+     * @param status UserStatus enum
+     * @return String representation
+     */
+    @Named("statusToString")
+    default String statusToString(com.cashbee.domain.enums.UserStatus status) {
+        return status != null ? status.name() : null;
+    }
+}

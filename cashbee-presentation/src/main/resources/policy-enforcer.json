@@ -1,0 +1,199 @@
+{
+  "auth-server-url": "https://keycloak.openlearnhub.io.vn",
+  "realm": "cashbee",
+  "resource": "cashbee-backend",
+  "credentials": {
+    "secret": "5AYF2PUJmbiVugCdFHdBbzfyDXQsXBAx"
+  },
+  "enforcement-mode": "PERMISSIVE",
+  "http-method-as-scope": true,
+  "paths": [
+    {
+      "name": "User Sync",
+      "path": "/api/users/sync",
+      "methods": [
+        {
+          "method": "POST",
+          "scopes": ["user:sync"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "User Info",
+      "path": "/api/users/keycloak/*",
+      "methods": [
+        {
+          "method": "GET",
+          "scopes": ["user:view"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Wallet View",
+      "path": "/api/wallets/user/*",
+      "methods": [
+        {
+          "method": "GET",
+          "scopes": ["wallet:view"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Wallet Pending Balance",
+      "path": "/api/wallets/pending",
+      "methods": [
+        {
+          "method": "POST",
+          "scopes": ["wallet:admin"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Wallet Confirm Balance",
+      "path": "/api/wallets/confirm",
+      "methods": [
+        {
+          "method": "POST",
+          "scopes": ["wallet:admin"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Wallet Lock",
+      "path": "/api/wallets/lock",
+      "methods": [
+        {
+          "method": "POST",
+          "scopes": ["wallet:lock"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Wallet Unlock",
+      "path": "/api/wallets/unlock",
+      "methods": [
+        {
+          "method": "POST",
+          "scopes": ["wallet:admin"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Wallet Deduct",
+      "path": "/api/wallets/deduct",
+      "methods": [
+        {
+          "method": "POST",
+          "scopes": ["wallet:admin"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Transaction History",
+      "path": "/api/transactions/user/*",
+      "methods": [
+        {
+          "method": "GET",
+          "scopes": ["transaction:view"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Payout Request Create",
+      "path": "/api/payouts/request",
+      "methods": [
+        {
+          "method": "POST",
+          "scopes": ["payout:create"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Payout User View",
+      "path": "/api/payouts/user/*",
+      "methods": [
+        {
+          "method": "GET",
+          "scopes": ["payout:view"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Payout Admin View All",
+      "path": "/api/payouts/admin/all",
+      "methods": [
+        {
+          "method": "GET",
+          "scopes": ["payout:admin:view"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Payout Admin Approve",
+      "path": "/api/payouts/admin/*/approve",
+      "methods": [
+        {
+          "method": "PUT",
+          "scopes": ["payout:admin:approve"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Payout Admin Reject",
+      "path": "/api/payouts/admin/*/reject",
+      "methods": [
+        {
+          "method": "PUT",
+          "scopes": ["payout:admin:reject"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Payout Admin Complete",
+      "path": "/api/payouts/admin/*/complete",
+      "methods": [
+        {
+          "method": "PUT",
+          "scopes": ["payout:admin:complete"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Payout Cancel",
+      "path": "/api/payouts/*/cancel",
+      "methods": [
+        {
+          "method": "PUT",
+          "scopes": ["payout:cancel"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    },
+    {
+      "name": "Admin Dashboard Statistics",
+      "path": "/api/admin/dashboard/statistics",
+      "methods": [
+        {
+          "method": "GET",
+          "scopes": ["admin:statistics"],
+          "scopes-enforcement-mode": "ALL"
+        }
+      ]
+    }
+  ]
+}

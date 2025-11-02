@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="013" author="cashbee">
+        <comment>Add affiliate configuration columns to affiliate_platform table</comment>
+
+        <addColumn tableName="affiliate_platform">
+            <column name="affiliate_id" type="VARCHAR(100)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <addColumn tableName="affiliate_platform">
+            <column name="link_template" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <addColumn tableName="affiliate_platform">
+            <column name="tracking_enabled" type="TINYINT(1)" defaultValue="1">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <!-- Update Shopee with example template -->
+        <update tableName="affiliate_platform">
+            <column name="link_template" value="https://shopee.vn/universal-link/{product_id}?af_siteid=0&amp;pid={affiliate_id}&amp;af_sub1={tracking_code}"/>
+            <where>code='shopee'</where>
+        </update>
+    </changeSet>
+
+</databaseChangeLog>

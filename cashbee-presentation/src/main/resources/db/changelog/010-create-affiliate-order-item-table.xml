@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="010" author="cashbee">
+        <comment>Create affiliate_order_item table for storing order items</comment>
+
+        <createTable tableName="affiliate_order_item">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="order_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_item_order"
+                             references="affiliate_order(id)"
+                             deleteCascade="true"/>
+            </column>
+
+            <column name="item_id" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="item_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="quantity" type="INT" defaultValue="1"/>
+
+            <column name="actual_amount" type="DECIMAL(12,2)"/>
+
+            <column name="item_commission" type="DECIMAL(12,2)"/>
+
+            <column name="shop_id" type="VARCHAR(50)"/>
+
+            <column name="shop_name" type="VARCHAR(255)"/>
+
+            <column name="category_lv1" type="VARCHAR(100)"/>
+
+            <column name="category_lv2" type="VARCHAR(100)"/>
+
+            <column name="category_lv3" type="VARCHAR(100)"/>
+
+            <column name="img_url" type="VARCHAR(500)"/>
+
+            <column name="brand_commission_rate" type="DECIMAL(8,4)"/>
+
+            <column name="platform_commission_rate" type="DECIMAL(8,4)"/>
+
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for performance -->
+        <createIndex tableName="affiliate_order_item" indexName="idx_item_order">
+            <column name="order_id"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_order_item" indexName="idx_item_id">
+            <column name="item_id"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_order_item" indexName="idx_item_shop">
+            <column name="shop_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

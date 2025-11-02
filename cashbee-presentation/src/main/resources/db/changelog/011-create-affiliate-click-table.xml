@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="011" author="cashbee">
+        <comment>Create affiliate_click table for tracking user clicks and conversions</comment>
+
+        <createTable tableName="affiliate_click">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_click_user"
+                             references="user(id)"/>
+            </column>
+
+            <column name="platform_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_click_platform"
+                             references="affiliate_platform(id)"/>
+            </column>
+
+            <column name="shop_id" type="VARCHAR(50)"/>
+
+            <column name="item_id" type="VARCHAR(50)"/>
+
+            <column name="product_name" type="VARCHAR(255)"/>
+
+            <column name="tracking_code" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="tracking_url" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="original_url" type="TEXT"/>
+
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="clicked_at" type="DATETIME"/>
+
+            <column name="order_matched" type="TINYINT(1)" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="matched_order_id" type="BIGINT">
+                <constraints foreignKeyName="fk_click_order"
+                             references="affiliate_order(id)"/>
+            </column>
+
+            <column name="status" type="VARCHAR(20)" defaultValue="CREATED">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for performance -->
+        <createIndex tableName="affiliate_click" indexName="idx_click_tracking_code" unique="true">
+            <column name="tracking_code"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_click" indexName="idx_click_user">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_click" indexName="idx_click_user_platform">
+            <column name="user_id"/>
+            <column name="platform_id"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_click" indexName="idx_click_status">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_click" indexName="idx_click_created_at">
+            <column name="created_at"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_click" indexName="idx_click_order_matched">
+            <column name="order_matched"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

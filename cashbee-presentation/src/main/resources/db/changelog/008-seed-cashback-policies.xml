@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="008" author="cashbee">
+        <comment>Seed default cashback policies for MVP</comment>
+
+        <!-- Default policy for NORMAL users on Shopee (70% cashback) -->
+        <insert tableName="cashback_policy">
+            <column name="policy_name" value="Shopee Normal User Policy"/>
+            <column name="policy_code" value="SHOPEE_NORMAL_2025"/>
+            <column name="platform_id" value="1"/> <!-- Shopee -->
+            <column name="user_level" value="NORMAL"/>
+            <column name="cashback_rate" value="70.00"/>
+            <column name="min_order_value" value="0.00"/>
+            <column name="max_cashback_per_order" valueNumeric="null"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="priority" value="0"/>
+            <column name="effective_from" value="2025-01-01 00:00:00"/>
+            <column name="effective_to" valueComputed="null"/>
+            <column name="created_at" valueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" valueComputed="CURRENT_TIMESTAMP"/>
+        </insert>
+
+        <!-- VIP policy for Shopee (80% cashback, higher than normal) -->
+        <insert tableName="cashback_policy">
+            <column name="policy_name" value="Shopee VIP User Policy"/>
+            <column name="policy_code" value="SHOPEE_VIP_2025"/>
+            <column name="platform_id" value="1"/> <!-- Shopee -->
+            <column name="user_level" value="VIP"/>
+            <column name="cashback_rate" value="80.00"/>
+            <column name="min_order_value" value="0.00"/>
+            <column name="max_cashback_per_order" valueNumeric="null"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="priority" value="10"/> <!-- Higher priority than normal -->
+            <column name="effective_from" value="2025-01-01 00:00:00"/>
+            <column name="effective_to" valueComputed="null"/>
+            <column name="created_at" valueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" valueComputed="CURRENT_TIMESTAMP"/>
+        </insert>
+
+        <!-- SUPER VIP policy for Shopee (90% cashback, highest tier) -->
+        <insert tableName="cashback_policy">
+            <column name="policy_name" value="Shopee Super VIP Policy"/>
+            <column name="policy_code" value="SHOPEE_SUPER_2025"/>
+            <column name="platform_id" value="1"/> <!-- Shopee -->
+            <column name="user_level" value="SUPER"/>
+            <column name="cashback_rate" value="90.00"/>
+            <column name="min_order_value" value="0.00"/>
+            <column name="max_cashback_per_order" valueNumeric="null"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="priority" value="20"/> <!-- Highest priority -->
+            <column name="effective_from" value="2025-01-01 00:00:00"/>
+            <column name="effective_to" valueComputed="null"/>
+            <column name="created_at" valueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" valueComputed="CURRENT_TIMESTAMP"/>
+        </insert>
+
+        <!-- Universal policy for ALL platforms (applies if no platform-specific policy) -->
+        <insert tableName="cashback_policy">
+            <column name="policy_name" value="Universal Normal User Policy"/>
+            <column name="policy_code" value="UNIVERSAL_NORMAL_2025"/>
+            <column name="platform_id" valueNumeric="null"/> <!-- NULL = all platforms -->
+            <column name="user_level" value="NORMAL"/>
+            <column name="cashback_rate" value="60.00"/> <!-- Lower than platform-specific -->
+            <column name="min_order_value" value="0.00"/>
+            <column name="max_cashback_per_order" valueNumeric="null"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="priority" value="-10"/> <!-- Low priority (fallback) -->
+            <column name="effective_from" value="2025-01-01 00:00:00"/>
+            <column name="effective_to" valueComputed="null"/>
+            <column name="created_at" valueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" valueComputed="CURRENT_TIMESTAMP"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

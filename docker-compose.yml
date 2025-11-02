@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # MySQL Database Service
+  mysql:
+    image: mysql:8.3
+    container_name: cashbee-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: cashbee
+      MYSQL_USER: cashbee_user
+      MYSQL_PASSWORD: cashbee_password
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "33067:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - cashbee-network
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --max_connections=200
+      --innodb_buffer_pool_size=512M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # CashBee Backend Application
+  cashbee-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cashbee-backend
+    restart: unless-stopped
+    environment:
+      # Spring Profiles
+      SPRING_PROFILES_ACTIVE: docker
+
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cashbee?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpassword
+
+      # Liquibase Configuration
+      SPRING_LIQUIBASE_ENABLED: true
+      SPRING_LIQUIBASE_DEFAULT_SCHEMA: cashbee
+
+      # Keycloak Configuration
+      KEYCLOAK_SERVER_URL: https://keycloak.openlearnhub.io.vn
+      KEYCLOAK_REALM: cashbee
+      KEYCLOAK_CLIENT_ID: cashbee-backend
+      KEYCLOAK_CLIENT_SECRET: 5AYF2PUJmbiVugCdFHdBbzfyDXQsXBAx
+      KEYCLOAK_ISSUER_URI: https://keycloak.openlearnhub.io.vn/realms/cashbee
+      KEYCLOAK_ADMIN_USERNAME: admin
+      KEYCLOAK_ADMIN_PASSWORD: 1234
+
+      # JVM Options
+      JAVA_OPTS: -Xms512m -Xmx1024m -XX:+UseG1GC
+    ports:
+      - "8911:8080"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - cashbee-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+networks:
+  cashbee-network:
+    driver: bridge
+    name: cashbee-network
+
+volumes:
+  mysql_data:
+    driver: local
+    name: cashbee-mysql-data

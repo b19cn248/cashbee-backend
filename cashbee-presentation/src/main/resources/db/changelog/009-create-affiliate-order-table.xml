@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="009" author="cashbee">
+        <comment>Create affiliate_order table for storing orders from affiliate platforms</comment>
+
+        <createTable tableName="affiliate_order">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="platform_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_order_platform"
+                             references="affiliate_platform(id)"/>
+            </column>
+
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_order_user"
+                             references="user(id)"/>
+            </column>
+
+            <column name="click_id" type="VARCHAR(100)"/>
+
+            <column name="order_id" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="order_status" type="VARCHAR(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="product_name" type="VARCHAR(255)"/>
+
+            <column name="product_price" type="DECIMAL(12,2)"/>
+
+            <column name="commission_amount" type="DECIMAL(12,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="currency" type="VARCHAR(10)" defaultValue="VND"/>
+
+            <column name="order_time" type="DATETIME"/>
+
+            <column name="confirm_time" type="DATETIME"/>
+
+            <column name="paid_time" type="DATETIME"/>
+
+            <column name="source" type="VARCHAR(20)" defaultValue="IMPORT"/>
+
+            <column name="import_batch_id" type="BIGINT"/>
+
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="deleted_at" type="DATETIME"/>
+        </createTable>
+
+        <!-- Indexes for performance -->
+        <createIndex tableName="affiliate_order" indexName="idx_order_id" unique="true">
+            <column name="order_id"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_order" indexName="idx_order_user">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_order" indexName="idx_order_platform">
+            <column name="platform_id"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_order" indexName="idx_order_status">
+            <column name="order_status"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_order" indexName="idx_order_import_batch">
+            <column name="import_batch_id"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_order" indexName="idx_order_time">
+            <column name="order_time"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

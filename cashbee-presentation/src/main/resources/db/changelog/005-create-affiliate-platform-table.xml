@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="005" author="cashbee">
+        <comment>Create affiliate_platform table for managing affiliate platforms (Shopee, Lazada, TikTok)</comment>
+
+        <createTable tableName="affiliate_platform">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="name" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="code" type="VARCHAR(20)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="api_key" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="api_secret" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="base_url" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="default_commission_rate" type="DECIMAL(5,2)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="status" type="VARCHAR(20)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for performance -->
+        <createIndex tableName="affiliate_platform" indexName="idx_platform_code" unique="true">
+            <column name="code"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_platform" indexName="idx_platform_name" unique="true">
+            <column name="name"/>
+        </createIndex>
+
+        <createIndex tableName="affiliate_platform" indexName="idx_platform_status">
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
