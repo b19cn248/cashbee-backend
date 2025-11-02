@@ -57,16 +57,46 @@ cashbee-backend/
 - Foreign keys là primitive types (Long), KHÔNG dùng @OneToOne, @ManyToOne
 - Mappers convert giữa Domain models và JPA entities
 
+## 📚 Documentation
+
+**All documentation has been organized for easy navigation!**
+
+- 📖 **[DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)** - Complete documentation structure
+- 📂 **[docs/](docs/)** - All documentation organized by category
+  - [Architecture](docs/architecture/) - System design and architecture
+  - [API](docs/api/) - API documentation for frontend
+  - [Setup](docs/setup/) - Installation and configuration guides
+  - [Guides](docs/guides/) - Development and testing guides
+  - [Fixes](docs/fixes/) - Troubleshooting and bug fixes
+- 🐳 **[docker/](docker/)** - Docker configuration and setup
+
 ## 🚀 Quick Start
 
-### Prerequisites
+### Option 1: Docker (Recommended) 🐳
 
-- Java 17+
+**Chỉ cần 1 lệnh duy nhất:**
+
+```bash
+docker-compose up -d
+```
+
+- ✅ Tự động setup MySQL và Backend
+- ✅ Port Backend: **8911** (http://localhost:8911)
+- ✅ Port MySQL: **33067**
+- ✅ Swagger UI: http://localhost:8911/swagger-ui.html
+
+📖 **Chi tiết:** [docs/setup/DOCKER_SETUP.md](docs/setup/DOCKER_SETUP.md)
+
+### Option 2: Manual Setup
+
+#### Prerequisites
+
+- Java 21+
 - Maven 3.8+
 - MySQL 8.0+
 - Keycloak (optional - for authentication)
 
-### 1. Database Setup
+#### 1. Database Setup
 
 Tạo database và user:
 
@@ -77,7 +107,7 @@ GRANT ALL PRIVILEGES ON cashbee.* TO 'cashbee_user'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-### 2. Configuration
+#### 2. Configuration
 
 Cập nhật file `cashbee-presentation/src/main/resources/application.yml`:
 
@@ -89,7 +119,7 @@ spring:
     password: cashbee_password
 ```
 
-### 3. Build & Run
+#### 3. Build & Run
 
 ```bash
 # Build tất cả modules
@@ -102,7 +132,7 @@ spring:
 java -jar cashbee-presentation/target/cashbee-presentation-1.0.0-SNAPSHOT.jar
 ```
 
-### 4. Verify
+#### 4. Verify (Manual Setup)
 
 - API: http://localhost:8080
 - Swagger UI: http://localhost:8080/swagger-ui.html

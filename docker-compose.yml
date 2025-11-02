@@ -36,7 +36,7 @@ services:
   cashbee-backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
     container_name: cashbee-backend
     restart: unless-stopped
     environment:
@@ -64,7 +64,7 @@ services:
       # JVM Options
       JAVA_OPTS: -Xms512m -Xmx1024m -XX:+UseG1GC
     ports:
-      - "8991:8080"
+      - "8911:8080"
     volumes:
       - ./logs:/app/logs
     networks:

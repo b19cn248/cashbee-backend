@@ -24,5 +24,6 @@
     <include file="db/changelog/012-create-import-batch-table.xml"/>
     <include file="db/changelog/013-add-affiliate-config-to-platform.xml"/>
     <include file="db/changelog/014-update-shopee-affiliate-id.xml"/>
+    <include file="db/changelog/015-update-shopee-link-format.xml"/>
 
 </databaseChangeLog>

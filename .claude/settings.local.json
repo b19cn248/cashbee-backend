@@ -11,7 +11,15 @@
       "Bash(./mvnw test:*)",
       "Bash(./mvnw jacoco:report:*)",
       "Bash(./mvnw clean:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(if [ -f docs/FIX_TRACKING_CODE_NULL_ERROR.md ])",
+      "Bash(then mv docs/FIX_TRACKING_CODE_NULL_ERROR.md docs/fixes/)",
+      "Bash(fi)",
+      "Bash(if [ -f docs/FIX_AFFILIATE_ID_ERROR.md ])",
+      "Bash(then mv docs/FIX_AFFILIATE_ID_ERROR.md docs/fixes/)",
+      "Bash(tree:*)",
+      "Bash(docker-compose config:*)",
+      "WebFetch(domain:help.shopee.vn)"
     ],
     "deny": [],
     "ask": []

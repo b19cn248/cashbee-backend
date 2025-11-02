@@ -3,6 +3,7 @@ package com.cashbee.application.usecase.affiliate;
 import com.cashbee.application.dto.affiliate.CreateTrackingLinkRequest;
 import com.cashbee.application.dto.affiliate.TrackingLinkResponse;
 import com.cashbee.application.util.affiliate.AffiliateLinkBuilder;
+import com.cashbee.application.util.affiliate.ShopeeAffiliateLinkBuilder;
 import com.cashbee.application.util.affiliate.ShopeeUrlParser;
 import com.cashbee.application.util.affiliate.TrackingCodeGenerator;
 import com.cashbee.common.exception.BusinessException;
@@ -43,6 +44,7 @@ public class CreateTrackingLinkUseCase {
     private final ShopeeUrlParser urlParser;
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final AffiliateLinkBuilder linkBuilder;
+    private final ShopeeAffiliateLinkBuilder shopeeAffiliateLinkBuilder;
 
     /**
      * Execute use case to create tracking link.
@@ -95,9 +97,13 @@ public class CreateTrackingLinkUseCase {
             throw new BusinessException("Platform affiliate ID is not configured. Please contact admin.");
         }
 
-        if (platform.getLinkTemplate() == null || platform.getLinkTemplate().isBlank()) {
-            log.error("UseCase: Platform link template is not configured: {}", platformCode);
-            throw new BusinessException("Platform link template is not configured. Please contact admin.");
+        // Note: For Shopee, link_template is not used (uses redirect service instead)
+        // For other platforms, link_template is still required
+        if (!"shopee".equalsIgnoreCase(platformCode)) {
+            if (platform.getLinkTemplate() == null || platform.getLinkTemplate().isBlank()) {
+                log.error("UseCase: Platform link template is not configured: {}", platformCode);
+                throw new BusinessException("Platform link template is not configured. Please contact admin.");
+            }
         }
 
         // Step 3: Generate temporary tracking code (before save to avoid NULL constraint)
@@ -107,13 +113,24 @@ public class CreateTrackingLinkUseCase {
         // Step 4: Build temporary tracking URL
         String tempTrackingUrl;
         try {
-            tempTrackingUrl = linkBuilder.build(
-                platform,
-                parsedUrl.getItemId(),
-                parsedUrl.getShopId(),
-                tempTrackingCode
-            );
-            log.info("UseCase: Built temporary tracking URL: {}", tempTrackingUrl);
+            // Use Shopee-specific builder for Shopee platform
+            if ("shopee".equalsIgnoreCase(platformCode)) {
+                tempTrackingUrl = shopeeAffiliateLinkBuilder.build(
+                    request.getShopeeUrl(),  // Use original URL, not parsed values
+                    platform.getAffiliateId(),
+                    tempTrackingCode
+                );
+                log.info("UseCase: Built Shopee temporary tracking URL: {}", tempTrackingUrl);
+            } else {
+                // Use generic builder for other platforms
+                tempTrackingUrl = linkBuilder.build(
+                    platform,
+                    parsedUrl.getItemId(),
+                    parsedUrl.getShopId(),
+                    tempTrackingCode
+                );
+                log.info("UseCase: Built temporary tracking URL: {}", tempTrackingUrl);
+            }
         } catch (IllegalArgumentException e) {
             log.error("UseCase: Failed to build tracking URL", e);
             throw new BusinessException("Failed to build tracking URL: " + e.getMessage());
@@ -146,13 +163,24 @@ public class CreateTrackingLinkUseCase {
         // Step 8: Build real affiliate tracking URL
         String trackingUrl;
         try {
-            trackingUrl = linkBuilder.build(
-                platform,
-                parsedUrl.getItemId(),
-                parsedUrl.getShopId(),
-                trackingCode
-            );
-            log.info("UseCase: Built real tracking URL: {}", trackingUrl);
+            // Use Shopee-specific builder for Shopee platform
+            if ("shopee".equalsIgnoreCase(platformCode)) {
+                trackingUrl = shopeeAffiliateLinkBuilder.build(
+                    request.getShopeeUrl(),  // Use original URL, not parsed values
+                    platform.getAffiliateId(),
+                    trackingCode
+                );
+                log.info("UseCase: Built Shopee real tracking URL: {}", trackingUrl);
+            } else {
+                // Use generic builder for other platforms
+                trackingUrl = linkBuilder.build(
+                    platform,
+                    parsedUrl.getItemId(),
+                    parsedUrl.getShopId(),
+                    trackingCode
+                );
+                log.info("UseCase: Built real tracking URL: {}", trackingUrl);
+            }
         } catch (IllegalArgumentException e) {
             log.error("UseCase: Failed to build tracking URL", e);
             throw new BusinessException("Failed to build tracking URL: " + e.getMessage());
