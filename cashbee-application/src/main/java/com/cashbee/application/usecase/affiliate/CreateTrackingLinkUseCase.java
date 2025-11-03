@@ -49,15 +49,21 @@ public class CreateTrackingLinkUseCase {
     /**
      * Execute use case to create tracking link.
      *
-     * @param request Request containing Shopee URL and user ID
+     * SECURITY UPDATE:
+     * - userId is now passed as a separate parameter (extracted from JWT by controller)
+     * - This ensures userId comes from authenticated source, not client request
+     * - Prevents users from creating tracking links for other users
+     *
+     * @param request Request containing Shopee URL (NO userId)
+     * @param userId User ID extracted from JWT token by controller
      * @return Response with generated tracking link
      * @throws NotFoundException if platform not found
      * @throws BusinessException if URL parsing fails or platform not configured
      */
     @Transactional
-    public TrackingLinkResponse execute(CreateTrackingLinkRequest request) {
-        log.info("UseCase: Creating tracking link for user {} with URL: {}",
-            request.getUserId(), request.getShopeeUrl());
+    public TrackingLinkResponse execute(CreateTrackingLinkRequest request, Long userId) {
+        log.info("UseCase: Creating tracking link for authenticated user {} with URL: {}",
+            userId, request.getShopeeUrl());
 
         // Step 1: Parse Shopee URL
         ShopeeUrlParser.ParsedShopeeUrl parsedUrl;
@@ -107,7 +113,7 @@ public class CreateTrackingLinkUseCase {
         }
 
         // Step 3: Generate temporary tracking code (before save to avoid NULL constraint)
-        String tempTrackingCode = trackingCodeGenerator.generateTemporary(request.getUserId());
+        String tempTrackingCode = trackingCodeGenerator.generateTemporary(userId);
         log.info("UseCase: Generated temporary tracking code: {}", tempTrackingCode);
 
         // Step 4: Build temporary tracking URL
@@ -139,7 +145,7 @@ public class CreateTrackingLinkUseCase {
         // Step 5: Create AffiliateClick with temporary tracking code
         LocalDateTime now = LocalDateTime.now();
         AffiliateClick click = AffiliateClick.builder()
-            .userId(request.getUserId())
+            .userId(userId)
             .platformId(platform.getId())
             .shopId(parsedUrl.getShopId())
             .itemId(parsedUrl.getItemId())
@@ -157,7 +163,7 @@ public class CreateTrackingLinkUseCase {
         log.info("UseCase: Created AffiliateClick with ID: {}", savedClick.getId());
 
         // Step 7: Generate real tracking code using click ID
-        String trackingCode = trackingCodeGenerator.generate(request.getUserId(), savedClick.getId());
+        String trackingCode = trackingCodeGenerator.generate(userId, savedClick.getId());
         log.info("UseCase: Generated real tracking code: {}", trackingCode);
 
         // Step 8: Build real affiliate tracking URL
@@ -192,7 +198,7 @@ public class CreateTrackingLinkUseCase {
         savedClick = clickRepository.save(savedClick);
 
         log.info("UseCase: Successfully created tracking link for user {}, click ID {}",
-            request.getUserId(), savedClick.getId());
+            userId, savedClick.getId());
 
         // Step 7: Build and return response
         return TrackingLinkResponse.builder()

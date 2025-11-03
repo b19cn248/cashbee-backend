@@ -87,14 +87,23 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**",
-                                "/api/v1/articles/rss-feed", "/api/v1/build/**",
+                        // Public endpoints - No authentication required
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/api/v1/articles/rss-feed",
+                                "/api/v1/build/**",
                                 "/api/v1/articles/check-article-exists",
-                                "/api/v1/n8n/**", "/api/v1/notifications",
+                                "/api/v1/n8n/**",
+                                "/api/v1/notifications",
                                 "/api/v1/gemini/generate",
-                                "/api/payouts/**", "/api/users/**", "/api/admin/platforms/**",
-                                "/api/**"
+                                // Affiliate tracking redirect endpoints - Public (no auth required)
+                                // These are the actual tracking links that users click
+                                "/api/affiliate/tracking/redirect/**"
                         ).permitAll()
+                        // Protected endpoints - Authentication required
+                        // All other /api/** endpoints now require valid JWT token
+                        .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .cors(Customizer.withDefaults())

@@ -4,6 +4,7 @@ import com.cashbee.application.dto.affiliate.CreateTrackingLinkRequest;
 import com.cashbee.application.dto.affiliate.TrackingLinkResponse;
 import com.cashbee.application.usecase.affiliate.CreateTrackingLinkUseCase;
 import com.cashbee.application.usecase.affiliate.HandleClickRedirectUseCase;
+import com.cashbee.application.util.SecurityUtils;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 
@@ -37,33 +40,48 @@ public class AffiliateTrackingController {
 
     private final CreateTrackingLinkUseCase createTrackingLinkUseCase;
     private final HandleClickRedirectUseCase handleClickRedirectUseCase;
+    private final SecurityUtils securityUtils;
 
     /**
      * Create affiliate tracking link.
      *
+     * SECURITY UPDATE:
+     * - This endpoint now REQUIRES authentication (JWT token)
+     * - User ID is extracted from JWT token, NOT from request body
+     * - This prevents users from creating tracking links for other users
+     *
      * User provides Shopee product URL, system generates affiliate tracking link.
      *
      * Flow:
-     * 1. User copies Shopee product URL
-     * 2. User pastes URL into CashBee app
-     * 3. System generates tracking link
-     * 4. User clicks tracking link → redirects to Shopee with tracking
+     * 1. User logs in → receives JWT token from Keycloak
+     * 2. User copies Shopee product URL
+     * 3. User pastes URL into CashBee app
+     * 4. Frontend sends request with JWT token in Authorization header
+     * 5. Backend extracts user ID from JWT token (secure, cannot be forged)
+     * 6. System generates tracking link for authenticated user
+     * 7. User clicks tracking link → redirects to Shopee with tracking
      *
-     * @param request Request containing Shopee URL and user ID
+     * @param request Request containing Shopee URL (NO userId - extracted from JWT)
+     * @param jwt JWT token injected by Spring Security (contains authenticated user info)
      * @return Generated tracking link
      */
     @PostMapping("/create-link")
     @Operation(
         summary = "Create affiliate tracking link",
-        description = "Convert Shopee product URL to affiliate tracking link that earns cashback"
+        description = "Convert Shopee product URL to affiliate tracking link that earns cashback. Requires authentication."
     )
     public ResponseEntity<ApiResponse<TrackingLinkResponse>> createTrackingLink(
-        @Valid @RequestBody CreateTrackingLinkRequest request) {
+        @Valid @RequestBody CreateTrackingLinkRequest request,
+        @AuthenticationPrincipal Jwt jwt) {
 
-        log.info("API: Creating tracking link for user {} with URL: {}",
-            request.getUserId(), request.getShopeeUrl());
+        // Extract user ID from JWT token (secure - cannot be forged by client)
+        Long userId = securityUtils.getCurrentUserId(jwt);
 
-        TrackingLinkResponse response = createTrackingLinkUseCase.execute(request);
+        log.info("API: Creating tracking link for authenticated user {} with URL: {}",
+            userId, request.getShopeeUrl());
+
+        // Pass userId from token to use case
+        TrackingLinkResponse response = createTrackingLinkUseCase.execute(request, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
             ApiResponse.success(response, "Tracking link created successfully")

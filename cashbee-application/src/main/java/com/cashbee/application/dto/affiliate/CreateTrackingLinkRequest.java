@@ -9,7 +9,13 @@ import lombok.NoArgsConstructor;
 
 /**
  * Request DTO for creating an affiliate tracking link.
+ *
  * User provides the original Shopee product URL, and system generates affiliate tracking URL.
+ *
+ * SECURITY NOTE:
+ * - User ID is NO LONGER sent in request body (removed for security)
+ * - User ID is extracted from JWT token by the controller
+ * - This prevents users from creating tracking links for other users
  *
  * @author CashBee Team
  */
@@ -34,9 +40,27 @@ public class CreateTrackingLinkRequest {
     private String platformCode;
 
     /**
-     * User ID who is creating the tracking link.
-     * This will be encoded into the tracking code.
+     * ⚠️ REMOVED FIELD - DO NOT ADD BACK
+     *
+     * userId field has been removed for security reasons:
+     * - Previously: Client sent userId in request body (insecure - could be forged)
+     * - Now: Controller extracts userId from JWT token (secure - cannot be forged)
+     *
+     * Migration guide:
+     * - Frontend should NOT send userId in request body
+     * - Frontend MUST send valid JWT token in Authorization header
+     * - Backend will automatically extract userId from token
+     *
+     * Old request:
+     * {
+     *   "shopeeUrl": "...",
+     *   "userId": 123  ← REMOVED
+     * }
+     *
+     * New request:
+     * Headers: { "Authorization": "Bearer <JWT_TOKEN>" }
+     * Body: {
+     *   "shopeeUrl": "..."
+     * }
      */
-    @NotNull(message = "User ID is required")
-    private Long userId;
 }
