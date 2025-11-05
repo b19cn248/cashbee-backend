@@ -42,19 +42,24 @@ public class UserWalletJpaEntity {
     private Long userId;
 
     @Column(name = "balance", nullable = false, precision = 12, scale = 2)
-    private BigDecimal balance;
+    @Builder.Default
+    private BigDecimal balance = BigDecimal.ZERO;
 
     @Column(name = "pending_balance", nullable = false, precision = 12, scale = 2)
-    private BigDecimal pendingBalance;
+    @Builder.Default
+    private BigDecimal pendingBalance = BigDecimal.ZERO;
 
     @Column(name = "locked_balance", nullable = false, precision = 12, scale = 2)
-    private BigDecimal lockedBalance;
+    @Builder.Default
+    private BigDecimal lockedBalance = BigDecimal.ZERO;
 
     @Column(name = "total_earned", nullable = false, precision = 12, scale = 2)
-    private BigDecimal totalEarned;
+    @Builder.Default
+    private BigDecimal totalEarned = BigDecimal.ZERO;
 
     @Column(name = "total_withdrawn", nullable = false, precision = 12, scale = 2)
-    private BigDecimal totalWithdrawn;
+    @Builder.Default
+    private BigDecimal totalWithdrawn = BigDecimal.ZERO;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -66,8 +71,28 @@ public class UserWalletJpaEntity {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        ensureBalancesNotNull();
+    }
 
-        // Initialize balances to zero if null
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+        ensureBalancesNotNull();
+    }
+
+    @PostLoad
+    protected void onLoad() {
+        // Critical: Fix NULL values after loading from database
+        // This handles legacy data where database may have NULL values
+        ensureBalancesNotNull();
+    }
+
+    /**
+     * Ensure all balance fields are not null.
+     * Database may have NULL values if constraints were added later.
+     * This method protects against NullPointerException in calculations.
+     */
+    private void ensureBalancesNotNull() {
         if (this.balance == null) {
             this.balance = BigDecimal.ZERO;
         }
@@ -83,10 +108,5 @@ public class UserWalletJpaEntity {
         if (this.totalWithdrawn == null) {
             this.totalWithdrawn = BigDecimal.ZERO;
         }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

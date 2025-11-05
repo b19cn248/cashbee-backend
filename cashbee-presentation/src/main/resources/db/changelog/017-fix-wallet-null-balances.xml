@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+    Fix NULL values in user_wallet table.
+    This handles legacy data where balance columns may have NULL values.
+    -->
+    <changeSet id="017-fix-wallet-null-balances" author="cashbee-team">
+        <comment>Fix NULL values in user_wallet balance columns</comment>
+
+        <!-- Update NULL balance to 0.00 -->
+        <update tableName="user_wallet">
+            <column name="balance" value="0.00"/>
+            <where>balance IS NULL</where>
+        </update>
+
+        <!-- Update NULL pending_balance to 0.00 -->
+        <update tableName="user_wallet">
+            <column name="pending_balance" value="0.00"/>
+            <where>pending_balance IS NULL</where>
+        </update>
+
+        <!-- Update NULL locked_balance to 0.00 -->
+        <update tableName="user_wallet">
+            <column name="locked_balance" value="0.00"/>
+            <where>locked_balance IS NULL</where>
+        </update>
+
+        <!-- Update NULL total_earned to 0.00 -->
+        <update tableName="user_wallet">
+            <column name="total_earned" value="0.00"/>
+            <where>total_earned IS NULL</where>
+        </update>
+
+        <!-- Update NULL total_withdrawn to 0.00 -->
+        <update tableName="user_wallet">
+            <column name="total_withdrawn" value="0.00"/>
+            <where>total_withdrawn IS NULL</where>
+        </update>
+
+        <rollback>
+            <!-- Rollback not needed - fixing data integrity -->
+            <comment>No rollback - this fixes data integrity issues</comment>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

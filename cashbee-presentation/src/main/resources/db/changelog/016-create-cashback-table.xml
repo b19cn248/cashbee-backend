@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="016" author="cashbee">
+        <comment>Create cashback table for tracking cashback earned by users from affiliate orders</comment>
+
+        <createTable tableName="cashback">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_cashback_user"
+                             references="user(id)"/>
+            </column>
+
+            <column name="order_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_cashback_order"
+                             references="affiliate_order(id)"/>
+            </column>
+
+            <column name="platform_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_cashback_platform"
+                             references="affiliate_platform(id)"/>
+            </column>
+
+            <column name="commission_amount" type="DECIMAL(12,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="cashback_amount" type="DECIMAL(12,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="cashback_rate" type="DECIMAL(5,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="policy_id" type="BIGINT">
+                <constraints nullable="true"
+                             foreignKeyName="fk_cashback_policy"
+                             references="cashback_policy(id)"
+                             deleteCascade="false"/>
+            </column>
+
+            <column name="status" type="VARCHAR(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="note" type="TEXT"/>
+
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="confirmed_at" type="DATETIME"/>
+
+            <column name="paid_at" type="DATETIME"/>
+
+            <column name="cancelled_at" type="DATETIME"/>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for performance -->
+        <createIndex tableName="cashback" indexName="idx_cashback_user">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex tableName="cashback" indexName="idx_cashback_order">
+            <column name="order_id"/>
+        </createIndex>
+
+        <createIndex tableName="cashback" indexName="idx_cashback_status">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex tableName="cashback" indexName="idx_cashback_user_status">
+            <column name="user_id"/>
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex tableName="cashback" indexName="idx_cashback_created_at">
+            <column name="created_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="cashback"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

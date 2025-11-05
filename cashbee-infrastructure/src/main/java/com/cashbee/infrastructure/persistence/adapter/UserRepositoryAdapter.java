@@ -105,6 +105,13 @@ public class UserRepositoryAdapter implements UserRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public boolean existsById(Long id) {
+        log.debug("Checking if user exists by id: {}", id);
+        return jpaRepository.existsById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean existsByKeycloakId(String keycloakId) {
         log.debug("Checking if user exists by keycloakId: {}", keycloakId);
         return jpaRepository.existsByKeycloakId(keycloakId);

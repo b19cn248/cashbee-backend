@@ -2,8 +2,6 @@ package com.cashbee.application.usecase.affiliate;
 
 import com.cashbee.application.dto.affiliate.ImportOrdersRequest;
 import com.cashbee.application.dto.affiliate.ImportOrdersResponse;
-import com.cashbee.application.usecase.cashback.AddCashbackToWalletUseCase;
-import com.cashbee.application.usecase.cashback.CalculateCashbackUseCase;
 import com.cashbee.application.util.affiliate.ShopeeCSVParser;
 import com.cashbee.application.util.affiliate.TrackingCodeGenerator;
 import com.cashbee.common.exception.BusinessException;
@@ -13,7 +11,6 @@ import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.AffiliateClick;
 import com.cashbee.domain.model.AffiliateOrder;
 import com.cashbee.domain.model.AffiliatePlatform;
-import com.cashbee.domain.model.Cashback;
 import com.cashbee.domain.model.ImportBatch;
 import com.cashbee.domain.repository.AffiliateClickRepository;
 import com.cashbee.domain.repository.AffiliateOrderRepository;
@@ -58,8 +55,6 @@ public class ImportShopeeOrdersUseCase {
     private final AffiliatePlatformRepository platformRepository;
     private final ShopeeCSVParser csvParser;
     private final TrackingCodeGenerator trackingCodeGenerator;
-    private final CalculateCashbackUseCase calculateCashbackUseCase;
-    private final AddCashbackToWalletUseCase addCashbackToWalletUseCase;
 
     /**
      * Execute use case to import orders from CSV.
@@ -192,7 +187,7 @@ public class ImportShopeeOrdersUseCase {
                     .clickId(record.getTrackingCode())
                     .productName(record.getItemName())
                     .productPrice(record.getPrice())
-                    .commissionAmount(record.getCommissionForCashback())
+                    .commissionAmount(record.getTotalCommission())
                     .currency("VND")
                     .orderTime(record.getOrderTime())
                     .orderStatus(record.isCompleted() ? OrderStatus.APPROVED : OrderStatus.PENDING)
@@ -208,49 +203,6 @@ public class ImportShopeeOrdersUseCase {
                 // Save order
                 order = orderRepository.save(order);
                 log.debug("Created order {} for user {}", order.getId(), userId);
-
-                // Calculate and add cashback
-                try {
-                    // Skip if commission is zero or null
-                    if (record.getCommissionForCashback() != null &&
-                        record.getCommissionForCashback().compareTo(java.math.BigDecimal.ZERO) > 0) {
-
-                        // Determine if order is completed
-                        boolean isOrderCompleted = record.isCompleted();
-
-                        // Calculate cashback
-                        Cashback cashback = calculateCashbackUseCase.execute(
-                            userId,
-                            order.getId(),
-                            platform.getId(),
-                            record.getCommissionForCashback(),
-                            isOrderCompleted
-                        );
-
-                        log.info("Created cashback {} with amount {} VND (status: {})",
-                            cashback.getId(), cashback.getCashbackAmount(), cashback.getStatus());
-
-                        // Add cashback to wallet based on order status
-                        if (cashback.isConfirmed()) {
-                            // Order completed → Add to balance directly
-                            addCashbackToWalletUseCase.addConfirmedCashback(cashback.getId());
-                            log.info("Added confirmed cashback to balance for user {}", userId);
-                        } else if (cashback.isPending()) {
-                            // Order pending → Add to pending_balance
-                            addCashbackToWalletUseCase.addPendingCashback(cashback.getId());
-                            log.info("Added pending cashback to pending balance for user {}", userId);
-                        }
-
-                    } else {
-                        log.debug("Order {} has no commission, skipping cashback creation", order.getId());
-                    }
-
-                } catch (Exception e) {
-                    // Don't fail entire import if cashback fails
-                    log.error("Failed to create cashback for order {}: {}",
-                        order.getId(), e.getMessage(), e);
-                    // Continue with next record
-                }
 
                 // Match with click if found
                 if (click != null && request.getAutoMatch()) {

@@ -63,6 +63,13 @@
             <artifactId>mapstruct</artifactId>
         </dependency>
 
+        <!-- Apache Commons CSV for parsing CSV files -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.10.0</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -5,6 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
@@ -21,17 +24,11 @@ import java.util.List;
  *
  * CSV format from Shopee:
  * - UTF-8 with BOM
- * - Comma-separated
+ * - Comma-separated with quoted fields
  * - Vietnamese column names
  * - Date format: yyyy-MM-dd HH:mm:ss
  *
- * Key columns:
- * - ID đơn hàng (Order ID)
- * - Trạng thái đặt hàng (Order Status)
- * - Shop id
- * - Item id
- * - Sub_id1, Sub_id2, Sub_id3 (tracking parameters)
- * - Tổng hoa hồng sản phẩm(₫) (Commission amount)
+ * This parser uses column names (not indices) for robustness against CSV format changes.
  *
  * @author CashBee Team
  */
@@ -39,21 +36,45 @@ import java.util.List;
 @Slf4j
 public class ShopeeCSVParser {
 
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm");
 
-    // CSV column indices (0-based)
-    private static final int COL_ORDER_ID = 0;
-    private static final int COL_ORDER_STATUS = 1;
-    private static final int COL_ORDER_TIME = 3;
-    private static final int COL_SHOP_ID = 7;
-    private static final int COL_ITEM_ID = 9;
-    private static final int COL_ITEM_NAME = 10;
-    private static final int COL_PRICE = 17;
-    private static final int COL_QUANTITY = 18;
-    private static final int COL_TOTAL_COMMISSION = 27;
-    private static final int COL_SUB_ID1 = 40;
-    private static final int COL_SUB_ID2 = 41;
-    private static final int COL_SUB_ID3 = 42;
+    // CSV column names from Shopee (Vietnamese)
+    // Using column names instead of indices for robustness
+    private static final String COL_ORDER_ID = "ID đơn hàng";
+    private static final String COL_ORDER_STATUS = "Trạng thái đặt hàng";
+    private static final String COL_CHECKOUT_ID = "Checkout id";
+    private static final String COL_ORDER_TIME = "Thời Gian Đặt Hàng";
+    private static final String COL_COMPLETE_TIME = "Thời gian hoàn thành";
+    private static final String COL_CLICK_TIME = "Thời gian Click";
+    private static final String COL_SHOP_NAME = "Tên Shop";
+    private static final String COL_SHOP_ID = "Shop id";
+    private static final String COL_SHOP_TYPE = "Loại Shop";
+    private static final String COL_ITEM_ID = "Item id";
+    private static final String COL_ITEM_NAME = "Tên Item";
+    private static final String COL_MODEL_ID = "ID Model";
+    private static final String COL_PRODUCT_TYPE = "Loại sản phẩm";
+    private static final String COL_CATEGORY_LV1 = "L1 Danh mục toàn cầu";
+    private static final String COL_CATEGORY_LV2 = "L2 Danh mục toàn cầu";
+    private static final String COL_CATEGORY_LV3 = "L3 Danh mục toàn cầu";
+    private static final String COL_PRICE = "Giá(₫)";
+    private static final String COL_QUANTITY = "Số lượng";
+    private static final String COL_COMMISSION_TYPE = "Loại Hoa hồng";
+    private static final String COL_ORDER_VALUE = "Giá trị đơn hàng (₫)";
+    private static final String COL_REFUND_AMOUNT = "Số tiền hoàn trả (₫)";
+    private static final String COL_SHOPEE_COMMISSION_RATE = "Tỷ lệ sản phẩm hoa hồng Shope";
+    private static final String COL_SHOPEE_PRODUCT_COMMISSION = "Hoa hồng Shopee trên sản phẩm(₫)";
+    private static final String COL_SELLER_COMMISSION_RATE = "Tỷ lệ sản phẩm hoa hồng người bán";
+    private static final String COL_XTRA_PRODUCT_COMMISSION = "Hoa hồng Xtra trên sản phẩm(₫)";
+    private static final String COL_TOTAL_PRODUCT_COMMISSION = "Tổng hoa hồng sản phẩm(₫)";
+    private static final String COL_SHOPEE_ORDER_COMMISSION = "Hoa hồng đơn hàng từ Shopee(₫)";
+    private static final String COL_SELLER_ORDER_COMMISSION = "Hoa hồng đơn hàng từ Người bán(₫)";
+    private static final String COL_TOTAL_ORDER_COMMISSION = "Tổng hoa hồng đơn hàng(₫)";
+    private static final String COL_NET_AFFILIATE_COMMISSION = "Hoa hồng ròng tiếp thị liên kết(₫)";
+    private static final String COL_PRODUCT_STATUS = "Trạng thái sản phẩm liên kết";
+    private static final String COL_PRODUCT_NOTE = "Ghi chú sản phẩm";
+    private static final String COL_SUB_ID1 = "Sub_id1";
+    private static final String COL_SUB_ID2 = "Sub_id2";
+    private static final String COL_SUB_ID3 = "Sub_id3";
 
     /**
      * Parse Shopee CSV file and extract order data.
@@ -65,44 +86,47 @@ public class ShopeeCSVParser {
     public List<ShopeeOrderRecord> parse(InputStream inputStream) throws IOException {
         List<ShopeeOrderRecord> records = new ArrayList<>();
 
-        try (BufferedReader reader = new BufferedReader(
+        // Use Apache Commons CSV to handle quoted fields properly
+        // Wrap InputStreamReader in BufferedReader to support mark()
+        try (BufferedReader bufferedReader = new BufferedReader(
             new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
 
             // Skip BOM if present
-            reader.mark(1);
-            int firstChar = reader.read();
+            bufferedReader.mark(1);
+            int firstChar = bufferedReader.read();
             if (firstChar != 0xFEFF) {
-                reader.reset();  // No BOM, go back
+                bufferedReader.reset();  // No BOM, go back
             }
 
-            // Read and skip header line
-            String headerLine = reader.readLine();
-            if (headerLine == null) {
-                throw new IOException("CSV file is empty");
-            }
+            // Configure CSV format
+            CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
+                .setHeader()  // First line is header
+                .setSkipHeaderRecord(true)  // Skip header when parsing
+                .setIgnoreEmptyLines(true)
+                .setTrim(true)
+                .build();
 
-            log.info("CSV header: {}", headerLine);
+            CSVParser csvParser = csvFormat.parse(bufferedReader);
 
-            // Read data lines
-            String line;
+            log.info("CSV headers: {}", csvParser.getHeaderNames());
+
+            // Validate that required columns exist
+            validateHeaders(csvParser);
+
             int rowNumber = 1;  // Row 1 is first data row (after header)
 
-            while ((line = reader.readLine()) != null) {
+            for (CSVRecord csvRecord : csvParser) {
                 rowNumber++;
 
-                if (line.trim().isEmpty()) {
-                    continue;  // Skip empty lines
-                }
-
                 try {
-                    ShopeeOrderRecord record = parseLine(line, rowNumber);
+                    ShopeeOrderRecord record = parseLine(csvRecord, rowNumber);
                     records.add(record);
                 } catch (Exception e) {
-                    log.error("Failed to parse CSV row {}: {}", rowNumber, e.getMessage());
+                    log.error("Failed to parse CSV row {}: {}", rowNumber, e.getMessage(), e);
                     // Create error record
                     ShopeeOrderRecord errorRecord = ShopeeOrderRecord.builder()
                         .rowNumber(rowNumber)
-                        .rawData(line)
+                        .rawData(csvRecord.toString())
                         .parseError(e.getMessage())
                         .build();
                     records.add(errorRecord);
@@ -115,43 +139,103 @@ public class ShopeeCSVParser {
     }
 
     /**
-     * Parse a single CSV line.
+     * Validate that required CSV columns exist.
      *
-     * @param line CSV line
+     * @param csvParser CSV parser with headers loaded
+     */
+    private void validateHeaders(CSVParser csvParser) {
+        List<String> headers = csvParser.getHeaderNames();
+        List<String> requiredColumns = List.of(
+            COL_ORDER_ID,
+            COL_ORDER_STATUS,
+            COL_SUB_ID1,
+            COL_TOTAL_ORDER_COMMISSION,
+            COL_TOTAL_PRODUCT_COMMISSION
+        );
+
+        for (String column : requiredColumns) {
+            if (!headers.contains(column)) {
+                log.warn("Required column '{}' not found in CSV. Available columns: {}",
+                    column, headers);
+            }
+        }
+
+        log.debug("CSV has {} columns. Required columns validated.", headers.size());
+    }
+
+    /**
+     * Parse a single CSV record using column names.
+     *
+     * @param csvRecord CSV record from Apache Commons CSV
      * @param rowNumber Row number (for error reporting)
      * @return Parsed order record
      */
-    private ShopeeOrderRecord parseLine(String line, int rowNumber) {
-        // Simple CSV parsing (split by comma)
-        // Note: This doesn't handle quoted fields with commas inside
-        // For production, use Apache Commons CSV or OpenCSV
-        String[] columns = line.split(",", -1);  // -1 to keep trailing empty strings
-
+    private ShopeeOrderRecord parseLine(CSVRecord csvRecord, int rowNumber) {
         return ShopeeOrderRecord.builder()
             .rowNumber(rowNumber)
-            .rawData(line)
-            .orderId(getColumn(columns, COL_ORDER_ID))
-            .orderStatus(getColumn(columns, COL_ORDER_STATUS))
-            .orderTime(parseDateTime(getColumn(columns, COL_ORDER_TIME)))
-            .shopId(getColumn(columns, COL_SHOP_ID))
-            .itemId(getColumn(columns, COL_ITEM_ID))
-            .itemName(getColumn(columns, COL_ITEM_NAME))
-            .price(parseBigDecimal(getColumn(columns, COL_PRICE)))
-            .quantity(parseInteger(getColumn(columns, COL_QUANTITY)))
-            .totalCommission(parseBigDecimal(getColumn(columns, COL_TOTAL_COMMISSION)))
-            .subId1(getColumn(columns, COL_SUB_ID1))
-            .subId2(getColumn(columns, COL_SUB_ID2))
-            .subId3(getColumn(columns, COL_SUB_ID3))
+            .rawData(csvRecord.toString())
+            .orderId(getColumnByName(csvRecord, COL_ORDER_ID))
+            .orderStatus(getColumnByName(csvRecord, COL_ORDER_STATUS))
+            .checkoutId(getColumnByName(csvRecord, COL_CHECKOUT_ID))
+            .orderTime(parseDateTime(getColumnByName(csvRecord, COL_ORDER_TIME)))
+            .completeTime(parseDateTime(getColumnByName(csvRecord, COL_COMPLETE_TIME)))
+            .clickTime(parseDateTime(getColumnByName(csvRecord, COL_CLICK_TIME)))
+            .shopName(getColumnByName(csvRecord, COL_SHOP_NAME))
+            .shopId(getColumnByName(csvRecord, COL_SHOP_ID))
+            .shopType(getColumnByName(csvRecord, COL_SHOP_TYPE))
+            .itemId(getColumnByName(csvRecord, COL_ITEM_ID))
+            .itemName(getColumnByName(csvRecord, COL_ITEM_NAME))
+            .modelId(getColumnByName(csvRecord, COL_MODEL_ID))
+            .productType(getColumnByName(csvRecord, COL_PRODUCT_TYPE))
+            .categoryLv1(getColumnByName(csvRecord, COL_CATEGORY_LV1))
+            .categoryLv2(getColumnByName(csvRecord, COL_CATEGORY_LV2))
+            .categoryLv3(getColumnByName(csvRecord, COL_CATEGORY_LV3))
+            .price(parseBigDecimal(getColumnByName(csvRecord, COL_PRICE)))
+            .quantity(parseInteger(getColumnByName(csvRecord, COL_QUANTITY)))
+            .commissionType(getColumnByName(csvRecord, COL_COMMISSION_TYPE))
+            .orderValue(parseBigDecimal(getColumnByName(csvRecord, COL_ORDER_VALUE)))
+            .refundAmount(parseBigDecimal(getColumnByName(csvRecord, COL_REFUND_AMOUNT)))
+            .shopeeCommissionRate(parseBigDecimal(getColumnByName(csvRecord, COL_SHOPEE_COMMISSION_RATE)))
+            .shopeeProductCommission(parseBigDecimal(getColumnByName(csvRecord, COL_SHOPEE_PRODUCT_COMMISSION)))
+            .sellerCommissionRate(parseBigDecimal(getColumnByName(csvRecord, COL_SELLER_COMMISSION_RATE)))
+            .xtraProductCommission(parseBigDecimal(getColumnByName(csvRecord, COL_XTRA_PRODUCT_COMMISSION)))
+            .totalProductCommission(parseBigDecimal(getColumnByName(csvRecord, COL_TOTAL_PRODUCT_COMMISSION)))
+            .shopeeOrderCommission(parseBigDecimal(getColumnByName(csvRecord, COL_SHOPEE_ORDER_COMMISSION)))
+            .sellerOrderCommission(parseBigDecimal(getColumnByName(csvRecord, COL_SELLER_ORDER_COMMISSION)))
+            .totalOrderCommission(parseBigDecimal(getColumnByName(csvRecord, COL_TOTAL_ORDER_COMMISSION)))
+            .netAffiliateCommission(parseBigDecimal(getColumnByName(csvRecord, COL_NET_AFFILIATE_COMMISSION)))
+            .productStatus(getColumnByName(csvRecord, COL_PRODUCT_STATUS))
+            .productNote(getColumnByName(csvRecord, COL_PRODUCT_NOTE))
+            .subId1(getColumnByName(csvRecord, COL_SUB_ID1))
+            .subId2(getColumnByName(csvRecord, COL_SUB_ID2))
+            .subId3(getColumnByName(csvRecord, COL_SUB_ID3))
             .build();
     }
 
     /**
-     * Get column value safely.
+     * Get column value by name from CSVRecord.
+     * This method is robust against column order changes.
+     *
+     * @param csvRecord CSV record
+     * @param columnName Column name to retrieve
+     * @return Column value, or null if not found or empty
      */
-    private String getColumn(String[] columns, int index) {
-        if (index >= 0 && index < columns.length) {
-            String value = columns[index].trim();
-            return value.isEmpty() ? null : value;
+    private String getColumnByName(CSVRecord csvRecord, String columnName) {
+        try {
+            // Check if column exists in the record
+            if (csvRecord.isMapped(columnName)) {
+                String value = csvRecord.get(columnName);
+                if (value != null) {
+                    value = value.trim();
+                    return value.isEmpty() ? null : value;
+                }
+            } else {
+                log.debug("Column '{}' not mapped in CSV record {}", columnName, csvRecord.getRecordNumber());
+            }
+        } catch (IllegalArgumentException e) {
+            log.debug("Column '{}' not found in CSV: {}", columnName, e.getMessage());
+        } catch (Exception e) {
+            log.debug("Failed to get column '{}' from record: {}", columnName, e.getMessage());
         }
         return null;
     }
@@ -167,7 +251,7 @@ public class ShopeeCSVParser {
         try {
             return LocalDateTime.parse(value, DATE_TIME_FORMATTER);
         } catch (DateTimeParseException e) {
-            log.warn("Failed to parse datetime: {}", value);
+            log.debug("Failed to parse datetime: {}", value);
             return null;
         }
     }
@@ -181,9 +265,10 @@ public class ShopeeCSVParser {
         }
 
         try {
-            // Remove currency symbols and commas
+            // Remove currency symbols, commas, and percentage signs
             String cleaned = value.replace("₫", "")
                 .replace(",", "")
+                .replace("%", "")
                 .replace(" ", "")
                 .trim();
 
@@ -193,7 +278,7 @@ public class ShopeeCSVParser {
 
             return new BigDecimal(cleaned);
         } catch (NumberFormatException e) {
-            log.warn("Failed to parse BigDecimal: {}", value);
+            log.debug("Failed to parse BigDecimal: {}", value);
             return null;
         }
     }
@@ -210,7 +295,7 @@ public class ShopeeCSVParser {
             String cleaned = value.replace(",", "").trim();
             return Integer.parseInt(cleaned);
         } catch (NumberFormatException e) {
-            log.warn("Failed to parse Integer: {}", value);
+            log.debug("Failed to parse Integer: {}", value);
             return null;
         }
     }
@@ -249,14 +334,39 @@ public class ShopeeCSVParser {
         private String orderStatus;
 
         /**
+         * Checkout ID (groups multiple items in same checkout).
+         */
+        private String checkoutId;
+
+        /**
          * Order timestamp.
          */
         private LocalDateTime orderTime;
 
         /**
+         * Complete time (when order was completed).
+         */
+        private LocalDateTime completeTime;
+
+        /**
+         * Click time (when user clicked affiliate link).
+         */
+        private LocalDateTime clickTime;
+
+        /**
+         * Shop name.
+         */
+        private String shopName;
+
+        /**
          * Shop ID.
          */
         private String shopId;
+
+        /**
+         * Shop type (e.g., "Preferred(Non-CB)", "Shopee Mall(Non-CB)").
+         */
+        private String shopType;
 
         /**
          * Item ID (Product ID).
@@ -269,6 +379,31 @@ public class ShopeeCSVParser {
         private String itemName;
 
         /**
+         * Model ID (Product variant ID).
+         */
+        private String modelId;
+
+        /**
+         * Product type (e.g., "Normal Product").
+         */
+        private String productType;
+
+        /**
+         * Category level 1.
+         */
+        private String categoryLv1;
+
+        /**
+         * Category level 2.
+         */
+        private String categoryLv2;
+
+        /**
+         * Category level 3.
+         */
+        private String categoryLv3;
+
+        /**
          * Product price.
          */
         private BigDecimal price;
@@ -279,9 +414,74 @@ public class ShopeeCSVParser {
         private Integer quantity;
 
         /**
-         * Total commission amount for this order.
+         * Commission type (e.g., "Shopee Comm", "XTRA Comm").
          */
-        private BigDecimal totalCommission;
+        private String commissionType;
+
+        /**
+         * Order value (actual order amount after discount).
+         */
+        private BigDecimal orderValue;
+
+        /**
+         * Refund amount (if any).
+         */
+        private BigDecimal refundAmount;
+
+        /**
+         * Shopee commission rate (%).
+         */
+        private BigDecimal shopeeCommissionRate;
+
+        /**
+         * Shopee commission on product (VND).
+         */
+        private BigDecimal shopeeProductCommission;
+
+        /**
+         * Seller commission rate (%).
+         */
+        private BigDecimal sellerCommissionRate;
+
+        /**
+         * Xtra commission on product (VND).
+         */
+        private BigDecimal xtraProductCommission;
+
+        /**
+         * Total product commission (VND).
+         */
+        private BigDecimal totalProductCommission;
+
+        /**
+         * Shopee order commission (VND).
+         */
+        private BigDecimal shopeeOrderCommission;
+
+        /**
+         * Seller order commission (VND).
+         */
+        private BigDecimal sellerOrderCommission;
+
+        /**
+         * Total order commission (VND) - IMPORTANT for cashback calculation.
+         */
+        private BigDecimal totalOrderCommission;
+
+        /**
+         * Net affiliate commission after fees (VND).
+         */
+        private BigDecimal netAffiliateCommission;
+
+        /**
+         * Product status (e.g., "Đang chờ xử lý", "Hoàn thành").
+         */
+        private String productStatus;
+
+        /**
+         * Product note (reason for status).
+         */
+        private String productNote;
 
         /**
          * Custom parameter 1 (contains tracking code).
@@ -335,6 +535,20 @@ public class ShopeeCSVParser {
             // "Đã hủy" means cancelled in Vietnamese
             return orderStatus != null &&
                 (orderStatus.contains("Đã hủy") || orderStatus.equalsIgnoreCase("Cancelled"));
+        }
+
+        /**
+         * Get the commission amount to use for cashback calculation.
+         * Priority: totalOrderCommission > totalProductCommission > 0
+         */
+        public BigDecimal getCommissionForCashback() {
+            if (totalOrderCommission != null && totalOrderCommission.compareTo(BigDecimal.ZERO) > 0) {
+                return totalOrderCommission;
+            }
+            if (totalProductCommission != null && totalProductCommission.compareTo(BigDecimal.ZERO) > 0) {
+                return totalProductCommission;
+            }
+            return BigDecimal.ZERO;
         }
     }
 }

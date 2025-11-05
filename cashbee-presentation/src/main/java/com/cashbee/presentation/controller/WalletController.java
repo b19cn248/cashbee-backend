@@ -12,6 +12,7 @@ import com.cashbee.application.usecase.wallet.DeductBalanceUseCase;
 import com.cashbee.application.usecase.wallet.GetUserWalletUseCase;
 import com.cashbee.application.usecase.wallet.LockBalanceUseCase;
 import com.cashbee.application.usecase.wallet.UnlockBalanceUseCase;
+import com.cashbee.application.util.SecurityUtils;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,13 +21,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * REST Controller for Wallet operations.
  *
  * Endpoints:
- * - GET /api/wallets/user/{userId} - Get wallet by user ID
+ * - GET /api/wallets/me - Get current user's wallet (recommended for frontend)
+ * - GET /api/wallets/user/{userId} - Get wallet by user ID (for admin)
  * - POST /api/wallets/pending - Add pending balance
  * - POST /api/wallets/confirm - Confirm pending balance
  * - POST /api/wallets/lock - Lock balance for payout
@@ -48,16 +52,58 @@ public class WalletController {
     private final LockBalanceUseCase lockBalanceUseCase;
     private final UnlockBalanceUseCase unlockBalanceUseCase;
     private final DeductBalanceUseCase deductBalanceUseCase;
+    private final SecurityUtils securityUtils;
+
+    /**
+     * Get current authenticated user's wallet.
+     * <p>
+     * This endpoint automatically extracts userId from JWT token,
+     * so frontend doesn't need to manage userId.
+     *
+     * Usage (Frontend):
+     * <pre>
+     * // ✅ Simple - no need to store userId
+     * const response = await fetch('/api/wallets/me', {
+     *   headers: { 'Authorization': `Bearer ${token}` }
+     * });
+     * const wallet = response.data;
+     * </pre>
+     *
+     * @param jwt JWT token (auto-injected by Spring Security)
+     * @return Current user's wallet
+     */
+    @GetMapping("/me")
+    @Operation(summary = "Get current user's wallet",
+               description = "Get wallet for the currently authenticated user from JWT token")
+    public ResponseEntity<ApiResponse<WalletResponse>> getCurrentUserWallet(
+        @AuthenticationPrincipal Jwt jwt) {
+
+        log.info("API: Getting wallet for current user from JWT");
+
+        // Extract userId from JWT token (secure - cannot be forged)
+        Long userId = securityUtils.getCurrentUserId(jwt);
+
+        log.info("API: Current user wallet: userId={}", userId);
+
+        WalletResponse wallet = getUserWalletUseCase.execute(userId);
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(ApiResponse.success(wallet));
+    }
 
     /**
      * Get wallet by user ID.
+     * <p>
+     * This endpoint is primarily for admin use or when you need to query
+     * another user's wallet. For getting your own wallet, use GET /api/wallets/me instead.
      *
      * @param userId User ID
      * @return Wallet response
      */
     @GetMapping("/user/{userId}")
     @Operation(summary = "Get wallet by user ID",
-               description = "Retrieve wallet information for a specific user")
+               description = "Retrieve wallet information for a specific user (admin use)")
     public ResponseEntity<ApiResponse<WalletResponse>> getWalletByUserId(
         @PathVariable Long userId) {
 

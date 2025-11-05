@@ -3,7 +3,7 @@
   "realm": "cashbee",
   "resource": "cashbee-backend",
   "credentials": {
-    "secret": "x7owaG4Wcilsdu6dbsVzfuk6D9Bevkrq"
+    "secret": "OuRhlczFR6yz6gNKSBapX028DKbjKl4y"
   },
   "enforcement-mode": "PERMISSIVE",
   "http-method-as-scope": "true",

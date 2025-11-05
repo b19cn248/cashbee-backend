@@ -56,7 +56,7 @@ services:
       KEYCLOAK_SERVER_URL: https://auth.nguocchieuvangle.io.vn
       KEYCLOAK_REALM: cashbee
       KEYCLOAK_CLIENT_ID: cashbee-backend
-      KEYCLOAK_CLIENT_SECRET: x7owaG4Wcilsdu6dbsVzfuk6D9Bevkrq
+      KEYCLOAK_CLIENT_SECRET: OuRhlczFR6yz6gNKSBapX028DKbjKl4y
       KEYCLOAK_ISSUER_URI: https://auth.nguocchieuvangle.io.vn/realms/cashbee
       KEYCLOAK_ADMIN_USERNAME: admin
       KEYCLOAK_ADMIN_PASSWORD: 1234

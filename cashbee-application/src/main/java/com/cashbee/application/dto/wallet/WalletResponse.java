@@ -66,15 +66,24 @@ public class WalletResponse {
 
     /**
      * Calculate total balance across all states.
+     * Handles null values safely by treating them as zero.
      */
     public BigDecimal getTotalBalance() {
-        return balance.add(pendingBalance).add(lockedBalance);
+        BigDecimal safeBalance = balance != null ? balance : BigDecimal.ZERO;
+        BigDecimal safePending = pendingBalance != null ? pendingBalance : BigDecimal.ZERO;
+        BigDecimal safeLocked = lockedBalance != null ? lockedBalance : BigDecimal.ZERO;
+
+        return safeBalance.add(safePending).add(safeLocked);
     }
 
     /**
      * Check if wallet has sufficient available balance.
+     * Handles null values safely by treating them as zero.
      */
     public boolean hasSufficientBalance(BigDecimal amount) {
+        if (amount == null || balance == null) {
+            return false;
+        }
         return balance.compareTo(amount) >= 0;
     }
 }

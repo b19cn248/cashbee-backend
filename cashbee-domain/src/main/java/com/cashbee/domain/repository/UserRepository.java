@@ -68,6 +68,14 @@ public interface UserRepository {
     Optional<User> findByReferralCode(String referralCode);
 
     /**
+     * Check if user exists by ID.
+     *
+     * @param id User ID
+     * @return true if user exists
+     */
+    boolean existsById(Long id);
+
+    /**
      * Check if user exists by Keycloak ID.
      *
      * @param keycloakId Keycloak user UUID

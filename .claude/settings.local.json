@@ -19,7 +19,9 @@
       "Bash(then mv docs/FIX_AFFILIATE_ID_ERROR.md docs/fixes/)",
       "Bash(tree:*)",
       "Bash(docker-compose config:*)",
-      "WebFetch(domain:help.shopee.vn)"
+      "WebFetch(domain:help.shopee.vn)",
+      "Bash(python3:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []
