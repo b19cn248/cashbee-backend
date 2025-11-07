@@ -2,6 +2,8 @@ package com.cashbee.infrastructure.repository;
 
 import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.infrastructure.entity.AffiliateOrderJpaEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -23,10 +25,17 @@ public interface AffiliateOrderJpaRepository extends JpaRepository<AffiliateOrde
     Optional<AffiliateOrderJpaEntity> findByOrderId(String orderId);
 
     /**
-     * Find all orders for a specific user.
-     * This is the KEY method for user viewing their orders!
+     * Find all orders for a specific user (WITHOUT pagination).
+     * @deprecated Use findByUserId(userId, pageable) for better performance
      */
+    @Deprecated
     List<AffiliateOrderJpaEntity> findByUserId(Long userId);
+
+    /**
+     * Find orders for a specific user with PAGINATION.
+     * This is the RECOMMENDED method for user viewing their orders!
+     */
+    Page<AffiliateOrderJpaEntity> findByUserId(Long userId, Pageable pageable);
 
     /**
      * Find orders by user and status.

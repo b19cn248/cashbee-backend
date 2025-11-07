@@ -61,8 +61,18 @@ services:
       KEYCLOAK_ADMIN_USERNAME: admin
       KEYCLOAK_ADMIN_PASSWORD: 1234
 
-      # JVM Options
-      JAVA_OPTS: -Xms512m -Xmx1024m -XX:+UseG1GC
+      # JVM Options - Optimized for production with memory leak protection
+      JAVA_OPTS: >-
+        -Xms1g
+        -Xmx2g
+        -XX:+UseG1GC
+        -XX:MaxGCPauseMillis=200
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/app/logs/heap-dump.hprof
+        -XX:+ExitOnOutOfMemoryError
+        -XX:MaxMetaspaceSize=512m
+        -XX:+UnlockExperimentalVMOptions
+        -XX:+UseStringDeduplication
     ports:
       - "8991:8080"
     volumes:

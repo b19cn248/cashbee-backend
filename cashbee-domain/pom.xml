@@ -31,6 +31,12 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Spring Data Commons (for Page and Pageable interfaces) -->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-commons</artifactId>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

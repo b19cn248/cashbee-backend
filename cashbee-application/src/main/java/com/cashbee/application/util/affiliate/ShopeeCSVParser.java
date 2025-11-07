@@ -18,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Utility class to parse Shopee affiliate commission CSV files.
@@ -78,11 +79,14 @@ public class ShopeeCSVParser {
 
     /**
      * Parse Shopee CSV file and extract order data.
+     * WARNING: This method loads ALL records into memory. Use parseStreaming() for large files.
      *
      * @param inputStream CSV file input stream
      * @return List of parsed order records
      * @throws IOException if file reading fails
+     * @deprecated Use parseStreaming() for better memory efficiency
      */
+    @Deprecated
     public List<ShopeeOrderRecord> parse(InputStream inputStream) throws IOException {
         List<ShopeeOrderRecord> records = new ArrayList<>();
 
@@ -136,6 +140,96 @@ public class ShopeeCSVParser {
 
         log.info("Parsed {} records from CSV", records.size());
         return records;
+    }
+
+    /**
+     * Parse Shopee CSV file using STREAMING to minimize memory usage.
+     * This method processes records in batches and calls the consumer callback for each batch.
+     *
+     * Benefits:
+     * - Memory efficient: Only keeps one batch in memory at a time
+     * - Scalable: Can handle files with millions of records
+     * - Fast: Processes records as they are read
+     *
+     * @param inputStream CSV file input stream
+     * @param batchSize Number of records to process in each batch (recommended: 100-500)
+     * @param batchConsumer Callback function to process each batch
+     * @return Total number of records processed
+     * @throws IOException if file reading fails
+     */
+    public int parseStreaming(InputStream inputStream, int batchSize,
+                             Consumer<List<ShopeeOrderRecord>> batchConsumer) throws IOException {
+        int totalRecords = 0;
+        List<ShopeeOrderRecord> currentBatch = new ArrayList<>(batchSize);
+
+        // Use Apache Commons CSV to handle quoted fields properly
+        try (BufferedReader bufferedReader = new BufferedReader(
+            new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+
+            // Skip BOM if present
+            bufferedReader.mark(1);
+            int firstChar = bufferedReader.read();
+            if (firstChar != 0xFEFF) {
+                bufferedReader.reset();  // No BOM, go back
+            }
+
+            // Configure CSV format
+            CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
+                .setHeader()  // First line is header
+                .setSkipHeaderRecord(true)  // Skip header when parsing
+                .setIgnoreEmptyLines(true)
+                .setTrim(true)
+                .build();
+
+            CSVParser csvParser = csvFormat.parse(bufferedReader);
+
+            log.info("CSV headers: {}", csvParser.getHeaderNames());
+
+            // Validate that required columns exist
+            validateHeaders(csvParser);
+
+            int rowNumber = 1;  // Row 1 is first data row (after header)
+
+            for (CSVRecord csvRecord : csvParser) {
+                rowNumber++;
+
+                try {
+                    ShopeeOrderRecord record = parseLine(csvRecord, rowNumber);
+                    currentBatch.add(record);
+                } catch (Exception e) {
+                    log.error("Failed to parse CSV row {}: {}", rowNumber, e.getMessage(), e);
+                    // Create error record
+                    ShopeeOrderRecord errorRecord = ShopeeOrderRecord.builder()
+                        .rowNumber(rowNumber)
+                        .rawData(csvRecord.toString())
+                        .parseError(e.getMessage())
+                        .build();
+                    currentBatch.add(errorRecord);
+                }
+
+                // Process batch when it reaches the batch size
+                if (currentBatch.size() >= batchSize) {
+                    batchConsumer.accept(currentBatch);
+                    totalRecords += currentBatch.size();
+
+                    // Clear batch to free memory
+                    currentBatch.clear();
+
+                    log.debug("Processed batch of {} records. Total so far: {}", batchSize, totalRecords);
+                }
+            }
+
+            // Process remaining records in the last batch
+            if (!currentBatch.isEmpty()) {
+                batchConsumer.accept(currentBatch);
+                totalRecords += currentBatch.size();
+                log.debug("Processed final batch of {} records", currentBatch.size());
+            }
+        }
+
+        log.info("Streaming parse completed. Total {} records processed in batches of {}",
+                totalRecords, batchSize);
+        return totalRecords;
     }
 
     /**

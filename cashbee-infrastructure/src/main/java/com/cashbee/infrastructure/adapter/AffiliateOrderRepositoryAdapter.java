@@ -6,6 +6,8 @@ import com.cashbee.domain.repository.AffiliateOrderRepository;
 import com.cashbee.infrastructure.mapper.AffiliateOrderMapper;
 import com.cashbee.infrastructure.repository.AffiliateOrderJpaRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -53,10 +55,18 @@ public class AffiliateOrderRepositoryAdapter implements AffiliateOrderRepository
     }
 
     @Override
+    @Deprecated
     public List<AffiliateOrder> findByUserId(Long userId) {
         return jpaRepository.findByUserId(userId).stream()
             .map(mapper::toDomain)
             .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<AffiliateOrder> findByUserId(Long userId, Pageable pageable) {
+        Page<com.cashbee.infrastructure.entity.AffiliateOrderJpaEntity> entityPage =
+            jpaRepository.findByUserId(userId, pageable);
+        return entityPage.map(mapper::toDomain);
     }
 
     @Override

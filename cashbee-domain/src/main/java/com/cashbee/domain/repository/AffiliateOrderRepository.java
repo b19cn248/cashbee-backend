@@ -2,6 +2,8 @@ package com.cashbee.domain.repository;
 
 import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.AffiliateOrder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,10 +37,25 @@ public interface AffiliateOrderRepository {
     List<AffiliateOrder> findAll();
 
     /**
-     * Find all orders for a specific user.
-     * This is the KEY method for user viewing their orders!
+     * Find all orders for a specific user (WITHOUT pagination).
+     * WARNING: This can cause memory issues for users with many orders.
+     * Use findByUserId(userId, pageable) instead.
+     *
+     * @deprecated Use findByUserId(userId, pageable) for better performance
      */
+    @Deprecated
     List<AffiliateOrder> findByUserId(Long userId);
+
+    /**
+     * Find orders for a specific user with PAGINATION.
+     * This is the RECOMMENDED method for user viewing their orders!
+     * Prevents memory issues when users have many orders.
+     *
+     * @param userId User ID
+     * @param pageable Pagination parameters (page, size, sort)
+     * @return Paginated orders
+     */
+    Page<AffiliateOrder> findByUserId(Long userId, Pageable pageable);
 
     /**
      * Find orders by user and status.

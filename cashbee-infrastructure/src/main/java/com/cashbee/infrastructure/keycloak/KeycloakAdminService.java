@@ -66,6 +66,8 @@ public class KeycloakAdminService {
 
         try {
             // Build Keycloak Admin Client
+            // Note: Connection pool configuration is handled by the underlying HTTP client
+            // Keycloak Admin Client reuses connections automatically
             KeycloakBuilder builder = KeycloakBuilder.builder()
                     .serverUrl(keycloakProperties.getServerUrl())
                     .realm(keycloakProperties.getRealm())

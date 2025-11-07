@@ -19,10 +19,12 @@ import com.cashbee.domain.repository.AffiliateClickRepository;
 import com.cashbee.domain.repository.AffiliateOrderRepository;
 import com.cashbee.domain.repository.AffiliatePlatformRepository;
 import com.cashbee.domain.repository.ImportBatchRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -60,15 +62,23 @@ public class ImportShopeeOrdersUseCase {
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final CalculateCashbackUseCase calculateCashbackUseCase;
     private final AddCashbackToWalletUseCase addCashbackToWalletUseCase;
+    private final EntityManager entityManager;
+
+    /**
+     * Batch size for processing CSV records.
+     * This prevents OutOfMemoryError by processing records in smaller chunks.
+     */
+    private static final int BATCH_SIZE = 200;
 
     /**
      * Execute use case to import orders from CSV.
+     * Uses streaming and batch processing to prevent OutOfMemoryError.
      *
      * @param request Import request with file and options
      * @return Import response with statistics
      * @throws BusinessException if import fails
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRED)
     public ImportOrdersResponse execute(ImportOrdersRequest request) {
         LocalDateTime startTime = LocalDateTime.now();
         log.info("UseCase: Starting import from file: {}", request.getFileName());
@@ -98,15 +108,26 @@ public class ImportShopeeOrdersUseCase {
             .build();
 
         batch = batchRepository.save(batch);
-        log.info("UseCase: Created ImportBatch with ID: {}", batch.getId());
+        final Long batchId = batch.getId();
+        log.info("UseCase: Created ImportBatch with ID: {}", batchId);
 
-        // Step 3: Parse CSV file
-        List<ShopeeCSVParser.ShopeeOrderRecord> records;
+        // Step 3: Parse CSV file using STREAMING to prevent OutOfMemoryError
+        List<ImportOrdersResponse.ImportErrorDetail> errors = new ArrayList<>();
+        final int[] matchedCount = {0};  // Use array to allow modification in lambda
+        final int[] totalRowsProcessed = {0};
+
         try {
-            records = csvParser.parse(request.getFileInputStream());
-            batch.setTotalRows(records.size());
+            // Use streaming parser to process records in batches
+            csvParser.parseStreaming(request.getFileInputStream(), BATCH_SIZE, recordBatch -> {
+                // Process this batch in a separate transaction
+                processBatch(recordBatch, platform, batchId, request, errors, matchedCount, totalRowsProcessed);
+            });
+
+            // Update total rows after parsing
+            batch.setTotalRows(totalRowsProcessed[0]);
             batchRepository.save(batch);
-            log.info("UseCase: Parsed {} records from CSV", records.size());
+            log.info("UseCase: Parsed {} records from CSV using streaming", totalRowsProcessed[0]);
+
         } catch (IOException e) {
             log.error("UseCase: Failed to parse CSV file", e);
             batch.setStatus(ImportStatus.FAILED);
@@ -117,11 +138,82 @@ public class ImportShopeeOrdersUseCase {
             return buildErrorResponse(batch, e.getMessage(), startTime);
         }
 
-        // Step 4: Process each record
-        List<ImportOrdersResponse.ImportErrorDetail> errors = new ArrayList<>();
-        int matchedCount = 0;
+        // Step 4: Finalize import batch
+        // Reload batch to get updated counts
+        batch = batchRepository.findById(batchId)
+            .orElseThrow(() -> new NotFoundException("Import batch not found"));
 
-        for (ShopeeCSVParser.ShopeeOrderRecord record : records) {
+        LocalDateTime endTime = LocalDateTime.now();
+
+        if (batch.getFailedCount() == 0) {
+            batch.setStatus(ImportStatus.COMPLETED);
+        } else if (batch.getSuccessCount() > 0) {
+            batch.setStatus(ImportStatus.PARTIAL);
+        } else {
+            batch.setStatus(ImportStatus.FAILED);
+        }
+
+        batch.setCompletedAt(endTime);
+        batch = batchRepository.save(batch);
+
+        log.info("UseCase: Import completed. Success: {}, Failed: {}, Skipped: {}, Matched: {}",
+            batch.getSuccessCount(), batch.getFailedCount(), batch.getSkippedCount(), matchedCount[0]);
+
+        // Step 5: Build response
+        long durationSeconds = Duration.between(startTime, endTime).getSeconds();
+
+        return ImportOrdersResponse.builder()
+            .batchId(batch.getId())
+            .platformName(platform.getName())
+            .platformCode(platform.getCode())
+            .fileName(batch.getFileName())
+            .status(batch.getStatus())
+            .totalRows(batch.getTotalRows())
+            .successCount(batch.getSuccessCount())
+            .failedCount(batch.getFailedCount())
+            .skippedCount(batch.getSkippedCount())
+            .matchedCount(matchedCount[0])
+            .successRate(batch.getSuccessRate())
+            .errors(errors)
+            .startedAt(startTime)
+            .completedAt(endTime)
+            .durationSeconds(durationSeconds)
+            .importedBy(request.getImportedBy())
+            .message(buildMessage(batch, matchedCount[0]))
+            .build();
+    }
+
+    /**
+     * Process a batch of CSV records.
+     * This method is called for each batch during streaming parsing.
+     * Each batch is processed with flush & clear to prevent memory buildup.
+     *
+     * @param recordBatch List of records in this batch
+     * @param platform Affiliate platform
+     * @param batchId Import batch ID
+     * @param request Import request
+     * @param errors List to collect errors
+     * @param matchedCount Counter for matched orders
+     * @param totalRowsProcessed Counter for total rows processed
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected void processBatch(List<ShopeeCSVParser.ShopeeOrderRecord> recordBatch,
+                                AffiliatePlatform platform,
+                                Long batchId,
+                                ImportOrdersRequest request,
+                                List<ImportOrdersResponse.ImportErrorDetail> errors,
+                                int[] matchedCount,
+                                int[] totalRowsProcessed) {
+
+        ImportBatch batch = batchRepository.findById(batchId)
+            .orElseThrow(() -> new NotFoundException("Import batch not found"));
+
+        int processedInThisBatch = 0;
+
+        for (ShopeeCSVParser.ShopeeOrderRecord record : recordBatch) {
+            totalRowsProcessed[0]++;
+            processedInThisBatch++;
+
             try {
                 // Skip records with parse errors
                 if (record.hasError()) {
@@ -197,7 +289,7 @@ public class ImportShopeeOrdersUseCase {
                     .orderTime(record.getOrderTime())
                     .orderStatus(record.isCompleted() ? OrderStatus.APPROVED : OrderStatus.PENDING)
                     .source("IMPORT")
-                    .importBatchId(batch.getId())
+                    .importBatchId(batchId)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build();
@@ -256,11 +348,18 @@ public class ImportShopeeOrdersUseCase {
                 if (click != null && request.getAutoMatch()) {
                     click.matchWithOrder(order.getId());
                     clickRepository.save(click);
-                    matchedCount++;
+                    matchedCount[0]++;
                     log.debug("Matched order {} with click {}", order.getId(), click.getId());
                 }
 
                 batch.incrementSuccess();
+
+                // Flush and clear every 50 records to prevent memory buildup
+                if (processedInThisBatch % 50 == 0) {
+                    entityManager.flush();
+                    entityManager.clear();
+                    log.debug("Flushed and cleared EntityManager after {} records in batch", processedInThisBatch);
+                }
 
             } catch (Exception e) {
                 batch.incrementFailed();
@@ -274,45 +373,15 @@ public class ImportShopeeOrdersUseCase {
             }
         }
 
-        // Step 5: Finalize import batch
-        LocalDateTime endTime = LocalDateTime.now();
+        // Save batch after processing all records in this batch
+        batchRepository.save(batch);
 
-        if (batch.getFailedCount() == 0) {
-            batch.setStatus(ImportStatus.COMPLETED);
-        } else if (batch.getSuccessCount() > 0) {
-            batch.setStatus(ImportStatus.PARTIAL);
-        } else {
-            batch.setStatus(ImportStatus.FAILED);
-        }
+        // Final flush and clear for this batch
+        entityManager.flush();
+        entityManager.clear();
 
-        batch.setCompletedAt(endTime);
-        batch = batchRepository.save(batch);
-
-        log.info("UseCase: Import completed. Success: {}, Failed: {}, Skipped: {}, Matched: {}",
-            batch.getSuccessCount(), batch.getFailedCount(), batch.getSkippedCount(), matchedCount);
-
-        // Step 6: Build response
-        long durationSeconds = Duration.between(startTime, endTime).getSeconds();
-
-        return ImportOrdersResponse.builder()
-            .batchId(batch.getId())
-            .platformName(platform.getName())
-            .platformCode(platform.getCode())
-            .fileName(batch.getFileName())
-            .status(batch.getStatus())
-            .totalRows(batch.getTotalRows())
-            .successCount(batch.getSuccessCount())
-            .failedCount(batch.getFailedCount())
-            .skippedCount(batch.getSkippedCount())
-            .matchedCount(matchedCount)
-            .successRate(batch.getSuccessRate())
-            .errors(errors)
-            .startedAt(startTime)
-            .completedAt(endTime)
-            .durationSeconds(durationSeconds)
-            .importedBy(request.getImportedBy())
-            .message(buildMessage(batch, matchedCount))
-            .build();
+        log.info("Completed batch processing: {} records processed, {} successful, {} failed, {} skipped",
+            processedInThisBatch, batch.getSuccessCount(), batch.getFailedCount(), batch.getSkippedCount());
     }
 
     /**

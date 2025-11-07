@@ -13,6 +13,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -37,21 +41,66 @@ public class AffiliateOrderController {
     private final UpdateOrderStatusUseCase updateOrderStatusUseCase;
 
     /**
-     * Get all orders for the current user.
+     * Get all orders for the current user with PAGINATION.
      *
      * Endpoint: GET /api/orders/my
      *
      * This is the KEY endpoint for users to view their orders.
+     * Now supports pagination to prevent memory issues with large result sets.
      * In production, userId would come from JWT token.
      * For now, we use a request parameter.
+     *
+     * @param userId User ID (TODO: Extract from JWT token in production)
+     * @param page Page number (0-indexed, default: 0)
+     * @param size Page size (default: 20, max: 100)
+     * @param sort Sort field (default: createdAt,desc)
+     * @return Paginated list of orders
      */
     @GetMapping("/api/orders/my")
-    @Operation(summary = "Get current user's orders", description = "Retrieve all orders for the authenticated user")
-    public ResponseEntity<ApiResponse<List<AffiliateOrderResponse>>> getMyOrders(
-        @RequestParam Long userId // TODO: Extract from JWT token in production
+    @Operation(summary = "Get current user's orders (paginated)",
+               description = "Retrieve orders for the authenticated user with pagination support")
+    public ResponseEntity<ApiResponse<Page<AffiliateOrderResponse>>> getMyOrders(
+        @RequestParam Long userId, // TODO: Extract from JWT token in production
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size,
+        @RequestParam(defaultValue = "createdAt,desc") String sort
     ) {
-        log.info("Getting orders for user: {}", userId);
-        var orders = getUserOrdersUseCase.execute(userId);
+        log.info("Getting orders for user: {} (page: {}, size: {})", userId, page, size);
+
+        // Validate and limit page size to prevent abuse
+        if (size > 100) {
+            size = 100;
+            log.warn("Page size exceeds maximum (100), limiting to 100");
+        }
+
+        // Parse sort parameter
+        String[] sortParts = sort.split(",");
+        String sortField = sortParts[0];
+        Sort.Direction sortDirection = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc")
+            ? Sort.Direction.ASC
+            : Sort.Direction.DESC;
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortField));
+
+        var orders = getUserOrdersUseCase.execute(userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(orders));
+    }
+
+    /**
+     * Get all orders for the current user WITHOUT pagination (DEPRECATED).
+     * Use the paginated version instead for better performance.
+     *
+     * @deprecated Use getMyOrders() with pagination parameters instead
+     */
+    @Deprecated
+    @GetMapping("/api/orders/my/all")
+    @Operation(summary = "Get all user's orders (deprecated)",
+               description = "Retrieve all orders without pagination. Use paginated version instead.")
+    public ResponseEntity<ApiResponse<List<AffiliateOrderResponse>>> getAllMyOrders(
+        @RequestParam Long userId
+    ) {
+        log.warn("Using deprecated non-paginated endpoint for user: {}", userId);
+        var orders = getUserOrdersUseCase.executeAll(userId);
         return ResponseEntity.ok(ApiResponse.success(orders));
     }
 

@@ -3,16 +3,23 @@ spring:
     name: cashbee-backend
 
   datasource:
-    url: jdbc:mysql://localhost:33061/cashbee?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:33061/cashbee?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&cachePrepStmts=true&useServerPrepStmts=true&rewriteBatchedStatements=true
     username: root
     password: rootpassword
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+      # Connection pool optimization to prevent memory leaks
+      maximum-pool-size: 5              # Reduced from 10 to 5 (fewer connections = less memory)
+      minimum-idle: 2                   # Reduced from 5 to 2 (maintain minimum connections)
+      connection-timeout: 30000         # 30 seconds to wait for connection from pool
+      idle-timeout: 300000              # 5 minutes (reduced from 10 min) - idle connections are closed faster
+      max-lifetime: 1200000             # 20 minutes (reduced from 30 min) - connections recycled faster
+      leak-detection-threshold: 60000   # 60 seconds - detect connection leaks
+      connection-test-query: SELECT 1   # Test query to validate connections
+      pool-name: CashBeeHikariPool
+      # Additional optimizations
+      auto-commit: true
+      register-mbeans: true             # Enable JMX monitoring
 
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
@@ -88,18 +95,51 @@ springdoc:
     display-request-duration: true
     show-extensions: true
 
-# Management Endpoints (Actuator)
+# Management Endpoints (Actuator) - Enhanced for memory monitoring
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        # Enable more endpoints for monitoring memory and performance
+        include: health,info,metrics,prometheus,heapdump,threaddump,env,loggers
+      base-path: /actuator
   endpoint:
     health:
       show-details: when-authorized
+      # Add custom health indicators
+      probes:
+        enabled: true
+    # Enable heap dump endpoint (use carefully in production)
+    heapdump:
+      enabled: true
+    # Enable thread dump for debugging
+    threaddump:
+      enabled: true
   metrics:
     tags:
       application: ${spring.application.name}
+    # Enable JVM metrics
+    enable:
+      jvm: true
+      process: true
+      system: true
+      http: true
+      logback: true
+      hikaricp: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  # Health indicators
+  health:
+    defaults:
+      enabled: true
+    # Database health check
+    db:
+      enabled: true
+    # Disk space health check
+    diskspace:
+      enabled: true
+      threshold: 10MB
 
 # Keycloak Configuration
 # - Authorization Services: Used by Policy Enforcer to enforce permissions

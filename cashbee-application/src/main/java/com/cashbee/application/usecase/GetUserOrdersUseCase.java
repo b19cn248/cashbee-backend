@@ -8,6 +8,8 @@ import com.cashbee.domain.repository.AffiliateOrderItemRepository;
 import com.cashbee.domain.repository.AffiliateOrderRepository;
 import com.cashbee.domain.repository.AffiliatePlatformRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,13 +31,33 @@ public class GetUserOrdersUseCase {
     private final AffiliatePlatformRepository platformRepository;
 
     /**
-     * Execute use case: get all orders for a user.
+     * Execute use case: get orders for a user with PAGINATION.
+     * This prevents memory issues when users have many orders.
      *
      * @param userId user ID (from JWT token)
-     * @return list of orders with items
+     * @param pageable pagination parameters (page, size, sort)
+     * @return paginated list of orders with items
      */
     @Transactional(readOnly = true)
-    public List<AffiliateOrderResponse> execute(Long userId) {
+    public Page<AffiliateOrderResponse> execute(Long userId, Pageable pageable) {
+        // Fetch paginated orders for this user
+        Page<AffiliateOrder> ordersPage = orderRepository.findByUserId(userId, pageable);
+
+        // Map to response DTOs
+        return ordersPage.map(this::mapToResponse);
+    }
+
+    /**
+     * Execute use case: get ALL orders for a user WITHOUT pagination.
+     * WARNING: This can cause memory issues for users with many orders.
+     *
+     * @param userId user ID (from JWT token)
+     * @return list of all orders with items
+     * @deprecated Use execute(userId, pageable) instead for better performance
+     */
+    @Deprecated
+    @Transactional(readOnly = true)
+    public List<AffiliateOrderResponse> executeAll(Long userId) {
         // Fetch all orders for this user
         var orders = orderRepository.findByUserId(userId);
 

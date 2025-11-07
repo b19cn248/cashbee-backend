@@ -21,7 +21,8 @@
       "Bash(docker-compose config:*)",
       "WebFetch(domain:help.shopee.vn)",
       "Bash(python3:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
