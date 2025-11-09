@@ -69,6 +69,11 @@ public class ImportOrdersResponse {
     private Integer skippedCount;
 
     /**
+     * Number of existing orders updated (when re-uploading file).
+     */
+    private Integer updatedCount;
+
+    /**
      * Number of orders matched with clicks.
      */
     private Integer matchedCount;

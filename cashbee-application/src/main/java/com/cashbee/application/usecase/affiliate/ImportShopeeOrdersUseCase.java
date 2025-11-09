@@ -4,12 +4,14 @@ import com.cashbee.application.dto.affiliate.ImportOrdersRequest;
 import com.cashbee.application.dto.affiliate.ImportOrdersResponse;
 import com.cashbee.application.usecase.cashback.AddCashbackToWalletUseCase;
 import com.cashbee.application.usecase.cashback.CalculateCashbackUseCase;
+import com.cashbee.application.usecase.cashback.UpdateCashbackOnOrderStatusChangeUseCase;
 import com.cashbee.application.util.affiliate.ShopeeCSVParser;
 import com.cashbee.application.util.affiliate.TrackingCodeGenerator;
 import com.cashbee.common.exception.BusinessException;
 import com.cashbee.common.exception.NotFoundException;
 import com.cashbee.domain.enums.ImportStatus;
 import com.cashbee.domain.enums.OrderStatus;
+import com.cashbee.domain.enums.UpdateMode;
 import com.cashbee.domain.model.AffiliateClick;
 import com.cashbee.domain.model.AffiliateOrder;
 import com.cashbee.domain.model.AffiliatePlatform;
@@ -62,6 +64,7 @@ public class ImportShopeeOrdersUseCase {
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final CalculateCashbackUseCase calculateCashbackUseCase;
     private final AddCashbackToWalletUseCase addCashbackToWalletUseCase;
+    private final UpdateCashbackOnOrderStatusChangeUseCase updateCashbackOnOrderStatusChangeUseCase;
     private final EntityManager entityManager;
 
     /**
@@ -156,8 +159,9 @@ public class ImportShopeeOrdersUseCase {
         batch.setCompletedAt(endTime);
         batch = batchRepository.save(batch);
 
-        log.info("UseCase: Import completed. Success: {}, Failed: {}, Skipped: {}, Matched: {}",
-            batch.getSuccessCount(), batch.getFailedCount(), batch.getSkippedCount(), matchedCount[0]);
+        log.info("UseCase: Import completed. Success: {}, Updated: {}, Failed: {}, Skipped: {}, Matched: {}",
+            batch.getSuccessCount(), batch.getUpdatedCount(), batch.getFailedCount(),
+            batch.getSkippedCount(), matchedCount[0]);
 
         // Step 5: Build response
         long durationSeconds = Duration.between(startTime, endTime).getSeconds();
@@ -172,6 +176,7 @@ public class ImportShopeeOrdersUseCase {
             .successCount(batch.getSuccessCount())
             .failedCount(batch.getFailedCount())
             .skippedCount(batch.getSkippedCount())
+            .updatedCount(batch.getUpdatedCount())
             .matchedCount(matchedCount[0])
             .successRate(batch.getSuccessRate())
             .errors(errors)
@@ -234,14 +239,20 @@ public class ImportShopeeOrdersUseCase {
                     continue;
                 }
 
-                // Check for duplicates
-                if (orderRepository.existsByOrderId(record.getOrderId())) {
-                    if (request.getSkipDuplicates()) {
+                // Check for duplicates and handle based on updateMode
+                AffiliateOrder existingOrder = orderRepository.findByOrderId(record.getOrderId())
+                    .orElse(null);
+
+                if (existingOrder != null) {
+                    // Order already exists - handle based on updateMode
+                    if (request.getUpdateMode() == UpdateMode.SKIP) {
                         batch.incrementSkipped();
                         log.debug("Skipping duplicate order: {}", record.getOrderId());
                         continue;
-                    } else {
-                        throw new BusinessException("Duplicate order ID: " + record.getOrderId());
+                    } else if (request.getUpdateMode() == UpdateMode.UPDATE) {
+                        // Update existing order
+                        updateExistingOrder(existingOrder, record, batch);
+                        continue;
                     }
                 }
 
@@ -410,18 +421,101 @@ public class ImportShopeeOrdersUseCase {
     }
 
     /**
+     * Update existing order with new data from CSV.
+     *
+     * @param existingOrder Existing order from database
+     * @param record CSV record with new data
+     * @param batch Import batch
+     */
+    private void updateExistingOrder(AffiliateOrder existingOrder,
+                                     ShopeeCSVParser.ShopeeOrderRecord record,
+                                     ImportBatch batch) {
+
+        log.info("UseCase: Updating existing order: {} (old status: {})",
+            existingOrder.getOrderId(), existingOrder.getOrderStatus());
+
+        try {
+            // Get old status before update
+            OrderStatus oldStatus = existingOrder.getOrderStatus();
+            OrderStatus newStatus = record.isCompleted() ? OrderStatus.APPROVED : OrderStatus.PENDING;
+
+            // Check if status changed
+            boolean statusChanged = oldStatus != newStatus;
+
+            // Update order fields
+            existingOrder.setOrderStatus(newStatus);
+            existingOrder.setProductName(record.getItemName());
+            existingOrder.setProductPrice(record.getPrice());
+            existingOrder.setCommissionAmount(record.getCommissionForCashback());
+            existingOrder.setOrderTime(record.getOrderTime());
+
+            // Update time fields based on status
+            if (newStatus == OrderStatus.APPROVED && existingOrder.getConfirmTime() == null) {
+                existingOrder.setConfirmTime(LocalDateTime.now());
+            }
+            if (newStatus == OrderStatus.PAID && existingOrder.getPaidTime() == null) {
+                existingOrder.setPaidTime(LocalDateTime.now());
+            }
+
+            existingOrder.setUpdatedAt(LocalDateTime.now());
+
+            // Validate and save
+            existingOrder.validate();
+            orderRepository.save(existingOrder);
+
+            log.info("UseCase: Updated order {} (status: {} → {})",
+                existingOrder.getOrderId(), oldStatus, newStatus);
+
+            // Update cashback if status changed
+            if (statusChanged) {
+                log.info("UseCase: Order status changed, updating cashback...");
+                updateCashbackOnOrderStatusChangeUseCase.execute(
+                    existingOrder.getId(),
+                    oldStatus,
+                    newStatus
+                );
+            }
+
+            // Increment updated count
+            batch.incrementUpdated();
+
+        } catch (Exception e) {
+            batch.incrementFailed();
+            log.error("UseCase: Failed to update order {}: {}",
+                existingOrder.getOrderId(), e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
      * Build user-friendly message.
      */
     private String buildMessage(ImportBatch batch, int matchedCount) {
+        StringBuilder message = new StringBuilder();
+
         if (batch.getStatus() == ImportStatus.COMPLETED) {
-            return String.format("Successfully imported %d orders. %d orders matched with clicks.",
-                batch.getSuccessCount(), matchedCount);
+            message.append(String.format("Successfully processed %d rows. ", batch.getTotalRows()));
+            if (batch.getSuccessCount() > 0) {
+                message.append(String.format("%d new orders imported. ", batch.getSuccessCount()));
+            }
+            if (batch.getUpdatedCount() > 0) {
+                message.append(String.format("%d orders updated. ", batch.getUpdatedCount()));
+            }
+            if (matchedCount > 0) {
+                message.append(String.format("%d orders matched with clicks.", matchedCount));
+            }
         } else if (batch.getStatus() == ImportStatus.PARTIAL) {
-            return String.format("Partially imported %d orders (%d failed, %d skipped). %d orders matched.",
-                batch.getSuccessCount(), batch.getFailedCount(), batch.getSkippedCount(), matchedCount);
+            message.append(String.format("Partially processed: %d new, %d updated, %d failed, %d skipped. ",
+                batch.getSuccessCount(), batch.getUpdatedCount(),
+                batch.getFailedCount(), batch.getSkippedCount()));
+            if (matchedCount > 0) {
+                message.append(String.format("%d orders matched.", matchedCount));
+            }
         } else {
-            return String.format("Import failed. %d orders failed to import.",
-                batch.getFailedCount());
+            message.append(String.format("Import failed. %d orders failed to import.",
+                batch.getFailedCount()));
         }
+
+        return message.toString().trim();
     }
 }

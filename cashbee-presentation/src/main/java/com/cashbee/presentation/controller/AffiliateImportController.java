@@ -3,6 +3,7 @@ package com.cashbee.presentation.controller;
 import com.cashbee.application.dto.affiliate.ImportOrdersRequest;
 import com.cashbee.application.dto.affiliate.ImportOrdersResponse;
 import com.cashbee.application.usecase.affiliate.ImportShopeeOrdersUseCase;
+import com.cashbee.domain.enums.UpdateMode;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -53,9 +54,9 @@ public class AffiliateImportController {
      * @param file CSV file uploaded by admin
      * @param platformCode Platform code (default: "shopee")
      * @param importedBy Admin user ID
-     * @param skipDuplicates Whether to skip duplicate orders (default: true)
+     * @param updateMode How to handle duplicate orders: SKIP or UPDATE (default: UPDATE)
      * @param autoMatch Whether to auto-match orders with clicks (default: true)
-     * @return Import statistics (success, failed, skipped counts)
+     * @return Import statistics (success, failed, skipped, updated counts)
      */
     @PostMapping(value = "/orders", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
@@ -72,8 +73,8 @@ public class AffiliateImportController {
         @Parameter(description = "Admin user ID who is importing", required = true)
         @RequestParam("importedBy") Long importedBy,
 
-        @Parameter(description = "Skip duplicate orders (default: true)")
-        @RequestParam(value = "skipDuplicates", required = false, defaultValue = "true") Boolean skipDuplicates,
+        @Parameter(description = "Update mode for duplicate orders: SKIP or UPDATE (default: UPDATE)")
+        @RequestParam(value = "updateMode", required = false, defaultValue = "UPDATE") UpdateMode updateMode,
 
         @Parameter(description = "Auto-match orders with clicks (default: true)")
         @RequestParam(value = "autoMatch", required = false, defaultValue = "true") Boolean autoMatch
@@ -102,7 +103,7 @@ public class AffiliateImportController {
                 .fileName(file.getOriginalFilename())
                 .platformCode(platformCode)
                 .importedBy(importedBy)
-                .skipDuplicates(skipDuplicates)
+                .updateMode(updateMode)
                 .autoMatch(autoMatch)
                 .build();
         } catch (Exception e) {
@@ -115,9 +116,10 @@ public class AffiliateImportController {
         // Execute import
         ImportOrdersResponse response = importShopeeOrdersUseCase.execute(request);
 
-        log.info("API: Import completed. Batch ID: {}, Success: {}, Failed: {}, Skipped: {}, Matched: {}",
+        log.info("API: Import completed. Batch ID: {}, Success: {}, Updated: {}, Failed: {}, Skipped: {}, Matched: {}",
             response.getBatchId(),
             response.getSuccessCount(),
+            response.getUpdatedCount(),
             response.getFailedCount(),
             response.getSkippedCount(),
             response.getMatchedCount());
