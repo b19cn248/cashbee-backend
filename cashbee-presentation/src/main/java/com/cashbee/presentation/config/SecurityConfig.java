@@ -145,7 +145,7 @@ public class SecurityConfig {
     public CorsFilter corsFilter() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:3007",
+        config.setAllowedOrigins(List.of("http://localhost:3000",
                 "https://cashbee.nguocchieuvangle.io.vn/", "https://video.management.v1.openlearnhub.io.vn/",
                 "https://auth.nguocchieuvangle.io.vn/"));
         config.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Requested-With"));
