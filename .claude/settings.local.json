@@ -22,7 +22,8 @@
       "WebFetch(domain:help.shopee.vn)",
       "Bash(python3:*)",
       "Bash(awk:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(docker ps:*)"
     ],
     "deny": [],
     "ask": []

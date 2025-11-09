@@ -21,6 +21,7 @@ import com.cashbee.domain.repository.AffiliateClickRepository;
 import com.cashbee.domain.repository.AffiliateOrderRepository;
 import com.cashbee.domain.repository.AffiliatePlatformRepository;
 import com.cashbee.domain.repository.ImportBatchRepository;
+import com.cashbee.domain.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +61,7 @@ public class ImportShopeeOrdersUseCase {
     private final AffiliateOrderRepository orderRepository;
     private final AffiliateClickRepository clickRepository;
     private final AffiliatePlatformRepository platformRepository;
+    private final UserRepository userRepository;
     private final ShopeeCSVParser csvParser;
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final CalculateCashbackUseCase calculateCashbackUseCase;
@@ -265,6 +267,21 @@ public class ImportShopeeOrdersUseCase {
                         userId = trackingCodeGenerator.extractUserId(record.getTrackingCode());
                         log.debug("Extracted user ID {} from tracking code {}", userId, record.getTrackingCode());
 
+                        // Validate that user exists in database
+                        if (!userRepository.existsById(userId)) {
+                            batch.incrementSkipped();
+                            log.warn("User ID {} extracted from tracking code {} does not exist in database, skipping order {}",
+                                userId, record.getTrackingCode(), record.getOrderId());
+                            errors.add(ImportOrdersResponse.ImportErrorDetail.builder()
+                                .rowNumber(record.getRowNumber())
+                                .orderId(record.getOrderId())
+                                .error(String.format("User ID %d does not exist in database (tracking code: %s)",
+                                    userId, record.getTrackingCode()))
+                                .rawData(record.getRawData())
+                                .build());
+                            continue;
+                        }
+
                         // Find the click if autoMatch is enabled
                         if (request.getAutoMatch()) {
                             click = clickRepository.findByTrackingCode(record.getTrackingCode())
@@ -276,14 +293,28 @@ public class ImportShopeeOrdersUseCase {
                             }
                         }
                     } catch (IllegalArgumentException e) {
+                        batch.incrementSkipped();
                         log.warn("Failed to extract user ID from tracking code: {}", record.getTrackingCode());
+                        errors.add(ImportOrdersResponse.ImportErrorDetail.builder()
+                            .rowNumber(record.getRowNumber())
+                            .orderId(record.getOrderId())
+                            .error("Invalid tracking code format: " + e.getMessage())
+                            .rawData(record.getRawData())
+                            .build());
+                        continue;
                     }
                 }
 
                 // If no user ID found, skip this order
                 if (userId == null) {
                     batch.incrementSkipped();
-                    log.warn("No user ID found for order {}, skipping", record.getOrderId());
+                    log.warn("No tracking code found for order {}, skipping", record.getOrderId());
+                    errors.add(ImportOrdersResponse.ImportErrorDetail.builder()
+                        .rowNumber(record.getRowNumber())
+                        .orderId(record.getOrderId())
+                        .error("No tracking code (Sub_id1) found in CSV record")
+                        .rawData(record.getRawData())
+                        .build());
                     continue;
                 }
 
