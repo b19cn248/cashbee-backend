@@ -3,9 +3,9 @@ spring:
     name: cashbee-backend
 
   datasource:
-    url: jdbc:mysql://localhost:33061/cashbee?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&cachePrepStmts=true&useServerPrepStmts=true&rewriteBatchedStatements=true
+    url: jdbc:mysql://localhost:3306/cashbee?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&cachePrepStmts=true&useServerPrepStmts=true&rewriteBatchedStatements=true
     username: root
-    password: rootpassword
+    password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       # Connection pool optimization to prevent memory leaks

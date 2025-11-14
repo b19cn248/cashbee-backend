@@ -99,7 +99,9 @@ public class SecurityConfig {
                                 "/api/v1/gemini/generate",
                                 // Affiliate tracking redirect endpoints - Public (no auth required)
                                 // These are the actual tracking links that users click
-                                "/api/affiliate/tracking/redirect/**"
+                                "/api/affiliate/tracking/redirect/**",
+                                // Authentication endpoints - Public (no auth required for registration)
+                                "/api/auth/register"
                         ).permitAll()
                         // Protected endpoints - Authentication required
                         // All other /api/** endpoints now require valid JWT token

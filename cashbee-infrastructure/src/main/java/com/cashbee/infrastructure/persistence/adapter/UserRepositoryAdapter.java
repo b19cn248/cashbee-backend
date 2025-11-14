@@ -133,6 +133,13 @@ public class UserRepositoryAdapter implements UserRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public boolean existsByReferralCode(String referralCode) {
+        log.debug("Checking if user exists by referralCode: {}", referralCode);
+        return jpaRepository.existsByReferralCode(referralCode);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<User> findByReferredBy(String referralCode) {
         log.debug("Finding users referred by: {}", referralCode);
         List<UserJpaEntity> entities = jpaRepository.findByReferredBy(referralCode);

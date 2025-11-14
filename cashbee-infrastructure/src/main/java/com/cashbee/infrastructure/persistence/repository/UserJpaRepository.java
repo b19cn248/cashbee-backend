@@ -78,6 +78,14 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, Long> {
     boolean existsByUsername(String username);
 
     /**
+     * Check if user exists by referral code.
+     *
+     * @param referralCode Referral code
+     * @return true if referral code exists
+     */
+    boolean existsByReferralCode(String referralCode);
+
+    /**
      * Find all users referred by a specific referral code.
      *
      * @param referredBy Referral code

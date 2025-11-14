@@ -268,13 +268,51 @@ public class KeycloakAdminService {
     // ============================================================
 
     /**
+     * Check if a realm role exists.
+     *
+     * @param roleName Role name to check
+     * @return true if role exists, false otherwise
+     */
+    public boolean roleExists(String roleName) {
+        log.debug("Checking if role exists: {}", roleName);
+
+        try {
+            getRealmResource()
+                    .roles()
+                    .get(roleName)
+                    .toRepresentation();
+            log.debug("Role {} exists", roleName);
+            return true;
+
+        } catch (Exception e) {
+            log.debug("Role {} does not exist", roleName);
+            return false;
+        }
+    }
+
+    /**
      * Assign a realm role to user.
+     * <p>
+     * IMPORTANT: This method will NOT fail if the role doesn't exist.
+     * Instead, it logs a warning and continues. This ensures that user
+     * registration doesn't fail due to missing roles in Keycloak configuration.
+     * <p>
+     * Best Practice: Ensure all required roles (USER, ADMIN) exist in Keycloak
+     * realm before using this application.
      *
      * @param keycloakId Keycloak user ID
      * @param role UserRole enum (USER or ADMIN)
      */
     public void assignRealmRole(String keycloakId, UserRole role) {
         log.info("Assigning role {} to user {}", role, keycloakId);
+
+        // Check if role exists first
+        if (!roleExists(role.name())) {
+            log.warn("Role {} does not exist in Keycloak realm. Skipping role assignment for user {}. " +
+                     "Please create the role in Keycloak: Realm Settings > Roles > Create Role '{}'",
+                     role, keycloakId, role.name());
+            return;
+        }
 
         try {
             // Get role representation from realm
@@ -293,8 +331,10 @@ public class KeycloakAdminService {
             log.info("Role {} assigned successfully to user {}", role, keycloakId);
 
         } catch (Exception e) {
-            log.error("Failed to assign role {} to user {}", role, keycloakId, e);
-            throw new RuntimeException("Failed to assign role", e);
+            log.error("Failed to assign role {} to user {}: {}. User created but without role.",
+                     role, keycloakId, e.getMessage());
+            // Don't throw exception - user creation should succeed even if role assignment fails
+            // This prevents orphaned users in Keycloak
         }
     }
 
