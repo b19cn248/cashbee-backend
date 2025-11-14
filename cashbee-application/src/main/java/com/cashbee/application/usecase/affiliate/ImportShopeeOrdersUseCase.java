@@ -165,6 +165,18 @@ public class ImportShopeeOrdersUseCase {
             batch.getSuccessCount(), batch.getUpdatedCount(), batch.getFailedCount(),
             batch.getSkippedCount(), matchedCount[0]);
 
+        // Q3 - Option B: Rollback if ANY errors occurred
+        if (batch.getFailedCount() > 0) {
+            String errorMessage = String.format(
+                "Import failed with %d errors. Transaction will be rolled back. " +
+                "First error: %s",
+                batch.getFailedCount(),
+                errors.isEmpty() ? "Unknown error" : errors.get(0).getError()
+            );
+            log.error("UseCase: {}", errorMessage);
+            throw new BusinessException("IMPORT_FAILED", errorMessage);
+        }
+
         // Step 5: Build response
         long durationSeconds = Duration.between(startTime, endTime).getSeconds();
 
@@ -195,6 +207,11 @@ public class ImportShopeeOrdersUseCase {
      * This method is called for each batch during streaming parsing.
      * Each batch is processed with flush & clear to prevent memory buildup.
      *
+     * TRANSACTION STRATEGY (Q3 - Option B):
+     * - Uses MANDATORY propagation to run in parent transaction
+     * - If ANY error occurs, ENTIRE import will rollback
+     * - This ensures data consistency but may fail the whole import for 1 bad record
+     *
      * @param recordBatch List of records in this batch
      * @param platform Affiliate platform
      * @param batchId Import batch ID
@@ -203,7 +220,7 @@ public class ImportShopeeOrdersUseCase {
      * @param matchedCount Counter for matched orders
      * @param totalRowsProcessed Counter for total rows processed
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.MANDATORY)
     protected void processBatch(List<ShopeeCSVParser.ShopeeOrderRecord> recordBatch,
                                 AffiliatePlatform platform,
                                 Long batchId,

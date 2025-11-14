@@ -121,8 +121,15 @@ public class CreateTrackingLinkUseCase {
         try {
             // Use Shopee-specific builder for Shopee platform
             if ("shopee".equalsIgnoreCase(platformCode)) {
+                // IMPORTANT: Use expanded URL if available (for shortened links)
+                // parsedUrl.getUrlForAffiliateLink() returns:
+                // - expandedUrl if URL was a shortened link (s.shopee.vn)
+                // - originalUrl if URL was already a full Shopee URL
+                String urlForAffiliate = parsedUrl.getUrlForAffiliateLink();
+                log.debug("UseCase: Building affiliate link with URL: {}", urlForAffiliate);
+
                 tempTrackingUrl = shopeeAffiliateLinkBuilder.build(
-                    request.getShopeeUrl(),  // Use original URL, not parsed values
+                    urlForAffiliate,  // Use expanded URL (if shortened) or original URL
                     platform.getAffiliateId(),
                     tempTrackingCode
                 );
@@ -171,8 +178,12 @@ public class CreateTrackingLinkUseCase {
         try {
             // Use Shopee-specific builder for Shopee platform
             if ("shopee".equalsIgnoreCase(platformCode)) {
+                // IMPORTANT: Use expanded URL if available (for shortened links)
+                String urlForAffiliate = parsedUrl.getUrlForAffiliateLink();
+                log.debug("UseCase: Building real affiliate link with URL: {}", urlForAffiliate);
+
                 trackingUrl = shopeeAffiliateLinkBuilder.build(
-                    request.getShopeeUrl(),  // Use original URL, not parsed values
+                    urlForAffiliate,  // Use expanded URL (if shortened) or original URL
                     platform.getAffiliateId(),
                     trackingCode
                 );

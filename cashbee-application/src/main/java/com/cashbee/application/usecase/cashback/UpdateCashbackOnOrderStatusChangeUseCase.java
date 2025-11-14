@@ -125,14 +125,16 @@ public class UpdateCashbackOnOrderStatusChangeUseCase {
             return;
         }
 
-        // PAID → CANCELLED (very rare: should not happen in normal flow)
+        // PAID → CANCELLED (refund scenario: order was paid then cancelled)
         if (oldStatus == OrderStatus.PAID && newStatus == OrderStatus.CANCELLED) {
-            log.error("UseCase: Order {} cancelled after payment (PAID → CANCELLED) - manual intervention required",
+            log.warn("UseCase: Order {} cancelled after payment (PAID → CANCELLED), reversing cashback",
                 orderId);
-            // Cannot automatically rollback PAID cashback - requires manual intervention
-            throw new IllegalStateException(
-                "Cannot cancel order " + orderId + " that has already been paid. Manual refund required."
-            );
+
+            // Reverse paid cashback (will subtract from balance and totalEarned)
+            addCashbackToWalletUseCase.reversePaidCashbackForOrder(orderId);
+
+            log.info("UseCase: Successfully reversed paid cashback for order {}", orderId);
+            return;
         }
 
         // Other transitions: No action needed

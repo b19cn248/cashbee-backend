@@ -23,9 +23,23 @@
       "Bash(python3:*)",
       "Bash(awk:*)",
       "Bash(find:*)",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "WebFetch(domain:code.claude.com)",
+      "Bash(claude mcp list:*)",
+      "Bash(claude mcp --help:*)",
+      "Bash(claude mcp reset-project-choices:*)",
+      "mcp__cashbee_server_mysql__mysql_query",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "ghost-mcp",
+    "plane",
+    "mcp_server_mysql",
+    "local_server_mysql",
+    "cashbee_server_mysql"
+  ]
 }

@@ -18,14 +18,18 @@ import java.util.regex.Pattern;
  *
  * Shopee URL formats supported:
  * 1. Standard format: https://shopee.vn/product/{shop_id}/{item_id}
- * 2. Short format: https://shopee.vn/-i.{shop_id}.{item_id}
- * 3. Universal link: https://shopee.vn/universal-link/{item_id}
- * 4. Product name format: https://shopee.vn/Product-Name-i.{shop_id}.{item_id}
- * 5. Full URL from homepage (NEW): https://shopee.vn/{url-encoded-name}-i.{shop_id}.{item_id}?extraParams={json}
+ * 2. Shop name format: https://shopee.vn/{shop_name}/{shop_id}/{item_id}
+ * 3. Short format: https://shopee.vn/-i.{shop_id}.{item_id}
+ * 4. Universal link: https://shopee.vn/universal-link/{item_id}
+ * 5. Product name format: https://shopee.vn/Product-Name-i.{shop_id}.{item_id}
+ * 6. Full URL from homepage: https://shopee.vn/{url-encoded-name}-i.{shop_id}.{item_id}?extraParams={json}
+ * 7. Shortened link: https://s.shopee.vn/{short_code} (auto-expanded to format 2)
  *
  * Version History:
  * - v1.0: Initial version with standard, short, universal link formats
  * - v1.1: Added logging and URL encoding validation for full URLs from homepage
+ * - v1.2: Added support for shortened links (s.shopee.vn) with auto-expansion
+ * - v1.3: Added shop name format (/{shop_name}/{shop_id}/{item_id}) for expanded shortened links
  *
  * @author CashBee Team
  */
@@ -33,13 +37,34 @@ import java.util.regex.Pattern;
 @Slf4j
 public class ShopeeUrlParser {
 
+    private final ShopeeUrlExpanderService urlExpanderService;
+
+    /**
+     * Constructor with dependency injection.
+     *
+     * @param urlExpanderService Service to expand shortened URLs
+     */
+    public ShopeeUrlParser(ShopeeUrlExpanderService urlExpanderService) {
+        this.urlExpanderService = urlExpanderService;
+    }
+
     // Pattern 1: https://shopee.vn/product/{shop_id}/{item_id}
     // Example: https://shopee.vn/product/101480242/1635050758
     private static final Pattern STANDARD_PATTERN = Pattern.compile(
         "https?://shopee\\.vn/product/(\\d+)/(\\d+)"
     );
 
-    // Pattern 2: https://shopee.vn/-i.{shop_id}.{item_id}
+    // Pattern 2: https://shopee.vn/{shop_name}/{shop_id}/{item_id} (NEW)
+    // Example: https://shopee.vn/opaanlp/281960897/29266558866
+    // This is the format used by Shopee shortened links after expansion
+    // - {shop_name} = shop slug (e.g., "opaanlp")
+    // - {shop_id} = numeric shop ID (e.g., 281960897)
+    // - {item_id} = numeric item ID (e.g., 29266558866)
+    private static final Pattern SHOP_NAME_PATTERN = Pattern.compile(
+        "https?://shopee\\.vn/([^/]+)/(\\d+)/(\\d+)(?:\\?.*)?$"
+    );
+
+    // Pattern 3: https://shopee.vn/-i.{shop_id}.{item_id}
     // Pattern 3: https://shopee.vn/Product-Name-i.{shop_id}.{item_id}
     // Pattern 4: https://shopee.vn/{url-encoded-name}-i.{shop_id}.{item_id}?extraParams={json}
     //
@@ -112,7 +137,11 @@ public class ShopeeUrlParser {
      * - Added detailed logging for debugging
      * - Improved query parameter handling
      *
-     * @param url Shopee product URL
+     * ENHANCED in v1.2:
+     * - Added support for shortened links (s.shopee.vn)
+     * - Auto-expand shortened links before parsing
+     *
+     * @param url Shopee product URL (can be full URL or shortened link)
      * @return ParsedShopeeUrl containing shop_id and item_id
      * @throws IllegalArgumentException if URL format is invalid or URL encoding is malformed
      */
@@ -125,71 +154,116 @@ public class ShopeeUrlParser {
             throw new IllegalArgumentException("Shopee URL cannot be empty");
         }
 
-        // Step 2: Validate URL encoding (security check)
-        if (!isValidUrlEncoding(url)) {
-            log.error("Invalid URL encoding in URL: {}", url);
+        // Step 2: Check if this is a shortened link and expand it
+        String urlToProcess = url;
+        String expandedUrl = null;  // Track if URL was expanded
+
+        if (urlExpanderService.isShortenedUrl(url)) {
+            log.info("Detected shortened URL, expanding: {}", url);
+            try {
+                urlToProcess = urlExpanderService.expandUrl(url);
+                expandedUrl = urlToProcess;  // Save expanded URL
+                log.info("Successfully expanded shortened URL: {} -> {}", url, urlToProcess);
+            } catch (IllegalArgumentException e) {
+                log.error("Failed to expand shortened URL: {}", url, e);
+                throw new IllegalArgumentException("Failed to expand shortened link: " + e.getMessage(), e);
+            }
+        }
+
+        // Step 3: Validate URL encoding (security check)
+        if (!isValidUrlEncoding(urlToProcess)) {
+            log.error("Invalid URL encoding in URL: {}", urlToProcess);
             throw new IllegalArgumentException("Invalid URL encoding format. URL contains malformed percent-encoding.");
         }
 
-        // Step 3: Try Pattern 1 - Standard format
-        Matcher matcher = STANDARD_PATTERN.matcher(url);
+        // Step 4: Try Pattern 1 - Standard format
+        Matcher matcher = STANDARD_PATTERN.matcher(urlToProcess);
         if (matcher.find()) {
             String shopId = matcher.group(1);
             String itemId = matcher.group(2);
             log.info("Parsed as STANDARD format - Shop ID: {}, Item ID: {}", shopId, itemId);
 
             return ParsedShopeeUrl.builder()
-                .originalUrl(url)
+                .originalUrl(url)  // Keep original URL for tracking
+                .expandedUrl(expandedUrl)  // Set expanded URL if it was shortened
                 .shopId(shopId)
                 .itemId(itemId)
                 .format("standard")
                 .build();
         }
 
-        // Step 4: Try Pattern 2, 3, 4 - Short format, product name, or full URL from homepage
-        matcher = SHORT_PATTERN.matcher(url);
+        // Step 5: Try Pattern 2 - Shop name format (from shortened links)
+        // Format: https://shopee.vn/{shop_name}/{shop_id}/{item_id}
+        matcher = SHOP_NAME_PATTERN.matcher(urlToProcess);
+        if (matcher.find()) {
+            String shopName = matcher.group(1);  // Shop slug (e.g., "opaanlp")
+            String shopId = matcher.group(2);     // Shop ID (e.g., "281960897")
+            String itemId = matcher.group(3);     // Item ID (e.g., "29266558866")
+
+            log.info("Parsed as SHOP_NAME format - Shop Name: '{}', Shop ID: {}, Item ID: {}",
+                shopName, shopId, itemId);
+
+            // Check if URL has query parameters
+            if (urlToProcess.contains("?")) {
+                String queryPart = urlToProcess.substring(urlToProcess.indexOf("?") + 1);
+                log.debug("Query parameters detected: {}", queryPart);
+            }
+
+            return ParsedShopeeUrl.builder()
+                .originalUrl(url)  // Keep original URL for tracking
+                .expandedUrl(expandedUrl)  // Set expanded URL if it was shortened
+                .shopId(shopId)
+                .itemId(itemId)
+                .format("shop_name")
+                .build();
+        }
+
+        // Step 6: Try Pattern 3, 4, 5 - Short format, product name, or full URL from homepage
+        matcher = SHORT_PATTERN.matcher(urlToProcess);
         if (matcher.find()) {
             String shopId = matcher.group(1);
             String itemId = matcher.group(2);
 
             // Extract product name part for logging (if URL encoded, decode it)
-            String productNamePart = extractProductNamePart(url);
+            String productNamePart = extractProductNamePart(urlToProcess);
             String decodedName = decodeForLogging(productNamePart);
 
             log.info("Parsed as SHORT/PRODUCT format - Shop ID: {}, Item ID: {}, Product: '{}'",
                 shopId, itemId, decodedName);
 
             // Check if URL has query parameters
-            if (url.contains("?")) {
-                String queryPart = url.substring(url.indexOf("?") + 1);
+            if (urlToProcess.contains("?")) {
+                String queryPart = urlToProcess.substring(urlToProcess.indexOf("?") + 1);
                 log.debug("Query parameters detected: {}", queryPart);
             }
 
             return ParsedShopeeUrl.builder()
-                .originalUrl(url)
+                .originalUrl(url)  // Keep original URL for tracking
+                .expandedUrl(expandedUrl)  // Set expanded URL if it was shortened
                 .shopId(shopId)
                 .itemId(itemId)
                 .format("short")
                 .build();
         }
 
-        // Step 5: Try Pattern 5 - Universal link (no shop_id available)
-        matcher = UNIVERSAL_LINK_PATTERN.matcher(url);
+        // Step 7: Try Pattern 6 - Universal link (no shop_id available)
+        matcher = UNIVERSAL_LINK_PATTERN.matcher(urlToProcess);
         if (matcher.find()) {
             String itemId = matcher.group(1);
             log.info("Parsed as UNIVERSAL LINK format - Item ID: {} (no shop_id)", itemId);
 
             return ParsedShopeeUrl.builder()
-                .originalUrl(url)
+                .originalUrl(url)  // Keep original URL for tracking
+                .expandedUrl(expandedUrl)  // Set expanded URL if it was shortened
                 .shopId(null)  // Universal links don't have shop_id
                 .itemId(itemId)
                 .format("universal")
                 .build();
         }
 
-        // Step 6: No pattern matched - invalid URL
-        log.error("Failed to parse URL - no pattern matched: {}", url);
-        throw new IllegalArgumentException("Invalid Shopee URL format: " + url);
+        // Step 8: No pattern matched - invalid URL
+        log.error("Failed to parse URL - no pattern matched: {}", urlToProcess);
+        throw new IllegalArgumentException("Invalid Shopee URL format: " + urlToProcess);
     }
 
     /**
@@ -261,6 +335,18 @@ public class ShopeeUrlParser {
         private String originalUrl;
 
         /**
+         * Expanded URL (if original URL was a shortened link).
+         *
+         * - If originalUrl is a shortened link (s.shopee.vn), this contains the expanded URL
+         * - If originalUrl is already a full URL, this is null
+         *
+         * Example:
+         * - originalUrl: https://s.shopee.vn/12Y5L6SJB
+         * - expandedUrl: https://shopee.vn/opaanlp/281960897/29266558866
+         */
+        private String expandedUrl;
+
+        /**
          * Shop ID extracted from URL.
          * May be null for universal links.
          */
@@ -272,7 +358,7 @@ public class ShopeeUrlParser {
         private String itemId;
 
         /**
-         * URL format detected: "standard", "short", or "universal".
+         * URL format detected: "standard", "shop_name", "short", or "universal".
          */
         private String format;
 
@@ -283,6 +369,25 @@ public class ShopeeUrlParser {
          */
         public boolean hasShopId() {
             return shopId != null && !shopId.isBlank();
+        }
+
+        /**
+         * Check if original URL was a shortened link that was expanded.
+         *
+         * @return true if URL was expanded from shortened link
+         */
+        public boolean wasExpanded() {
+            return expandedUrl != null && !expandedUrl.isBlank();
+        }
+
+        /**
+         * Get the URL to use for building affiliate links.
+         * Returns expandedUrl if available, otherwise returns originalUrl.
+         *
+         * @return URL suitable for affiliate link building
+         */
+        public String getUrlForAffiliateLink() {
+            return wasExpanded() ? expandedUrl : originalUrl;
         }
     }
 }
