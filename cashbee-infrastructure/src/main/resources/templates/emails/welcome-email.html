@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chào mừng đến với CashBee</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7fa;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 50px 20px;
+            text-align: center;
+        }
+        .logo {
+            max-width: 120px;
+            height: auto;
+            margin-bottom: 20px;
+        }
+        .header-title {
+            color: #ffffff;
+            font-size: 32px;
+            font-weight: bold;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header-subtitle {
+            color: #ffffff;
+            font-size: 18px;
+            margin-top: 10px;
+            opacity: 0.95;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 22px;
+            color: #333333;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .message {
+            font-size: 16px;
+            color: #555555;
+            line-height: 1.8;
+            margin-bottom: 25px;
+        }
+        .referral-box {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin: 30px 0;
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
+        }
+        .referral-label {
+            color: #ffffff;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        .referral-code {
+            color: #ffffff;
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            margin: 15px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-family: 'Courier New', monospace;
+        }
+        .referral-description {
+            color: #ffffff;
+            font-size: 14px;
+            margin-top: 15px;
+            opacity: 0.95;
+            line-height: 1.6;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            text-decoration: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 20px 0;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: transform 0.2s;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .features {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        .features-title {
+            color: #333333;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .feature-icon {
+            color: #667eea;
+            font-size: 24px;
+            margin-right: 15px;
+        }
+        .feature-text {
+            color: #555555;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer-text {
+            color: #6c757d;
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 5px 0;
+        }
+        .footer-link {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .footer-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <img th:src="'cid:logo'" src="../static/images/cashbee-logo.png" alt="CashBee Logo" class="logo"/>
+            <h1 class="header-title">🎉 Chào mừng đến với CashBee!</h1>
+            <p class="header-subtitle">Bắt đầu hành trình kiếm cashback cùng chúng tôi</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <p class="greeting">
+                Xin chào <strong th:text="${fullName}">Bạn</strong>!
+            </p>
+
+            <p class="message">
+                Chúc mừng bạn đã tạo tài khoản thành công tại <strong th:text="${appName}">CashBee</strong>!
+                Chúng tôi rất vui mừng được đồng hành cùng bạn trong hành trình mua sắm thông minh và nhận cashback hấp dẫn.
+            </p>
+
+            <!-- Referral Code -->
+            <div class="referral-box">
+                <div class="referral-label">Mã giới thiệu của bạn</div>
+                <div class="referral-code" th:text="${referralCode}">CBXYZ123</div>
+                <div class="referral-description">
+                    Chia sẻ mã này với bạn bè để cùng nhận thưởng!<br/>
+                    Mỗi người bạn đăng ký qua mã của bạn, cả hai sẽ nhận được phần thưởng đặc biệt 🎁
+                </div>
+            </div>
+
+            <!-- CTA Button -->
+            <div style="text-align: center;">
+                <a th:href="${appUrl}" href="#" class="cta-button">
+                    Bắt đầu mua sắm ngay
+                </a>
+            </div>
+
+            <!-- Features -->
+            <div class="features">
+                <div class="features-title">Bạn có thể làm gì với CashBee?</div>
+
+                <div class="feature-item">
+                    <div class="feature-icon">💰</div>
+                    <div class="feature-text">
+                        <strong>Nhận cashback</strong> khi mua sắm qua các liên kết affiliate từ Shopee, Lazada, Tiki và nhiều nền tảng khác
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon">👥</div>
+                    <div class="feature-text">
+                        <strong>Giới thiệu bạn bè</strong> để nhận thêm phần thưởng hoa hồng từ hệ thống giới thiệu
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon">💳</div>
+                    <div class="feature-text">
+                        <strong>Rút tiền dễ dàng</strong> về tài khoản ngân hàng khi đạt ngưỡng tối thiểu
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-text">
+                        <strong>Theo dõi thu nhập</strong> và lịch sử giao dịch minh bạch, rõ ràng
+                    </div>
+                </div>
+            </div>
+
+            <p class="message">
+                Nếu bạn có bất kỳ câu hỏi nào, đừng ngần ngại liên hệ với đội ngũ hỗ trợ của chúng tôi.
+                Chúng tôi luôn sẵn sàng giúp đỡ bạn!
+            </p>
+
+            <p class="message" style="margin-top: 30px; font-weight: 600;">
+                Chúc bạn có trải nghiệm tuyệt vời! 🚀
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p class="footer-text">
+                Email này được gửi tự động, vui lòng không trả lời.
+            </p>
+            <p class="footer-text">
+                Tên đăng nhập: <strong th:text="${username}">username</strong>
+            </p>
+            <p class="footer-text">
+                <a th:href="${appUrl}" href="#" class="footer-link" th:text="${appUrl}">https://cashbee.nguocchieuvangle.io.vn</a>
+            </p>
+            <p class="footer-text">
+                &copy; 2025 <span th:text="${appName}">CashBee</span>. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

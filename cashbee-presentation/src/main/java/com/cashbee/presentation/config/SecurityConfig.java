@@ -100,8 +100,10 @@ public class SecurityConfig {
                                 // Affiliate tracking redirect endpoints - Public (no auth required)
                                 // These are the actual tracking links that users click
                                 "/api/affiliate/tracking/redirect/**",
-                                // Authentication endpoints - Public (no auth required for registration)
-                                "/api/auth/register"
+                                // Authentication endpoints - Public (no auth required)
+                                "/api/auth/register",
+                                "/api/auth/verify-otp",
+                                "/api/auth/resend-otp"
                         ).permitAll()
                         // Protected endpoints - Authentication required
                         // All other /api/** endpoints now require valid JWT token

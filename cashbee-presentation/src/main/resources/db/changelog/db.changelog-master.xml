@@ -28,4 +28,8 @@
     <include file="db/changelog/016-create-cashback-table.xml"/>
     <include file="db/changelog/017-fix-wallet-null-balances.xml"/>
 
+    <!-- OTP Email Verification -->
+    <include file="db/changelog/018-create-otp-verification-table.xml"/>
+    <include file="db/changelog/019-fix-otp-verified-column-type.xml"/>
+
 </databaseChangeLog>

@@ -2,46 +2,59 @@ package com.cashbee.application.usecase.auth;
 
 import com.cashbee.application.dto.auth.RegisterRequest;
 import com.cashbee.application.dto.auth.RegisterResponse;
+import com.cashbee.application.util.EmailMaskingUtil;
+import com.cashbee.application.util.OtpGenerator;
 import com.cashbee.application.util.ReferralCodeGenerator;
-import com.cashbee.domain.port.IdentityProviderPort;
 import com.cashbee.common.exception.BusinessException;
 import com.cashbee.domain.enums.UserRole;
-import com.cashbee.domain.enums.UserStatus;
+import com.cashbee.domain.model.OtpPurpose;
+import com.cashbee.domain.model.OtpVerification;
 import com.cashbee.domain.model.User;
-import com.cashbee.domain.model.UserWallet;
+import com.cashbee.domain.port.EmailPort;
+import com.cashbee.domain.port.IdentityProviderPort;
+import com.cashbee.domain.repository.OtpVerificationRepository;
 import com.cashbee.domain.repository.UserRepository;
-import com.cashbee.domain.repository.UserWalletRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
- * Use Case for registering a new user.
+ * Use Case for registering a new user with OTP email verification (Approach 3).
  *
- * This is a public endpoint (no authentication required) that:
+ * NEW FLOW (with OTP verification):
  * 1. Validates input (username, email, password, referral code)
  * 2. Checks for duplicates in Keycloak (username, email)
- * 3. Creates user in Keycloak with password and assigns USER role
- * 4. Generates unique referral code
- * 5. Saves user to local database
- * 6. Creates wallet with balance = 0
- * 7. Returns registration response
+ * 3. Creates user in Keycloak with ENABLED=FALSE (user cannot login yet)
+ * 4. Generates 6-digit OTP code
+ * 5. Saves OTP record with keycloakId and registration data (JSON without password)
+ * 6. Sends OTP email to user
+ * 7. Returns response indicating OTP verification is required
+ *
+ * User must then call VerifyOtpUseCase to:
+ * - Enable Keycloak user
+ * - Create local DB user
+ * - Create wallet
+ * - Complete registration
  *
  * Transaction Management:
- * - Uses @Transactional to ensure atomicity
- * - If database save fails after Keycloak creation, we attempt cleanup
- * - If Keycloak creation fails, transaction rolls back automatically
+ * - Uses @Transactional for OTP save
+ * - If OTP save fails, cleanup Keycloak user
  *
  * Error Handling:
  * - Duplicate username/email → BusinessException
  * - Invalid referral code → BusinessException
  * - Keycloak creation failure → RuntimeException
- * - Database save failure → RuntimeException (with cleanup attempt)
+ * - OTP save failure → RuntimeException (with cleanup)
+ * - Email send failure → RuntimeException (with cleanup)
  *
  * @author CashBee Team
  */
@@ -51,20 +64,25 @@ import java.util.Optional;
 public class RegisterUserUseCase {
 
     private final UserRepository userRepository;
-    private final UserWalletRepository walletRepository;
+    private final OtpVerificationRepository otpRepository;
     private final IdentityProviderPort identityProvider;
+    private final EmailPort emailPort;
     private final ReferralCodeGenerator referralCodeGenerator;
+    private final ObjectMapper objectMapper;
+
+    @Value("${cashbee.otp.expiry-minutes:5}")
+    private int otpExpiryMinutes;
 
     /**
-     * Execute user registration.
+     * Execute user registration (NEW: with OTP verification).
      *
      * @param request Registration request with user data
-     * @return RegisterResponse with user and wallet information
+     * @return RegisterResponse indicating OTP verification is required
      * @throws BusinessException if validation fails or duplicate found
      */
     @Transactional
     public RegisterResponse execute(RegisterRequest request) {
-        log.info("UseCase: Registering new user: username={}, email={}",
+        log.info("UseCase: Starting registration with OTP verification: username={}, email={}",
             request.getUsername(), request.getEmail());
 
         // Step 1: Validate referral code if provided
@@ -73,41 +91,44 @@ public class RegisterUserUseCase {
         // Step 2: Check for duplicates in Keycloak
         checkDuplicates(request);
 
-        // Step 3: Create user in Keycloak
-        String keycloakId = createKeycloakUser(request);
+        // Step 3: Create DISABLED user in Keycloak (user cannot login yet)
+        String keycloakId = createDisabledKeycloakUser(request);
 
-        // Step 4: Generate unique referral code
-        String referralCode = referralCodeGenerator.generate();
-        log.info("UseCase: Generated referral code: {}", referralCode);
+        // Step 4: Generate OTP code
+        String otpCode = OtpGenerator.generate();
+        log.info("UseCase: Generated OTP code for email: {}", request.getEmail());
 
-        // Step 5: Save user to local database
-        User user;
+        // Step 5: Save OTP record with registration data
+        OtpVerification otpVerification;
         try {
-            user = createLocalUser(request, keycloakId, referralCode);
-            log.info("UseCase: User saved to database: userId={}", user.getId());
+            otpVerification = saveOtpRecord(request, keycloakId, otpCode);
+            log.info("UseCase: OTP record saved: otpId={}", otpVerification.getId());
         } catch (Exception e) {
-            log.error("UseCase: Failed to save user to database, cleaning up Keycloak user", e);
+            log.error("UseCase: Failed to save OTP record, cleaning up Keycloak user", e);
             cleanupKeycloakUser(keycloakId);
-            throw new RuntimeException("Failed to create user account", e);
+            throw new RuntimeException("Failed to initiate registration", e);
         }
 
-        // Step 6: Create wallet for user
-        UserWallet wallet;
+        // Step 6: Send OTP email
         try {
-            wallet = createWallet(user);
-            log.info("UseCase: Wallet created: walletId={}", wallet.getId());
+            emailPort.sendOtpEmail(request.getEmail(), otpCode, otpExpiryMinutes);
+            log.info("UseCase: OTP email sent to: {}", request.getEmail());
         } catch (Exception e) {
-            log.error("UseCase: Failed to create wallet", e);
-            // Transaction will rollback, Keycloak user will be cleaned up
+            log.error("UseCase: Failed to send OTP email, cleaning up", e);
             cleanupKeycloakUser(keycloakId);
-            throw new RuntimeException("Failed to create user wallet", e);
+            otpRepository.delete(otpVerification);
+            throw new RuntimeException("Failed to send verification email. Please try again.", e);
         }
 
-        // Step 7: Build and return response
-        RegisterResponse response = buildResponse(user, wallet);
-        log.info("UseCase: User registration completed successfully: userId={}, username={}",
-            user.getId(), user.getUsername());
+        // Step 7: Build response indicating OTP verification is required
+        String maskedEmail = EmailMaskingUtil.maskEmail(request.getEmail());
+        RegisterResponse response = RegisterResponse.requiresOtpVerification(
+            request.getEmail(),
+            maskedEmail,
+            otpExpiryMinutes * 60 // Convert to seconds
+        );
 
+        log.info("UseCase: Registration initiated, OTP verification required for: {}", request.getEmail());
         return response;
     }
 
@@ -175,20 +196,18 @@ public class RegisterUserUseCase {
     }
 
     /**
-     * Create user in identity provider with password and assign USER role.
+     * Create DISABLED user in Keycloak with password.
+     * User will be enabled after OTP verification.
      * <p>
-     * Note: Role assignment is optional and will not fail the registration if the role
-     * doesn't exist in Keycloak. The user will be created successfully and can login,
-     * but won't have the USER role assigned until it's created in Keycloak.
+     * Note: Role assignment is done after OTP verification in VerifyOtpUseCase.
      *
      * @param request Registration request
-     * @return Identity provider user ID
+     * @return Keycloak user ID
      * @throws RuntimeException if user creation fails
      */
-    private String createKeycloakUser(RegisterRequest request) {
-        log.info("UseCase: Creating user in identity provider: username={}", request.getUsername());
+    private String createDisabledKeycloakUser(RegisterRequest request) {
+        log.info("UseCase: Creating DISABLED user in Keycloak: username={}", request.getUsername());
 
-        String userId = null;
         try {
             // Parse full name into first name and last name
             String firstName = null;
@@ -199,113 +218,72 @@ public class RegisterUserUseCase {
                 lastName = nameParts.length > 1 ? nameParts[1] : null;
             }
 
-            // Create user in identity provider
-            userId = identityProvider.createUser(
+            // Create DISABLED user in Keycloak (enabled=false)
+            String keycloakId = identityProvider.createUser(
                 request.getUsername(),
                 request.getEmail(),
                 request.getPassword(),
                 firstName,
                 lastName,
-                true  // enabled
+                false  // DISABLED - will be enabled after OTP verification
             );
 
-            log.info("UseCase: User created in identity provider: userId={}", userId);
-
-            // Assign USER role (non-blocking - won't fail if role doesn't exist)
-            try {
-                identityProvider.assignRole(userId, UserRole.USER);
-                log.info("UseCase: USER role assignment completed for userId={}", userId);
-            } catch (Exception roleEx) {
-                log.warn("UseCase: Role assignment failed but continuing registration: {}", roleEx.getMessage());
-                // Don't throw - user is already created and can login
-            }
-
-            return userId;
+            log.info("UseCase: DISABLED user created in Keycloak: keycloakId={}", keycloakId);
+            return keycloakId;
 
         } catch (Exception e) {
-            log.error("UseCase: Failed to create user in identity provider", e);
+            log.error("UseCase: Failed to create user in Keycloak", e);
             throw new RuntimeException("Failed to create user in authentication system", e);
         }
     }
 
     /**
-     * Create user in local database.
+     * Save OTP verification record with registration data.
+     * Registration data is stored as JSON (without password).
      *
      * @param request Registration request
      * @param keycloakId Keycloak user ID
-     * @param referralCode Generated referral code
-     * @return Saved user
+     * @param otpCode Generated OTP code
+     * @return Saved OTP verification
+     * @throws JsonProcessingException if JSON serialization fails
      */
-    private User createLocalUser(RegisterRequest request, String keycloakId, String referralCode) {
-        log.debug("UseCase: Creating user in local database");
+    private OtpVerification saveOtpRecord(RegisterRequest request, String keycloakId, String otpCode)
+            throws JsonProcessingException {
+        log.debug("UseCase: Saving OTP record for email: {}", request.getEmail());
 
-        LocalDateTime now = LocalDateTime.now();
+        // Build registration data JSON (WITHOUT password)
+        Map<String, String> registrationData = new HashMap<>();
+        registrationData.put("username", request.getUsername());
+        registrationData.put("fullName", request.getFullName());
+        registrationData.put("phone", request.getPhone());
+        registrationData.put("referredBy", request.getReferredBy());
 
-        User user = User.builder()
-            .keycloakId(keycloakId)
-            .username(request.getUsername())
+        String registrationDataJson = objectMapper.writeValueAsString(registrationData);
+
+        // Calculate expiry time
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(otpExpiryMinutes);
+
+        // Build and save OTP verification
+        OtpVerification otpVerification = OtpVerification.builder()
             .email(request.getEmail())
-            .fullName(request.getFullName())
-            .phone(request.getPhone())
-            .referralCode(referralCode)
-            .referredBy(request.getReferredBy())  // Nullable
-            .status(UserStatus.ACTIVE)
-            .lastSyncAt(now)
-            .createdAt(now)
-            .updatedAt(now)
+            .otpCode(otpCode)
+            .purpose(OtpPurpose.REGISTRATION)
+            .keycloakId(keycloakId)
+            .registrationData(registrationDataJson)
+            .createdAt(LocalDateTime.now())
+            .expiresAt(expiresAt)
+            .verified(false)
+            .attemptCount(0)
+            .maxAttempts(3)
+            .resendCount(0)
             .build();
 
-        return userRepository.save(user);
+        // Validate before saving
+        otpVerification.validate();
+
+        return otpRepository.save(otpVerification);
     }
 
-    /**
-     * Create wallet for user with zero balance.
-     *
-     * @param user User entity
-     * @return Created wallet
-     */
-    private UserWallet createWallet(User user) {
-        log.debug("UseCase: Creating wallet for userId={}", user.getId());
-
-        LocalDateTime now = LocalDateTime.now();
-
-        UserWallet wallet = UserWallet.builder()
-            .userId(user.getId())
-            .balance(BigDecimal.ZERO)
-            .pendingBalance(BigDecimal.ZERO)
-            .lockedBalance(BigDecimal.ZERO)
-            .totalEarned(BigDecimal.ZERO)
-            .totalWithdrawn(BigDecimal.ZERO)
-            .createdAt(now)
-            .updatedAt(now)
-            .build();
-
-        return walletRepository.save(wallet);
-    }
-
-    /**
-     * Build registration response.
-     *
-     * @param user Created user
-     * @param wallet Created wallet
-     * @return RegisterResponse
-     */
-    private RegisterResponse buildResponse(User user, UserWallet wallet) {
-        return RegisterResponse.builder()
-            .userId(user.getId())
-            .keycloakId(user.getKeycloakId())
-            .username(user.getUsername())
-            .email(user.getEmail())
-            .fullName(user.getFullName())
-            .phone(user.getPhone())
-            .referralCode(user.getReferralCode())
-            .referredBy(user.getReferredBy())
-            .walletId(wallet.getId())
-            .status(user.getStatus().name())
-            .createdAt(user.getCreatedAt())
-            .message("Registration successful! Your referral code is: " + user.getReferralCode())
-            .build();
-    }
 
     /**
      * Cleanup identity provider user if database operation fails.

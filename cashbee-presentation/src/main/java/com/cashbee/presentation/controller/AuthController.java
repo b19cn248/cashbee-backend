@@ -2,7 +2,13 @@ package com.cashbee.presentation.controller;
 
 import com.cashbee.application.dto.auth.RegisterRequest;
 import com.cashbee.application.dto.auth.RegisterResponse;
+import com.cashbee.application.dto.auth.ResendOtpRequest;
+import com.cashbee.application.dto.auth.ResendOtpResponse;
+import com.cashbee.application.dto.auth.VerifyOtpRequest;
+import com.cashbee.application.dto.auth.VerifyOtpResponse;
 import com.cashbee.application.usecase.auth.RegisterUserUseCase;
+import com.cashbee.application.usecase.auth.ResendOtpUseCase;
+import com.cashbee.application.usecase.auth.VerifyOtpUseCase;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,10 +48,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Authentication", description = "Public authentication endpoints (registration, login)")
+@Tag(name = "Authentication", description = "Public authentication endpoints (registration, OTP verification, login)")
 public class AuthController {
 
     private final RegisterUserUseCase registerUserUseCase;
+    private final VerifyOtpUseCase verifyOtpUseCase;
+    private final ResendOtpUseCase resendOtpUseCase;
 
     /**
      * Register a new user.
@@ -124,9 +132,72 @@ public class AuthController {
         log.info("API: User registered successfully: userId={}, username={}, referralCode={}",
             response.getUserId(), response.getUsername(), response.getReferralCode());
 
-        // Return 201 Created with response
+        // Return 200 OK (not 201 Created anymore - registration not complete yet)
+        return ResponseEntity
+                .ok(ApiResponse.success(response, response.getMessage()));
+    }
+
+    /**
+     * Verify OTP and complete user registration.
+     * <p>
+     * After user receives OTP email, they must verify it to complete registration.
+     * This endpoint enables the Keycloak user, creates local DB user, and creates wallet.
+     *
+     * @param request OTP verification request
+     * @return API response with user information
+     */
+    @PostMapping("/verify-otp")
+    @Operation(
+        summary = "Verify OTP and complete registration",
+        description = "Verify the OTP code sent to email. " +
+                      "Completes user registration by enabling Keycloak account, " +
+                      "creating local database user, and creating wallet. " +
+                      "After successful verification, user can login."
+    )
+    public ResponseEntity<ApiResponse<VerifyOtpResponse>> verifyOtp(
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        log.info("API: OTP verification request received: email={}", request.email());
+
+        // Execute OTP verification use case
+        VerifyOtpResponse response = verifyOtpUseCase.execute(request);
+
+        log.info("API: OTP verified successfully: userId={}, username={}",
+            response.userId(), response.username());
+
+        // Return 201 Created (registration now complete)
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, response.getMessage()));
+                .body(ApiResponse.success(response, "Email verified successfully! Your account is now active."));
+    }
+
+    /**
+     * Resend OTP verification email.
+     * <p>
+     * If user didn't receive OTP or it expired, they can request a new one.
+     * Subject to cooldown period and daily limit.
+     *
+     * @param request Resend OTP request
+     * @return API response with masked email
+     */
+    @PostMapping("/resend-otp")
+    @Operation(
+        summary = "Resend OTP verification email",
+        description = "Request a new OTP code to be sent to email. " +
+                      "Subject to cooldown period (30 seconds) and daily limit (5 resends). " +
+                      "Resets attempt count and extends expiry time."
+    )
+    public ResponseEntity<ApiResponse<ResendOtpResponse>> resendOtp(
+            @Valid @RequestBody ResendOtpRequest request) {
+
+        log.info("API: Resend OTP request received: email={}", request.email());
+
+        // Execute resend OTP use case
+        ResendOtpResponse response = resendOtpUseCase.execute(request);
+
+        log.info("API: OTP resent successfully: email={}", request.email());
+
+        return ResponseEntity
+                .ok(ApiResponse.success(response, response.message()));
     }
 }

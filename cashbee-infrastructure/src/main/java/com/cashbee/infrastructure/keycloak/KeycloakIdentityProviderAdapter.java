@@ -84,6 +84,26 @@ public class KeycloakIdentityProviderAdapter implements IdentityProviderPort {
         return keycloakAdminService.getUserByEmail(email).isPresent();
     }
 
+    @Override
+    public void enableUser(String userId) {
+        log.debug("Adapter: Enabling user in Keycloak: {}", userId);
+        keycloakAdminService.enableUser(userId);
+    }
+
+    @Override
+    public void disableUser(String userId) {
+        log.debug("Adapter: Disabling user in Keycloak: {}", userId);
+        keycloakAdminService.disableUser(userId);
+    }
+
+    @Override
+    public Optional<IdentityUser> getUserById(String userId) {
+        log.debug("Adapter: Getting user by ID: {}", userId);
+
+        Optional<UserRepresentation> keycloakUser = keycloakAdminService.getUserById(userId);
+        return keycloakUser.map(this::toIdentityUser);
+    }
+
     /**
      * Convert Keycloak UserRepresentation to IdentityUser.
      *

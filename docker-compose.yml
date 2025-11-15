@@ -48,6 +48,10 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: rootpassword
 
+      # Mail configuration
+      MAIL_USERNAME: hieunm123.ptit@gmail.com
+      MAIL_PASSWORD: mauh rsak uxpc kbpo
+
       # Liquibase Configuration
       SPRING_LIQUIBASE_ENABLED: true
       SPRING_LIQUIBASE_DEFAULT_SCHEMA: cashbee

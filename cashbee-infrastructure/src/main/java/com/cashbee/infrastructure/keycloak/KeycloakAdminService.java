@@ -475,6 +475,28 @@ public class KeycloakAdminService {
     }
 
     /**
+     * Enable a disabled user account.
+     * Used after OTP verification to activate newly registered users.
+     *
+     * @param keycloakId Keycloak user ID
+     */
+    public void enableUser(String keycloakId) {
+        log.info("Enabling user account: {}", keycloakId);
+        setUserEnabled(keycloakId, true);
+    }
+
+    /**
+     * Disable an enabled user account.
+     * Used for account suspension or security purposes.
+     *
+     * @param keycloakId Keycloak user ID
+     */
+    public void disableUser(String keycloakId) {
+        log.info("Disabling user account: {}", keycloakId);
+        setUserEnabled(keycloakId, false);
+    }
+
+    /**
      * Delete user from Keycloak.
      * WARNING: This is a permanent deletion.
      *

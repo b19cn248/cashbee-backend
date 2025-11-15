@@ -46,6 +46,23 @@ spring:
       write-dates-as-timestamps: false
       indent-output: true
 
+  # Email Configuration (Gmail SMTP)
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:your-email@gmail.com}
+    password: ${MAIL_PASSWORD:your-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   # OAuth2 Resource Server Configuration
   security:
     oauth2:
@@ -172,3 +189,15 @@ keycloak:
     # Comment out if using client credentials
     username: ${KEYCLOAK_ADMIN_USERNAME:admin}
     password: ${KEYCLOAK_ADMIN_PASSWORD:1234}
+
+# CashBee Application Configuration
+cashbee:
+  app:
+    name: CashBee
+    url: ${APP_URL:https://cashbee.nguocchieuvangle.io.vn}
+
+  # OTP Configuration
+  otp:
+    expiry-minutes: 5                    # OTP expires after 5 minutes
+    resend-cooldown-seconds: 30          # Minimum 30 seconds between resends
+    max-resends-per-day: 5               # Maximum 5 OTP requests per email per day

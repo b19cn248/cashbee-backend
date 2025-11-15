@@ -96,4 +96,33 @@ public interface IdentityProviderPort {
      * @return true if email exists
      */
     boolean existsByEmail(String email);
+
+    /**
+     * Enable a disabled user in the identity provider.
+     * <p>
+     * Used after OTP verification to enable a user that was created
+     * in disabled state during registration.
+     *
+     * @param userId User ID in identity provider
+     * @throws RuntimeException if user enabling fails
+     */
+    void enableUser(String userId);
+
+    /**
+     * Disable an enabled user in the identity provider.
+     * <p>
+     * Can be used for account suspension or security purposes.
+     *
+     * @param userId User ID in identity provider
+     * @throws RuntimeException if user disabling fails
+     */
+    void disableUser(String userId);
+
+    /**
+     * Get a user by their identity provider ID.
+     *
+     * @param userId User ID in identity provider
+     * @return Optional containing user if found
+     */
+    Optional<IdentityUser> getUserById(String userId);
 }

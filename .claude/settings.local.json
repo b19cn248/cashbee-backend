@@ -29,7 +29,8 @@
       "Bash(claude mcp --help:*)",
       "Bash(claude mcp reset-project-choices:*)",
       "mcp__cashbee_server_mysql__mysql_query",
-      "WebSearch"
+      "WebSearch",
+      "Bash(copy \"D:\\workspace\\my-app\\assets\\icon.png\" \"C:\\Users\\Windows\\workspace\\cashbee-backend\\cashbee-infrastructure\\src\\main\\resources\\static\\images\\cashbee-logo.png\")"
     ],
     "deny": [],
     "ask": []

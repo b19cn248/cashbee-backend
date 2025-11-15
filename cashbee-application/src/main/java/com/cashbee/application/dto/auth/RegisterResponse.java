@@ -98,8 +98,30 @@ public class RegisterResponse {
     /**
      * Success message for mobile app.
      * Example: "Registration successful! Your referral code is CB4F7A9K"
+     * Or: "OTP has been sent to your email. Please verify to complete registration."
      */
     private String message;
+
+    /**
+     * Indicates if OTP verification is required.
+     * If true, frontend should navigate to OTP verification screen.
+     * If false, registration is complete (old flow - not used anymore).
+     */
+    private boolean requiresOtp;
+
+    /**
+     * Masked email for display on OTP screen.
+     * Example: "j***@ex***ple.com"
+     * Only populated when requiresOtp = true.
+     */
+    private String maskedEmail;
+
+    /**
+     * OTP expiry time in seconds.
+     * Example: 300 (5 minutes)
+     * Only populated when requiresOtp = true.
+     */
+    private Integer expiresIn;
 
     /**
      * Check if user was referred by someone.
@@ -108,5 +130,24 @@ public class RegisterResponse {
      */
     public boolean hasReferrer() {
         return referredBy != null && !referredBy.isBlank();
+    }
+
+    /**
+     * Factory method for OTP-required response (new flow).
+     * Used when registration creates disabled Keycloak user and sends OTP.
+     *
+     * @param email User's email
+     * @param maskedEmail Masked email for display
+     * @param expiresIn OTP expiry in seconds
+     * @return RegisterResponse indicating OTP is required
+     */
+    public static RegisterResponse requiresOtpVerification(String email, String maskedEmail, int expiresIn) {
+        return RegisterResponse.builder()
+            .email(email)
+            .maskedEmail(maskedEmail)
+            .requiresOtp(true)
+            .expiresIn(expiresIn)
+            .message("Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra và xác thực để hoàn tất đăng ký.")
+            .build();
     }
 }
