@@ -29,7 +29,7 @@
         <insert tableName="cashback_policy">
             <column name="policy_name" value="Shopee VIP User Policy"/>
             <column name="policy_code" value="SHOPEE_VIP_2025"/>
-            <column name="platform_id" value="1"/> <!-- Shopee -->
+            <column name="platform_id" value="2"/> <!-- Shopee -->
             <column name="user_level" value="VIP"/>
             <column name="cashback_rate" value="80.00"/>
             <column name="min_order_value" value="0.00"/>
@@ -46,7 +46,7 @@
         <insert tableName="cashback_policy">
             <column name="policy_name" value="Shopee Super VIP Policy"/>
             <column name="policy_code" value="SHOPEE_SUPER_2025"/>
-            <column name="platform_id" value="1"/> <!-- Shopee -->
+            <column name="platform_id" value="3"/> <!-- Shopee -->
             <column name="user_level" value="SUPER"/>
             <column name="cashback_rate" value="90.00"/>
             <column name="min_order_value" value="0.00"/>
@@ -63,7 +63,7 @@
         <insert tableName="cashback_policy">
             <column name="policy_name" value="Universal Normal User Policy"/>
             <column name="policy_code" value="UNIVERSAL_NORMAL_2025"/>
-            <column name="platform_id" valueNumeric="null"/> <!-- NULL = all platforms -->
+            <column name="platform_id" valueNumeric="3"/> <!-- NULL = all platforms -->
             <column name="user_level" value="NORMAL"/>
             <column name="cashback_rate" value="60.00"/> <!-- Lower than platform-specific -->
             <column name="min_order_value" value="0.00"/>
