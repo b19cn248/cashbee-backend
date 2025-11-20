@@ -336,8 +336,4 @@
                 columnDataType="VARCHAR(100)"/>
     </changeSet>
 
-    <rollback>
-        <dropColumn tableName="bank" columnName="short_name"/>
-    </rollback>
-
 </databaseChangeLog>
