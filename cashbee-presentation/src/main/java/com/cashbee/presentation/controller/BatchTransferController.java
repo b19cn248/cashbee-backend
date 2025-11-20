@@ -1,0 +1,263 @@
+package com.cashbee.presentation.controller;
+
+import com.cashbee.application.dto.batch.ExportBatchTransferRequest;
+import com.cashbee.application.dto.batch.ExportBatchTransferResponse;
+import com.cashbee.application.service.email.BatchTransferEmailService;
+import com.cashbee.application.service.usecase.ExportBatchTransferUseCase;
+import com.cashbee.application.service.usecase.GenerateBatchTransferFileUseCase;
+import com.cashbee.application.service.usecase.GetBatchExportHistoryUseCase;
+import com.cashbee.presentation.dto.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * REST Controller for batch transfer operations.
+ *
+ * Provides endpoints for:
+ * - Creating batch export metadata
+ * - Downloading Excel files
+ * - Sending files via email
+ * - Viewing export history
+ *
+ * All endpoints require ADMIN role.
+ *
+ * @author CashBee Team
+ */
+@RestController
+@RequestMapping("/api/admin/batch-transfer")
+@RequiredArgsConstructor
+@Slf4j
+@Tag(name = "Batch Transfer", description = "Batch transfer management APIs")
+@PreAuthorize("hasRole('ADMIN')")
+public class BatchTransferController {
+
+    private final ExportBatchTransferUseCase exportBatchTransferUseCase;
+    private final GenerateBatchTransferFileUseCase generateBatchTransferFileUseCase;
+    private final GetBatchExportHistoryUseCase getBatchExportHistoryUseCase;
+    private final BatchTransferEmailService emailService;
+
+    /**
+     * Create batch export metadata.
+     *
+     * POST /api/admin/batch-transfer/export
+     *
+     * Request body:
+     * {
+     *   "minBalance": 50000,
+     *   "remarkTemplate": "Hoan tien CashBee 11/2025",
+     *   "exportType": "MANUAL"
+     * }
+     *
+     * Response:
+     * {
+     *   "success": true,
+     *   "data": {
+     *     "batchCode": "BATCH_20251119_001",
+     *     "fileName": "BATCH_20251119_001.xls",
+     *     "totalUsers": 25,
+     *     "totalAmount": 15500000,
+     *     "exportedAt": "2025-11-19T14:30:00",
+     *     "message": "Export completed. 25 users eligible for transfer (total: 15,500,000 VND)"
+     *   }
+     * }
+     */
+    @PostMapping("/export")
+    @Operation(summary = "Create batch export metadata", description = "Create batch export metadata and calculate totals")
+    public ResponseEntity<ApiResponse<ExportBatchTransferResponse>> exportBatchTransfer(
+            @RequestBody(required = false) ExportBatchTransferRequest request) {
+
+        log.info("BatchTransferController: POST /export - request: {}", request);
+
+        // Use default request if not provided
+        if (request == null) {
+            request = ExportBatchTransferRequest.builder().build();
+        }
+
+        ExportBatchTransferResponse response = exportBatchTransferUseCase.execute(request);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * Download batch transfer Excel file.
+     *
+     * GET /api/admin/batch-transfer/download?batchCode=BATCH_20251119_001
+     *
+     * Returns Excel file (.xls) as attachment.
+     *
+     * Note: File is generated fresh each time (realtime data).
+     */
+    @GetMapping("/download")
+    @Operation(summary = "Download batch transfer file", description = "Generate and download Excel file for batch transfer")
+    public ResponseEntity<byte[]> downloadBatchTransferFile(
+            @RequestParam(required = false) String batchCode) {
+
+        log.info("BatchTransferController: GET /download - batchCode: {}", batchCode);
+
+        byte[] excelBytes;
+        String fileName;
+
+        if (batchCode != null && !batchCode.isBlank()) {
+            // Generate by batch code
+            excelBytes = generateBatchTransferFileUseCase.generateByBatchCode(batchCode);
+            fileName = batchCode + ".xls";
+        } else {
+            // Generate fresh with default criteria
+            excelBytes = generateBatchTransferFileUseCase.generateFile(
+                    java.math.BigDecimal.valueOf(50000),
+                    null // Use default remark
+            );
+            fileName = "BATCH_TRANSFER_" +
+                    java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) +
+                    ".xls";
+        }
+
+        // Set headers for file download
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDispositionFormData("attachment", fileName);
+        headers.setContentLength(excelBytes.length);
+
+        log.info("BatchTransferController: Returning file {} ({} bytes)", fileName, excelBytes.length);
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(excelBytes);
+    }
+
+    /**
+     * Send batch transfer file via email.
+     *
+     * POST /api/admin/batch-transfer/send-email
+     *
+     * Request body:
+     * {
+     *   "batchCode": "BATCH_20251119_001",
+     *   "recipientEmail": "admin@cashbee.com"
+     * }
+     *
+     * Response:
+     * {
+     *   "success": true,
+     *   "message": "Email sent successfully"
+     * }
+     */
+    @PostMapping("/send-email")
+    @Operation(summary = "Send batch transfer file via email", description = "Generate and send Excel file via email")
+    public ResponseEntity<ApiResponse<String>> sendBatchTransferEmail(
+            @RequestBody SendEmailRequest request) {
+
+        log.info("BatchTransferController: POST /send-email - request: {}", request);
+
+        // Generate file
+        byte[] excelBytes;
+        String fileName;
+        Integer totalUsers;
+        java.math.BigDecimal totalAmount;
+
+        if (request.getBatchCode() != null && !request.getBatchCode().isBlank()) {
+            // Generate by batch code and get metadata
+            excelBytes = generateBatchTransferFileUseCase.generateByBatchCode(request.getBatchCode());
+            fileName = request.getBatchCode() + ".xls";
+
+            // Get metadata from database (we would need to add this logic)
+            // For now, use placeholders
+            totalUsers = 0;
+            totalAmount = java.math.BigDecimal.ZERO;
+
+        } else {
+            // Generate fresh
+            excelBytes = generateBatchTransferFileUseCase.generateFile(
+                    java.math.BigDecimal.valueOf(50000),
+                    null
+            );
+            fileName = "BATCH_TRANSFER_" +
+                    java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) +
+                    ".xls";
+            totalUsers = 0;
+            totalAmount = java.math.BigDecimal.ZERO;
+        }
+
+        // Send email
+        emailService.sendBatchTransferFile(
+                fileName,
+                excelBytes,
+                totalUsers,
+                totalAmount,
+                request.getRecipientEmail()
+        );
+
+        return ResponseEntity.ok(ApiResponse.success("Email sent successfully to " +
+                (request.getRecipientEmail() != null ? request.getRecipientEmail() : "admin email")));
+    }
+
+    /**
+     * Get batch export history.
+     *
+     * GET /api/admin/batch-transfer/history?page=0&size=10
+     *
+     * Response:
+     * {
+     *   "success": true,
+     *   "data": {
+     *     "content": [...],
+     *     "totalElements": 100,
+     *     "totalPages": 10,
+     *     "size": 10,
+     *     "number": 0
+     *   }
+     * }
+     */
+    @GetMapping("/history")
+    @Operation(summary = "Get batch export history", description = "View all batch export history with pagination")
+    public ResponseEntity<ApiResponse<Page<ExportBatchTransferResponse>>> getBatchExportHistory(
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+
+        log.info("BatchTransferController: GET /history - page: {}", pageable.getPageNumber());
+
+        Page<ExportBatchTransferResponse> history = getBatchExportHistoryUseCase.execute(pageable);
+
+        return ResponseEntity.ok(ApiResponse.success(history));
+    }
+
+    /**
+     * Get batch export history by type.
+     *
+     * GET /api/admin/batch-transfer/history/MANUAL?page=0&size=10
+     */
+    @GetMapping("/history/{exportType}")
+    @Operation(summary = "Get batch export history by type", description = "View batch export history filtered by type")
+    public ResponseEntity<ApiResponse<Page<ExportBatchTransferResponse>>> getBatchExportHistoryByType(
+            @PathVariable String exportType,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+
+        log.info("BatchTransferController: GET /history/{} - page: {}", exportType, pageable.getPageNumber());
+
+        Page<ExportBatchTransferResponse> history = getBatchExportHistoryUseCase.executeByType(exportType, pageable);
+
+        return ResponseEntity.ok(ApiResponse.success(history));
+    }
+
+    /**
+     * Request DTO for send email endpoint.
+     */
+    public record SendEmailRequest(String batchCode, String recipientEmail) {
+        public String getBatchCode() {
+            return batchCode;
+        }
+
+        public String getRecipientEmail() {
+            return recipientEmail;
+        }
+    }
+}

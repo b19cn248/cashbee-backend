@@ -201,3 +201,21 @@ cashbee:
     expiry-minutes: 5                    # OTP expires after 5 minutes
     resend-cooldown-seconds: 30          # Minimum 30 seconds between resends
     max-resends-per-day: 5               # Maximum 5 OTP requests per email per day
+
+  # Batch Transfer Configuration
+  batch-transfer:
+    # Minimum balance required for batch transfer (VND)
+    min-balance: 50000
+
+    # Admin email to receive scheduled batch transfer files
+    admin-email: ${BATCH_TRANSFER_ADMIN_EMAIL:admin@cashbee.com}
+
+    # Scheduler configuration
+    scheduler:
+      # Enable/disable scheduled batch transfer exports
+      enabled: ${BATCH_TRANSFER_SCHEDULER_ENABLED:true}
+
+      # Cron expression: Every Monday at 08:00
+      # Format: second minute hour day-of-month month day-of-week
+      # 0 0 8 * * MON = At 08:00 on Monday
+      cron: ${BATCH_TRANSFER_SCHEDULER_CRON:0 0 8 * * MON}

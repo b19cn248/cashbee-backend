@@ -22,11 +22,17 @@ public interface UserDtoMapper {
 
     /**
      * Convert User domain model to UserResponse DTO.
+     * Bank account fields (accountNumber, accountName, bankCode, bankName)
+     * are ignored here and will be populated separately from UserBankAccount.
      *
      * @param user Domain model
      * @return Response DTO
      */
     @Mapping(target = "status", source = "status", qualifiedByName = "statusToString")
+    @Mapping(target = "accountNumber", ignore = true)
+    @Mapping(target = "accountName", ignore = true)
+    @Mapping(target = "bankCode", ignore = true)
+    @Mapping(target = "bankName", ignore = true)
     UserResponse toResponse(User user);
 
     /**

@@ -4,6 +4,7 @@ import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.port.UserDtoMapper;
 import com.cashbee.common.exception.NotFoundException;
 import com.cashbee.domain.model.User;
+import com.cashbee.domain.repository.UserBankAccountRepository;
 import com.cashbee.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,13 +32,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class GetUserByKeycloakIdUseCase {
 
     private final UserRepository userRepository;
+    private final UserBankAccountRepository userBankAccountRepository;
     private final UserDtoMapper userMapper;
 
     /**
      * Get user by Keycloak ID.
      *
      * @param keycloakId Keycloak user ID
-     * @return User response DTO
+     * @return User response DTO with bank account info (if exists)
      * @throws NotFoundException if user doesn't exist
      */
     @Transactional(readOnly = true)
@@ -51,6 +53,18 @@ public class GetUserByKeycloakIdUseCase {
         log.debug("Found user: id={}, username={}, status={}",
             user.getId(), user.getUsername(), user.getStatus());
 
-        return userMapper.toResponse(user);
+        // Map to response
+        UserResponse response = userMapper.toResponse(user);
+
+        // Add bank account info if exists
+        userBankAccountRepository.findByUserId(user.getId())
+                .ifPresent(bankAccount -> {
+                    response.setAccountNumber(bankAccount.getAccountNumber());
+                    response.setAccountName(bankAccount.getAccountName());
+                    response.setBankCode(bankAccount.getBankCode());
+                    response.setBankName(bankAccount.getBankName());
+                });
+
+        return response;
     }
 }

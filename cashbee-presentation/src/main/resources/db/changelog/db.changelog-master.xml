@@ -32,4 +32,12 @@
     <include file="db/changelog/018-create-otp-verification-table.xml"/>
     <include file="db/changelog/019-fix-otp-verified-column-type.xml"/>
 
+    <!-- Batch Transfer Export -->
+    <include file="db/changelog/020-create-batch-transfer-tables.xml"/>
+
+    <!-- Bank Management -->
+    <include file="db/changelog/021-create-bank-table.xml"/>
+    <include file="db/changelog/022-seed-banks.xml"/>
+    <include file="db/changelog/023-add-short-name-to-bank.xml"/>
+
 </databaseChangeLog>

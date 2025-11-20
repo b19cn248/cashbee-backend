@@ -30,7 +30,9 @@
       "Bash(claude mcp reset-project-choices:*)",
       "mcp__cashbee_server_mysql__mysql_query",
       "WebSearch",
-      "Bash(copy \"D:\\workspace\\my-app\\assets\\icon.png\" \"C:\\Users\\Windows\\workspace\\cashbee-backend\\cashbee-infrastructure\\src\\main\\resources\\static\\images\\cashbee-logo.png\")"
+      "Bash(copy \"D:\\workspace\\my-app\\assets\\icon.png\" \"C:\\Users\\Windows\\workspace\\cashbee-backend\\cashbee-infrastructure\\src\\main\\resources\\static\\images\\cashbee-logo.png\")",
+      "Bash(mkdir:*)",
+      "Bash(copy \"D:\\docs\\Batch_20599290.xls\" \"C:\\Users\\Windows\\workspace\\cashbee-backend\\cashbee-infrastructure\\src\\main\\resources\\templates\\vpbank_template.xls\")"
     ],
     "deny": [],
     "ask": []

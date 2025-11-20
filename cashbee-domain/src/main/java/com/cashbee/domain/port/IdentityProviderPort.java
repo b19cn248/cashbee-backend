@@ -2,6 +2,7 @@ package com.cashbee.domain.port;
 
 import com.cashbee.domain.enums.UserRole;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -125,4 +126,25 @@ public interface IdentityProviderPort {
      * @return Optional containing user if found
      */
     Optional<IdentityUser> getUserById(String userId);
+
+    /**
+     * Update user information in identity provider.
+     *
+     * @param userId User ID in identity provider
+     * @param email New email (optional, null to skip)
+     * @param firstName New first name (optional, null to skip)
+     * @param lastName New last name (optional, null to skip)
+     * @throws RuntimeException if update fails
+     */
+    void updateUser(String userId, String email, String firstName, String lastName);
+
+    /**
+     * Update user custom attributes in identity provider.
+     * Attributes can be included in JWT tokens.
+     *
+     * @param userId User ID in identity provider
+     * @param attributes Map of attribute name -> value
+     * @throws RuntimeException if update fails
+     */
+    void updateUserAttributes(String userId, Map<String, String> attributes);
 }

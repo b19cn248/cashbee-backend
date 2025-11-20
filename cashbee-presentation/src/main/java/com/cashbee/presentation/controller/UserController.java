@@ -1,9 +1,11 @@
 package com.cashbee.presentation.controller;
 
+import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.dto.user.UserSyncCommand;
 import com.cashbee.application.usecase.user.GetUserByKeycloakIdUseCase;
 import com.cashbee.application.usecase.user.SyncUserFromKeycloakUseCase;
+import com.cashbee.application.usecase.user.UpdateUserUseCase;
 import com.cashbee.application.util.SecurityUtils;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +38,7 @@ public class UserController {
 
     private final SyncUserFromKeycloakUseCase syncUserFromKeycloakUseCase;
     private final GetUserByKeycloakIdUseCase getUserByKeycloakIdUseCase;
+    private final UpdateUserUseCase updateUserUseCase;
     private final SecurityUtils securityUtils;
 
     /**
@@ -118,5 +121,57 @@ public class UserController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(ApiResponse.success(user));
+    }
+
+    /**
+     * Update current user information.
+     *
+     * This endpoint allows users to update their profile including:
+     * - Basic information (fullName, phone)
+     * - Bank account information (accountNumber, bankCode)
+     *
+     * All fields are optional - only provided fields will be updated.
+     *
+     * Usage (Frontend):
+     * <pre>
+     * const response = await fetch('/api/users/me', {
+     *   method: 'PUT',
+     *   headers: {
+     *     'Authorization': `Bearer ${token}`,
+     *     'Content-Type': 'application/json'
+     *   },
+     *   body: JSON.stringify({
+     *     fullName: "Nguyen Van A",
+     *     phone: "0987654321",
+     *     accountNumber: "1234567890",
+     *     bankCode: "VPBANK"
+     *   })
+     * });
+     * </pre>
+     *
+     * @param jwt JWT token (auto-injected by Spring Security)
+     * @param command Update command with new values
+     * @return Updated user information
+     */
+    @PutMapping("/me")
+    @Operation(summary = "Update current user",
+            description = "Update current user's profile information including bank account")
+    public ResponseEntity<ApiResponse<UserResponse>> updateCurrentUser(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UpdateUserCommand command) {
+
+        log.info("API: Updating current user");
+
+        // Extract keycloakId from JWT
+        String keycloakId = securityUtils.getKeycloakUserId(jwt);
+
+        // Execute update
+        UserResponse user = updateUserUseCase.execute(keycloakId, command);
+
+        log.info("API: User updated successfully: userId={}", user.getId());
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ApiResponse.success(user, "User updated successfully"));
     }
 }

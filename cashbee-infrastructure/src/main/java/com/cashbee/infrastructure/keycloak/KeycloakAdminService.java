@@ -514,4 +514,113 @@ public class KeycloakAdminService {
             throw new RuntimeException("Failed to delete user", e);
         }
     }
+
+    // ============================================================
+    // USER ATTRIBUTES METHODS
+    // ============================================================
+
+    /**
+     * Update user custom attributes in Keycloak.
+     * Keycloak allows storing custom key-value pairs in user attributes.
+     * These attributes can be included in JWT tokens.
+     *
+     * Use case: Store bank account info (account_number, bank_code)
+     * so they're available in JWT without querying database.
+     *
+     * @param keycloakId Keycloak user ID
+     * @param attributeName Attribute name (e.g., "account_number", "bank_code")
+     * @param attributeValue Attribute value
+     */
+    public void updateUserAttribute(String keycloakId, String attributeName, String attributeValue) {
+        log.info("Updating user {} attribute: {}={}", keycloakId, attributeName, attributeValue);
+
+        try {
+            UserResource userResource = getUsersResource().get(keycloakId);
+            UserRepresentation user = userResource.toRepresentation();
+
+            // Get existing attributes or create new map
+            var attributes = user.getAttributes();
+            if (attributes == null) {
+                attributes = new java.util.HashMap<>();
+                user.setAttributes(attributes);
+            }
+
+            // Set attribute value (attributes are stored as List<String>)
+            attributes.put(attributeName, java.util.Collections.singletonList(attributeValue));
+
+            // Save changes
+            userResource.update(user);
+            log.info("User {} attribute {} updated successfully", keycloakId, attributeName);
+
+        } catch (Exception e) {
+            log.error("Failed to update user {} attribute {}", keycloakId, attributeName, e);
+            throw new RuntimeException("Failed to update user attribute", e);
+        }
+    }
+
+    /**
+     * Update multiple user attributes at once.
+     *
+     * @param keycloakId Keycloak user ID
+     * @param attributes Map of attribute name -> value
+     */
+    public void updateUserAttributes(String keycloakId, java.util.Map<String, String> attributes) {
+        log.info("Updating user {} with {} attributes", keycloakId, attributes.size());
+
+        try {
+            UserResource userResource = getUsersResource().get(keycloakId);
+            UserRepresentation user = userResource.toRepresentation();
+
+            // Get existing attributes or create new map
+            var userAttributes = user.getAttributes();
+            if (userAttributes == null) {
+                userAttributes = new java.util.HashMap<>();
+                user.setAttributes(userAttributes);
+            }
+
+            // Update all attributes
+            for (var entry : attributes.entrySet()) {
+                userAttributes.put(entry.getKey(),
+                        java.util.Collections.singletonList(entry.getValue()));
+            }
+
+            // Save changes
+            userResource.update(user);
+            log.info("User {} attributes updated successfully", keycloakId);
+
+        } catch (Exception e) {
+            log.error("Failed to update user {} attributes", keycloakId, e);
+            throw new RuntimeException("Failed to update user attributes", e);
+        }
+    }
+
+    /**
+     * Get user attribute value.
+     *
+     * @param keycloakId Keycloak user ID
+     * @param attributeName Attribute name
+     * @return Attribute value or null if not found
+     */
+    public String getUserAttribute(String keycloakId, String attributeName) {
+        log.debug("Getting user {} attribute: {}", keycloakId, attributeName);
+
+        try {
+            UserResource userResource = getUsersResource().get(keycloakId);
+            UserRepresentation user = userResource.toRepresentation();
+
+            var attributes = user.getAttributes();
+            if (attributes != null && attributes.containsKey(attributeName)) {
+                var values = attributes.get(attributeName);
+                if (values != null && !values.isEmpty()) {
+                    return values.get(0);
+                }
+            }
+
+            return null;
+
+        } catch (Exception e) {
+            log.error("Failed to get user {} attribute {}", keycloakId, attributeName, e);
+            throw new RuntimeException("Failed to get user attribute", e);
+        }
+    }
 }

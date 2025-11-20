@@ -73,4 +73,24 @@ public class UserResponse {
      * Last update timestamp.
      */
     private LocalDateTime updatedAt;
+
+    /**
+     * Bank account number (if user has set up).
+     */
+    private String accountNumber;
+
+    /**
+     * Bank account holder name (if user has set up).
+     */
+    private String accountName;
+
+    /**
+     * Bank code (e.g., VPBANK, ACB).
+     */
+    private String bankCode;
+
+    /**
+     * Full bank name (e.g., "Ngân hàng TMCP Việt Nam Thịnh Vượng").
+     */
+    private String bankName;
 }

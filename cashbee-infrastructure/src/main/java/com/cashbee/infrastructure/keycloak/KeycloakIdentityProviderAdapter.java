@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -102,6 +103,19 @@ public class KeycloakIdentityProviderAdapter implements IdentityProviderPort {
 
         Optional<UserRepresentation> keycloakUser = keycloakAdminService.getUserById(userId);
         return keycloakUser.map(this::toIdentityUser);
+    }
+
+    @Override
+    public void updateUser(String userId, String email, String firstName, String lastName) {
+        log.debug("Adapter: Updating user in Keycloak: userId={}", userId);
+        keycloakAdminService.updateUser(userId, email, firstName, lastName);
+    }
+
+    @Override
+    public void updateUserAttributes(String userId, Map<String, String> attributes) {
+        log.debug("Adapter: Updating user attributes in Keycloak: userId={}, attributes count={}",
+                userId, attributes.size());
+        keycloakAdminService.updateUserAttributes(userId, attributes);
     }
 
     /**
