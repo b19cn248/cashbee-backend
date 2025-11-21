@@ -184,16 +184,14 @@ public class ImportShopeeOrdersUseCase {
             throw new BusinessException("IMPORT_FAILED", errorMessage);
         }
 
-        // Step 5: Flush all pending changes to DB before recalculating wallets
-        // IMPORTANT: cashback records must be persisted to DB first,
-        // otherwise recalculateWallet query won't see them!
-        entityManager.flush();
-        log.info("Flushed all pending changes to DB");
-
-        // Step 6: Recalculate wallets for all affected users
+        // Step 5: Recalculate wallets for all affected users in a NEW transaction
+        // IMPORTANT: Using REQUIRES_NEW transaction to ensure:
+        // 1. All cashback data from current transaction is committed first
+        // 2. New transaction queries DB directly, sees all committed data
+        // 3. Not affected by flush/clear in processBatch()
         if (!affectedUserIds.isEmpty()) {
-            log.info("Recalculating wallets for {} affected users", affectedUserIds.size());
-            recalculateWalletUseCase.executeForUsers(affectedUserIds);
+            log.info("Recalculating wallets for {} affected users in new transaction", affectedUserIds.size());
+            recalculateWalletUseCase.executeForUsersInNewTransaction(affectedUserIds);
         }
 
         // Step 6: Build response

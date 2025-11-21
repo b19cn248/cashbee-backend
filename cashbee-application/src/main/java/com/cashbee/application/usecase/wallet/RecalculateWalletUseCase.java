@@ -7,6 +7,7 @@ import com.cashbee.domain.repository.UserWalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -109,6 +110,35 @@ public class RecalculateWalletUseCase {
     @Transactional
     public void executeForUsers(Set<Long> userIds) {
         log.info("Recalculating wallets for {} users", userIds.size());
+
+        for (Long userId : userIds) {
+            try {
+                execute(userId);
+            } catch (Exception e) {
+                log.error("Failed to recalculate wallet for user {}: {}", userId, e.getMessage(), e);
+            }
+        }
+
+        log.info("Completed recalculating wallets for {} users", userIds.size());
+    }
+
+    /**
+     * Recalculate wallets for multiple users in a NEW transaction.
+     *
+     * IMPORTANT: This method uses REQUIRES_NEW propagation, which means:
+     * - It will SUSPEND the current transaction (if any)
+     * - Create a BRAND NEW transaction
+     * - Query the database DIRECTLY (sees committed data only)
+     *
+     * Use this method when calling from another @Transactional method
+     * where data has been saved but may not be visible yet due to
+     * persistence context issues (flush/clear).
+     *
+     * @param userIds Set of user IDs
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void executeForUsersInNewTransaction(Set<Long> userIds) {
+        log.info("Recalculating wallets for {} users in NEW transaction", userIds.size());
 
         for (Long userId : userIds) {
             try {
