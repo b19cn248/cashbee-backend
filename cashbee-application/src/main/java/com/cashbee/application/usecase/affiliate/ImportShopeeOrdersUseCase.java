@@ -2,9 +2,8 @@ package com.cashbee.application.usecase.affiliate;
 
 import com.cashbee.application.dto.affiliate.ImportOrdersRequest;
 import com.cashbee.application.dto.affiliate.ImportOrdersResponse;
-import com.cashbee.application.usecase.cashback.AddCashbackToWalletUseCase;
 import com.cashbee.application.usecase.cashback.CalculateCashbackUseCase;
-import com.cashbee.application.usecase.cashback.UpdateCashbackOnOrderStatusChangeUseCase;
+import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
 import com.cashbee.application.util.affiliate.ShopeeCSVParser;
 import com.cashbee.application.util.affiliate.TrackingCodeGenerator;
 import com.cashbee.common.exception.BusinessException;
@@ -37,8 +36,10 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Use case for importing Shopee orders from CSV file.
@@ -71,8 +72,7 @@ public class ImportShopeeOrdersUseCase {
     private final ShopeeCSVParser csvParser;
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final CalculateCashbackUseCase calculateCashbackUseCase;
-    private final AddCashbackToWalletUseCase addCashbackToWalletUseCase;
-    private final UpdateCashbackOnOrderStatusChangeUseCase updateCashbackOnOrderStatusChangeUseCase;
+    private final RecalculateWalletUseCase recalculateWalletUseCase;
     private final EntityManager entityManager;
 
     /**
@@ -126,12 +126,13 @@ public class ImportShopeeOrdersUseCase {
         List<ImportOrdersResponse.ImportErrorDetail> errors = new ArrayList<>();
         final int[] matchedCount = {0};  // Use array to allow modification in lambda
         final int[] totalRowsProcessed = {0};
+        final Set<Long> affectedUserIds = new HashSet<>();  // Track users to recalculate wallets
 
         try {
             // Use streaming parser to process records in batches
             csvParser.parseStreaming(request.getFileInputStream(), BATCH_SIZE, recordBatch -> {
                 // Process this batch in a separate transaction
-                processBatch(recordBatch, platform, batchId, request, errors, matchedCount, totalRowsProcessed);
+                processBatch(recordBatch, platform, batchId, request, errors, matchedCount, totalRowsProcessed, affectedUserIds);
             });
 
             // Update total rows after parsing
@@ -183,7 +184,13 @@ public class ImportShopeeOrdersUseCase {
             throw new BusinessException("IMPORT_FAILED", errorMessage);
         }
 
-        // Step 5: Build response
+        // Step 5: Recalculate wallets for all affected users
+        if (!affectedUserIds.isEmpty()) {
+            log.info("Recalculating wallets for {} affected users", affectedUserIds.size());
+            recalculateWalletUseCase.executeForUsers(affectedUserIds);
+        }
+
+        // Step 6: Build response
         long durationSeconds = Duration.between(startTime, endTime).getSeconds();
 
         return ImportOrdersResponse.builder()
@@ -237,7 +244,8 @@ public class ImportShopeeOrdersUseCase {
                                 ImportOrdersRequest request,
                                 List<ImportOrdersResponse.ImportErrorDetail> errors,
                                 int[] matchedCount,
-                                int[] totalRowsProcessed) {
+                                int[] totalRowsProcessed,
+                                Set<Long> affectedUserIds) {
 
         ImportBatch batch = batchRepository.findById(batchId)
             .orElseThrow(() -> new NotFoundException("Import batch not found"));
@@ -287,7 +295,7 @@ public class ImportShopeeOrdersUseCase {
             List<ShopeeCSVParser.ShopeeOrderRecord> items = entry.getValue();
 
             try {
-                processOrderWithItems(orderId, items, platform, batchId, request, errors, matchedCount, batch);
+                processOrderWithItems(orderId, items, platform, batchId, request, errors, matchedCount, batch, affectedUserIds);
                 processedOrders++;
 
                 // Flush and clear every 50 orders to prevent memory buildup
@@ -342,7 +350,8 @@ public class ImportShopeeOrdersUseCase {
                                        ImportOrdersRequest request,
                                        List<ImportOrdersResponse.ImportErrorDetail> errors,
                                        int[] matchedCount,
-                                       ImportBatch batch) {
+                                       ImportBatch batch,
+                                       Set<Long> affectedUserIds) {
 
         log.debug("Processing order {} with {} items", orderId, items.size());
 
@@ -412,7 +421,7 @@ public class ImportShopeeOrdersUseCase {
                 // Update existing order with aggregated data
                 updateExistingOrderWithItems(existingOrder, items, totalCommission, totalPrice,
                     isOrderCompleted, productNames.toString(), batch, platform.getId(),
-                    completedCommission, pendingCommission);
+                    completedCommission, pendingCommission, affectedUserIds);
                 return;
             }
         }
@@ -491,9 +500,13 @@ public class ImportShopeeOrdersUseCase {
         log.debug("Created order {} (id={}) for user {} with total commission {}",
             orderId, order.getId(), userId, totalCommission);
 
-        // Create AffiliateOrderItem records for each item
+        // Create AffiliateOrderItem records for each item, each with its own cashback
         final Long savedOrderId = order.getId();
+        final Long finalUserId = userId;
         for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
+            // Determine item status
+            OrderStatus itemStatus = item.isCompleted() ? OrderStatus.APPROVED : OrderStatus.PENDING;
+
             AffiliateOrderItem orderItem = AffiliateOrderItem.builder()
                 .orderId(savedOrderId)
                 .itemId(item.getItemId())
@@ -506,44 +519,30 @@ public class ImportShopeeOrdersUseCase {
                 .categoryLv1(item.getCategoryLv1())
                 .categoryLv2(item.getCategoryLv2())
                 .categoryLv3(item.getCategoryLv3())
+                .status(itemStatus)
                 .createdAt(LocalDateTime.now())
                 .build();
-            orderItemRepository.save(orderItem);
-        }
-        log.debug("Created {} order items for order {}", items.size(), orderId);
+            AffiliateOrderItem savedItem = orderItemRepository.save(orderItem);
 
-        // Calculate and add cashback for the order
-        // Handle items with different statuses: completed items → balance, pending items → pending_balance
-        if (totalCommission.compareTo(BigDecimal.ZERO) > 0) {
-            // Create cashback with TOTAL commission
-            // The cashback status depends on whether ALL items are completed
-            Cashback cashback = calculateCashbackUseCase.execute(
-                userId,
-                order.getId(),
-                platform.getId(),
-                totalCommission,
-                isOrderCompleted  // true only if ALL items completed
-            );
-
-            log.info("Created cashback {} with amount {} VND (status: {}) for order {}",
-                cashback.getId(), cashback.getCashbackAmount(), cashback.getStatus(), orderId);
-
-            // Add cashback to wallet based on order status
-            if (isOrderCompleted) {
-                // All items completed → Add entire cashback to balance
-                addCashbackToWalletUseCase.addConfirmedCashback(cashback.getId());
-                log.info("All items completed. Added {} VND to balance for user {}",
-                    cashback.getCashbackAmount(), userId);
-            } else {
-                // Some items pending → Add entire cashback to pending_balance
-                // Will be moved to balance when ALL items complete
-                addCashbackToWalletUseCase.addPendingCashback(cashback.getId());
-                log.info("Some items pending. Added {} VND to pending_balance for user {} (completed: {}, pending: {})",
-                    cashback.getCashbackAmount(), userId, completedCommission, pendingCommission);
+            // Create cashback for this item (each item has its own cashback)
+            BigDecimal itemCommission = item.getCommissionForCashback();
+            if (itemCommission != null && itemCommission.compareTo(BigDecimal.ZERO) > 0) {
+                Cashback cashback = calculateCashbackUseCase.executeForItem(
+                    finalUserId,
+                    savedOrderId,
+                    savedItem.getId(),
+                    platform.getId(),
+                    itemCommission,
+                    item.isCompleted()
+                );
+                log.debug("Created cashback {} for item {} (status: {})",
+                    cashback.getId(), item.getItemId(), cashback.getStatus());
             }
-        } else {
-            log.debug("Order {} has no commission, skipping cashback", orderId);
         }
+        log.debug("Created {} order items with cashbacks for order {}", items.size(), orderId);
+
+        // Track affected user for wallet recalculation
+        affectedUserIds.add(finalUserId);
 
         // Match with click
         if (click != null && request.getAutoMatch()) {
@@ -584,7 +583,8 @@ public class ImportShopeeOrdersUseCase {
                                               ImportBatch batch,
                                               Long platformId,
                                               BigDecimal completedCommission,
-                                              BigDecimal pendingCommission) {
+                                              BigDecimal pendingCommission,
+                                              Set<Long> affectedUserIds) {
 
         log.info("Updating existing order: {} (old status: {}, completed commission: {}, pending commission: {})",
             existingOrder.getOrderId(), existingOrder.getOrderStatus(), completedCommission, pendingCommission);
@@ -612,37 +612,69 @@ public class ImportShopeeOrdersUseCase {
             log.info("Updated order {} (status: {} → {}, commission: {})",
                 existingOrder.getOrderId(), oldStatus, newStatus, totalCommission);
 
-            // Update order items: delete old and create new
-            orderItemRepository.deleteByOrderId(existingOrder.getId());
+            // Update order items: upsert each item by order_id + item_id
             for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
-                AffiliateOrderItem orderItem = AffiliateOrderItem.builder()
-                    .orderId(existingOrder.getId())
-                    .itemId(item.getItemId())
-                    .itemName(item.getItemName())
-                    .quantity(item.getQuantity() != null ? item.getQuantity() : 1)
-                    .actualAmount(item.getPrice())
-                    .itemCommission(item.getCommissionForCashback())
-                    .shopId(item.getShopId())
-                    .shopName(item.getShopName())
-                    .categoryLv1(item.getCategoryLv1())
-                    .categoryLv2(item.getCategoryLv2())
-                    .categoryLv3(item.getCategoryLv3())
-                    .createdAt(LocalDateTime.now())
-                    .build();
-                orderItemRepository.save(orderItem);
-            }
+                OrderStatus itemStatus = item.isCompleted() ? OrderStatus.APPROVED : OrderStatus.PENDING;
 
-            // Update cashback if status changed (PENDING → APPROVED means all items completed)
-            if (statusChanged) {
-                log.info("Order status changed {} → {}, updating cashback...", oldStatus, newStatus);
-                updateCashbackOnOrderStatusChangeUseCase.execute(
-                    existingOrder.getId(),
-                    oldStatus,
-                    newStatus
-                );
+                // Find existing item or create new
+                AffiliateOrderItem existingItem = orderItemRepository
+                    .findByOrderIdAndItemId(existingOrder.getId(), item.getItemId())
+                    .orElse(null);
+
+                AffiliateOrderItem orderItem;
+                if (existingItem != null) {
+                    // Update existing item
+                    existingItem.setItemName(item.getItemName());
+                    existingItem.setQuantity(item.getQuantity() != null ? item.getQuantity() : 1);
+                    existingItem.setActualAmount(item.getPrice());
+                    existingItem.setItemCommission(item.getCommissionForCashback());
+                    existingItem.setShopId(item.getShopId());
+                    existingItem.setShopName(item.getShopName());
+                    existingItem.setCategoryLv1(item.getCategoryLv1());
+                    existingItem.setCategoryLv2(item.getCategoryLv2());
+                    existingItem.setCategoryLv3(item.getCategoryLv3());
+                    existingItem.setStatus(itemStatus);
+                    orderItem = orderItemRepository.save(existingItem);
+                    log.debug("Updated item {} for order {}", item.getItemId(), existingOrder.getOrderId());
+                } else {
+                    // Create new item
+                    orderItem = AffiliateOrderItem.builder()
+                        .orderId(existingOrder.getId())
+                        .itemId(item.getItemId())
+                        .itemName(item.getItemName())
+                        .quantity(item.getQuantity() != null ? item.getQuantity() : 1)
+                        .actualAmount(item.getPrice())
+                        .itemCommission(item.getCommissionForCashback())
+                        .shopId(item.getShopId())
+                        .shopName(item.getShopName())
+                        .categoryLv1(item.getCategoryLv1())
+                        .categoryLv2(item.getCategoryLv2())
+                        .categoryLv3(item.getCategoryLv3())
+                        .status(itemStatus)
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                    orderItem = orderItemRepository.save(orderItem);
+                    log.debug("Created new item {} for order {}", item.getItemId(), existingOrder.getOrderId());
+                }
+
+                // Upsert cashback for this item
+                BigDecimal itemCommission = item.getCommissionForCashback();
+                if (itemCommission != null && itemCommission.compareTo(BigDecimal.ZERO) > 0) {
+                    calculateCashbackUseCase.upsertForItem(
+                        existingOrder.getUserId(),
+                        existingOrder.getId(),
+                        orderItem.getId(),
+                        platformId,
+                        itemCommission,
+                        item.isCompleted()
+                    );
+                }
             }
 
             batch.incrementUpdated();
+
+            // Track affected user for wallet recalculation
+            affectedUserIds.add(existingOrder.getUserId());
 
         } catch (Exception e) {
             batch.incrementFailed();

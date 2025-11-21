@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Step 1: Add status column to affiliate_order_item -->
+    <changeSet id="024-01-add-status-to-order-item" author="cashbee">
+        <comment>Add status column to affiliate_order_item to track each item's status independently</comment>
+
+        <addColumn tableName="affiliate_order_item">
+            <column name="status" type="VARCHAR(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <createIndex tableName="affiliate_order_item" indexName="idx_order_item_status">
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 2: Add order_item_id column to cashback -->
+    <changeSet id="024-02-add-order-item-id-to-cashback" author="cashbee">
+        <comment>Add order_item_id to cashback table for per-item cashback tracking</comment>
+
+        <addColumn tableName="cashback">
+            <column name="order_item_id" type="BIGINT">
+                <constraints nullable="true"
+                             foreignKeyName="fk_cashback_order_item"
+                             references="affiliate_order_item(id)"/>
+            </column>
+        </addColumn>
+
+        <createIndex tableName="cashback" indexName="idx_cashback_order_item">
+            <column name="order_item_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 3: Add unique constraint for order_id + item_id -->
+    <changeSet id="024-03-add-unique-constraint-order-item" author="cashbee">
+        <comment>Add unique constraint to prevent duplicate items in same order</comment>
+
+        <addUniqueConstraint
+            tableName="affiliate_order_item"
+            columnNames="order_id, item_id"
+            constraintName="uk_order_item"/>
+    </changeSet>
+
+    <rollback>
+        <dropIndex tableName="cashback" indexName="idx_cashback_order_item"/>
+        <dropColumn tableName="cashback" columnName="order_item_id"/>
+        <dropIndex tableName="affiliate_order_item" indexName="idx_order_item_status"/>
+        <dropColumn tableName="affiliate_order_item" columnName="status"/>
+        <dropUniqueConstraint tableName="affiliate_order_item" constraintName="uk_order_item"/>
+    </rollback>
+
+</databaseChangeLog>

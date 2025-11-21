@@ -1,5 +1,6 @@
 package com.cashbee.infrastructure.entity;
 
+import com.cashbee.domain.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -71,6 +72,11 @@ public class AffiliateOrderItemJpaEntity {
 
     @Column(name = "platform_commission_rate", precision = 8, scale = 4)
     private BigDecimal platformCommissionRate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    @Builder.Default
+    private OrderStatus status = OrderStatus.PENDING;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

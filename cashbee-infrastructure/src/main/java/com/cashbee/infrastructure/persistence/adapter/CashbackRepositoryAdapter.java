@@ -9,6 +9,7 @@ import com.cashbee.infrastructure.persistence.repository.CashbackJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -67,5 +68,26 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
+    }
+
+    @Override
+    public Optional<Cashback> findByOrderItemId(Long orderItemId) {
+        return jpaRepository.findByOrderItemId(orderItemId)
+            .map(mapper::toDomain);
+    }
+
+    @Override
+    public boolean existsByOrderItemId(Long orderItemId) {
+        return jpaRepository.existsByOrderItemId(orderItemId);
+    }
+
+    @Override
+    public BigDecimal sumCashbackAmountByUserIdAndStatus(Long userId, CashbackStatus status) {
+        return jpaRepository.sumCashbackAmountByUserIdAndStatus(userId, status);
+    }
+
+    @Override
+    public BigDecimal sumCashbackAmountByUserIdAndStatusIn(Long userId, List<CashbackStatus> statuses) {
+        return jpaRepository.sumCashbackAmountByUserIdAndStatusIn(userId, statuses);
     }
 }

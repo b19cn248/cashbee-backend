@@ -53,4 +53,9 @@ public interface AffiliateOrderItemRepository {
      * Count items for an order.
      */
     long countByOrderId(Long orderId);
+
+    /**
+     * Find item by order ID and item ID (unique combination).
+     */
+    Optional<AffiliateOrderItem> findByOrderIdAndItemId(Long orderId, String itemId);
 }

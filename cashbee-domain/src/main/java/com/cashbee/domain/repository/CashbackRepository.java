@@ -69,4 +69,38 @@ public interface CashbackRepository {
      * @param id Cashback ID
      */
     void deleteById(Long id);
+
+    /**
+     * Find cashback by order item ID.
+     *
+     * @param orderItemId Order item ID
+     * @return Optional cashback
+     */
+    Optional<Cashback> findByOrderItemId(Long orderItemId);
+
+    /**
+     * Check if cashback exists for an order item.
+     *
+     * @param orderItemId Order item ID
+     * @return true if cashback exists
+     */
+    boolean existsByOrderItemId(Long orderItemId);
+
+    /**
+     * Sum cashback amount by user ID and status.
+     *
+     * @param userId User ID
+     * @param status Cashback status
+     * @return Sum of cashback amounts
+     */
+    java.math.BigDecimal sumCashbackAmountByUserIdAndStatus(Long userId, CashbackStatus status);
+
+    /**
+     * Sum cashback amount by user ID and statuses.
+     *
+     * @param userId User ID
+     * @param statuses List of statuses
+     * @return Sum of cashback amounts
+     */
+    java.math.BigDecimal sumCashbackAmountByUserIdAndStatusIn(Long userId, List<CashbackStatus> statuses);
 }

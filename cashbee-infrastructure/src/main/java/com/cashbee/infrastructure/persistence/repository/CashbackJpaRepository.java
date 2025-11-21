@@ -3,8 +3,11 @@ package com.cashbee.infrastructure.persistence.repository;
 import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.infrastructure.persistence.entity.CashbackJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,4 +51,26 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
      * @return true if cashback exists
      */
     boolean existsByOrderId(Long orderId);
+
+    /**
+     * Find cashback by order item ID.
+     */
+    Optional<CashbackJpaEntity> findByOrderItemId(Long orderItemId);
+
+    /**
+     * Check if cashback exists for an order item.
+     */
+    boolean existsByOrderItemId(Long orderItemId);
+
+    /**
+     * Sum cashback amount by user ID and status.
+     */
+    @Query("SELECT COALESCE(SUM(c.cashbackAmount), 0) FROM CashbackJpaEntity c WHERE c.userId = :userId AND c.status = :status")
+    BigDecimal sumCashbackAmountByUserIdAndStatus(@Param("userId") Long userId, @Param("status") CashbackStatus status);
+
+    /**
+     * Sum cashback amount by user ID and statuses.
+     */
+    @Query("SELECT COALESCE(SUM(c.cashbackAmount), 0) FROM CashbackJpaEntity c WHERE c.userId = :userId AND c.status IN :statuses")
+    BigDecimal sumCashbackAmountByUserIdAndStatusIn(@Param("userId") Long userId, @Param("statuses") List<CashbackStatus> statuses);
 }

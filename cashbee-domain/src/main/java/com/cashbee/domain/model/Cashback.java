@@ -52,8 +52,15 @@ public class Cashback {
 
     /**
      * Order that generated this cashback (FK to AffiliateOrder).
+     * @deprecated Use orderItemId instead. Kept for backward compatibility.
      */
     private final Long orderId;
+
+    /**
+     * Order item that generated this cashback (FK to AffiliateOrderItem).
+     * Each item has its own cashback record.
+     */
+    private final Long orderItemId;
 
     /**
      * Platform where order was placed (FK to AffiliatePlatform).
@@ -207,6 +214,7 @@ public class Cashback {
             .id(this.id)
             .userId(this.userId)
             .orderId(this.orderId)
+            .orderItemId(this.orderItemId)
             .platformId(this.platformId)
             .commissionAmount(this.commissionAmount)
             .cashbackAmount(this.cashbackAmount)

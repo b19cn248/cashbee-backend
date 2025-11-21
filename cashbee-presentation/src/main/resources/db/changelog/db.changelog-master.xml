@@ -40,4 +40,7 @@
     <include file="db/changelog/022-seed-banks.xml"/>
     <include file="db/changelog/023-add-short-name-to-bank.xml"/>
 
+    <!-- Refactor: Cashback per item -->
+    <include file="db/changelog/024-refactor-cashback-per-item.xml"/>
+
 </databaseChangeLog>
