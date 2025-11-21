@@ -514,39 +514,35 @@ public class ImportShopeeOrdersUseCase {
 
         // Calculate and add cashback for the order
         // Handle items with different statuses: completed items → balance, pending items → pending_balance
-        try {
-            if (totalCommission.compareTo(BigDecimal.ZERO) > 0) {
-                // Create cashback with TOTAL commission
-                // The cashback status depends on whether ALL items are completed
-                Cashback cashback = calculateCashbackUseCase.execute(
-                    userId,
-                    order.getId(),
-                    platform.getId(),
-                    totalCommission,
-                    isOrderCompleted  // true only if ALL items completed
-                );
+        if (totalCommission.compareTo(BigDecimal.ZERO) > 0) {
+            // Create cashback with TOTAL commission
+            // The cashback status depends on whether ALL items are completed
+            Cashback cashback = calculateCashbackUseCase.execute(
+                userId,
+                order.getId(),
+                platform.getId(),
+                totalCommission,
+                isOrderCompleted  // true only if ALL items completed
+            );
 
-                log.info("Created cashback {} with amount {} VND (status: {}) for order {}",
-                    cashback.getId(), cashback.getCashbackAmount(), cashback.getStatus(), orderId);
+            log.info("Created cashback {} with amount {} VND (status: {}) for order {}",
+                cashback.getId(), cashback.getCashbackAmount(), cashback.getStatus(), orderId);
 
-                // Add cashback to wallet based on order status
-                if (isOrderCompleted) {
-                    // All items completed → Add entire cashback to balance
-                    addCashbackToWalletUseCase.addConfirmedCashback(cashback.getId());
-                    log.info("All items completed. Added {} VND to balance for user {}",
-                        cashback.getCashbackAmount(), userId);
-                } else {
-                    // Some items pending → Add entire cashback to pending_balance
-                    // Will be moved to balance when ALL items complete
-                    addCashbackToWalletUseCase.addPendingCashback(cashback.getId());
-                    log.info("Some items pending. Added {} VND to pending_balance for user {} (completed: {}, pending: {})",
-                        cashback.getCashbackAmount(), userId, completedCommission, pendingCommission);
-                }
+            // Add cashback to wallet based on order status
+            if (isOrderCompleted) {
+                // All items completed → Add entire cashback to balance
+                addCashbackToWalletUseCase.addConfirmedCashback(cashback.getId());
+                log.info("All items completed. Added {} VND to balance for user {}",
+                    cashback.getCashbackAmount(), userId);
             } else {
-                log.debug("Order {} has no commission, skipping cashback", orderId);
+                // Some items pending → Add entire cashback to pending_balance
+                // Will be moved to balance when ALL items complete
+                addCashbackToWalletUseCase.addPendingCashback(cashback.getId());
+                log.info("Some items pending. Added {} VND to pending_balance for user {} (completed: {}, pending: {})",
+                    cashback.getCashbackAmount(), userId, completedCommission, pendingCommission);
             }
-        } catch (Exception e) {
-            log.error("Failed to create cashback for order {}: {}", orderId, e.getMessage(), e);
+        } else {
+            log.debug("Order {} has no commission, skipping cashback", orderId);
         }
 
         // Match with click

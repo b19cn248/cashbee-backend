@@ -83,9 +83,15 @@ public class AddCashbackToWalletUseCase {
         // OLD CODE: confirmPendingBalanceUseCase.execute() - caused InsufficientBalanceException
         // NEW CODE: Use addConfirmedCashbackDirectly() - no pending balance required
 
+        // Get or create wallet if not exists
         UserWallet wallet = walletRepository.findByUserId(cashback.getUserId())
-            .orElseThrow(() -> new NotFoundException("WALLET_NOT_FOUND",
-                "Wallet not found for user: " + cashback.getUserId()));
+            .orElseGet(() -> {
+                log.info("UseCase: Wallet not found for user {}, creating new wallet", cashback.getUserId());
+                UserWallet newWallet = UserWallet.builder()
+                    .userId(cashback.getUserId())
+                    .build();
+                return walletRepository.save(newWallet);
+            });
 
         wallet.addConfirmedCashbackDirectly(cashback.getCashbackAmount());
         walletRepository.save(wallet);
