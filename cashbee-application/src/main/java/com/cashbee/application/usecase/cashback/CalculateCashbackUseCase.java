@@ -5,8 +5,10 @@ import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.domain.enums.UserLevel;
 import com.cashbee.domain.model.Cashback;
 import com.cashbee.domain.model.CashbackPolicy;
+import com.cashbee.domain.model.UserWallet;
 import com.cashbee.domain.repository.CashbackPolicyRepository;
 import com.cashbee.domain.repository.CashbackRepository;
+import com.cashbee.domain.repository.UserWalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,6 +40,7 @@ public class CalculateCashbackUseCase {
 
     private final CashbackRepository cashbackRepository;
     private final CashbackPolicyRepository policyRepository;
+    private final UserWalletRepository walletRepository;
 
     /**
      * Calculate and create cashback for an order.
@@ -215,6 +218,9 @@ public class CalculateCashbackUseCase {
         cashback.validate();
         Cashback savedCashback = cashbackRepository.save(cashback);
 
+        // Update wallet directly (same transaction, no query needed)
+        updateWalletForNewCashback(userId, cashbackAmount, status);
+
         log.info("UseCase: Created cashback {} for item {} with amount {} VND (status: {})",
             savedCashback.getId(), orderItemId, savedCashback.getCashbackAmount(), savedCashback.getStatus());
 
@@ -249,6 +255,10 @@ public class CalculateCashbackUseCase {
             if (cashback.getStatus() != newStatus) {
                 log.info("UseCase: Updating cashback {} status from {} to {}",
                     cashback.getId(), cashback.getStatus(), newStatus);
+
+                // Update wallet for status change
+                updateWalletForStatusChange(cashback.getUserId(), cashback.getCashbackAmount(),
+                    cashback.getStatus(), newStatus);
 
                 Cashback updatedCashback = cashback.withStatus(newStatus,
                     isItemCompleted ? "Item completed, cashback confirmed" : "Item status changed to pending");
@@ -296,5 +306,98 @@ public class CalculateCashbackUseCase {
         log.info("UseCase: Updated cashback {} status to {}", updatedCashback.getId(), newStatus);
 
         return updatedCashback;
+    }
+
+    /**
+     * Update wallet when a NEW cashback is created.
+     *
+     * Logic:
+     * - PENDING cashback → add to pending_balance
+     * - CONFIRMED cashback → add to balance and total_earned
+     *
+     * @param userId User ID
+     * @param amount Cashback amount
+     * @param status Cashback status (PENDING or CONFIRMED)
+     */
+    private void updateWalletForNewCashback(Long userId, BigDecimal amount, CashbackStatus status) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        UserWallet wallet = getOrCreateWallet(userId);
+
+        if (status == CashbackStatus.PENDING) {
+            // New PENDING cashback → add to pending_balance
+            wallet.setPendingBalance(wallet.getPendingBalance().add(amount));
+            log.debug("Added {} to pending_balance for user {}", amount, userId);
+        } else if (status == CashbackStatus.CONFIRMED) {
+            // New CONFIRMED cashback → add to balance and total_earned
+            wallet.setBalance(wallet.getBalance().add(amount));
+            wallet.setTotalEarned(wallet.getTotalEarned().add(amount));
+            log.debug("Added {} to balance and total_earned for user {}", amount, userId);
+        }
+
+        wallet.scaleBalances();
+        walletRepository.save(wallet);
+    }
+
+    /**
+     * Update wallet when cashback status CHANGES.
+     *
+     * Logic:
+     * - PENDING → CONFIRMED: subtract from pending_balance, add to balance and total_earned
+     * - CONFIRMED → PENDING: subtract from balance and total_earned, add to pending_balance (rare case)
+     *
+     * @param userId User ID
+     * @param amount Cashback amount
+     * @param oldStatus Old status
+     * @param newStatus New status
+     */
+    private void updateWalletForStatusChange(Long userId, BigDecimal amount,
+                                              CashbackStatus oldStatus, CashbackStatus newStatus) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        if (oldStatus == newStatus) {
+            return; // No change
+        }
+
+        UserWallet wallet = getOrCreateWallet(userId);
+
+        if (oldStatus == CashbackStatus.PENDING && newStatus == CashbackStatus.CONFIRMED) {
+            // PENDING → CONFIRMED: move from pending_balance to balance
+            wallet.setPendingBalance(wallet.getPendingBalance().subtract(amount));
+            wallet.setBalance(wallet.getBalance().add(amount));
+            wallet.setTotalEarned(wallet.getTotalEarned().add(amount));
+            log.debug("Moved {} from pending_balance to balance for user {} (PENDING→CONFIRMED)", amount, userId);
+        } else if (oldStatus == CashbackStatus.CONFIRMED && newStatus == CashbackStatus.PENDING) {
+            // CONFIRMED → PENDING: move from balance back to pending_balance (rare)
+            wallet.setBalance(wallet.getBalance().subtract(amount));
+            wallet.setTotalEarned(wallet.getTotalEarned().subtract(amount));
+            wallet.setPendingBalance(wallet.getPendingBalance().add(amount));
+            log.debug("Moved {} from balance to pending_balance for user {} (CONFIRMED→PENDING)", amount, userId);
+        }
+
+        wallet.scaleBalances();
+        walletRepository.save(wallet);
+    }
+
+    /**
+     * Get existing wallet or create new one if not exists.
+     */
+    private UserWallet getOrCreateWallet(Long userId) {
+        return walletRepository.findByUserId(userId)
+            .orElseGet(() -> {
+                log.info("Wallet not found for user {}, creating new wallet", userId);
+                UserWallet newWallet = UserWallet.builder()
+                    .userId(userId)
+                    .balance(BigDecimal.ZERO)
+                    .pendingBalance(BigDecimal.ZERO)
+                    .totalEarned(BigDecimal.ZERO)
+                    .totalWithdrawn(BigDecimal.ZERO)
+                    .build();
+                return walletRepository.save(newWallet);
+            });
     }
 }

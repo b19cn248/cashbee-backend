@@ -3,7 +3,6 @@ package com.cashbee.application.usecase.affiliate;
 import com.cashbee.application.dto.affiliate.ImportOrdersRequest;
 import com.cashbee.application.dto.affiliate.ImportOrdersResponse;
 import com.cashbee.application.usecase.cashback.CalculateCashbackUseCase;
-import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
 import com.cashbee.application.util.affiliate.ShopeeCSVParser;
 import com.cashbee.application.util.affiliate.TrackingCodeGenerator;
 import com.cashbee.common.exception.BusinessException;
@@ -72,7 +71,6 @@ public class ImportShopeeOrdersUseCase {
     private final ShopeeCSVParser csvParser;
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final CalculateCashbackUseCase calculateCashbackUseCase;
-    private final RecalculateWalletUseCase recalculateWalletUseCase;
     private final EntityManager entityManager;
 
     /**
@@ -184,17 +182,9 @@ public class ImportShopeeOrdersUseCase {
             throw new BusinessException("IMPORT_FAILED", errorMessage);
         }
 
-        // Step 5: Recalculate wallets for all affected users in a NEW transaction
-        // IMPORTANT: Using REQUIRES_NEW transaction to ensure:
-        // 1. All cashback data from current transaction is committed first
-        // 2. New transaction queries DB directly, sees all committed data
-        // 3. Not affected by flush/clear in processBatch()
-        if (!affectedUserIds.isEmpty()) {
-            log.info("Recalculating wallets for {} affected users in new transaction", affectedUserIds.size());
-            recalculateWalletUseCase.executeForUsersInNewTransaction(affectedUserIds);
-        }
-
-        // Step 6: Build response
+        // Step 5: Build response
+        // NOTE: Wallet is now updated directly in CalculateCashbackUseCase
+        // when cashback is created or status changes. No need to recalculate here.
         long durationSeconds = Duration.between(startTime, endTime).getSeconds();
 
         return ImportOrdersResponse.builder()
