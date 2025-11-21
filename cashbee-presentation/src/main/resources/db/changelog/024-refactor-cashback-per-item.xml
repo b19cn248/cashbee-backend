@@ -45,14 +45,10 @@
             tableName="affiliate_order_item"
             columnNames="order_id, item_id"
             constraintName="uk_order_item"/>
-    </changeSet>
 
-    <rollback>
-        <dropIndex tableName="cashback" indexName="idx_cashback_order_item"/>
-        <dropColumn tableName="cashback" columnName="order_item_id"/>
-        <dropIndex tableName="affiliate_order_item" indexName="idx_order_item_status"/>
-        <dropColumn tableName="affiliate_order_item" columnName="status"/>
-        <dropUniqueConstraint tableName="affiliate_order_item" constraintName="uk_order_item"/>
-    </rollback>
+        <rollback>
+            <dropUniqueConstraint tableName="affiliate_order_item" constraintName="uk_order_item"/>
+        </rollback>
+    </changeSet>
 
 </databaseChangeLog>
