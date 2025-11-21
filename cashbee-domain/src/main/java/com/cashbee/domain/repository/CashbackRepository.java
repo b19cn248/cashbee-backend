@@ -103,4 +103,15 @@ public interface CashbackRepository {
      * @return Sum of cashback amounts
      */
     java.math.BigDecimal sumCashbackAmountByUserIdAndStatusIn(Long userId, List<CashbackStatus> statuses);
+
+    /**
+     * Update status for all cashbacks of a user with specific status.
+     * Used when batch transfer completes: CONFIRMED → PAID
+     *
+     * @param userId User ID
+     * @param oldStatus Current status to match
+     * @param newStatus New status to set
+     * @return Number of records updated
+     */
+    int updateStatusByUserIdAndStatus(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus);
 }

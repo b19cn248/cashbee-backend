@@ -3,9 +3,11 @@ package com.cashbee.presentation.controller;
 import com.cashbee.application.dto.batch.ExportBatchTransferRequest;
 import com.cashbee.application.dto.batch.ExportBatchTransferResponse;
 import com.cashbee.application.service.email.BatchTransferEmailService;
+import com.cashbee.application.service.usecase.CompleteBatchTransferUseCase;
 import com.cashbee.application.service.usecase.ExportBatchTransferUseCase;
 import com.cashbee.application.service.usecase.GenerateBatchTransferFileUseCase;
 import com.cashbee.application.service.usecase.GetBatchExportHistoryUseCase;
+import com.cashbee.domain.model.BatchTransferExport;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,6 +46,7 @@ public class BatchTransferController {
     private final ExportBatchTransferUseCase exportBatchTransferUseCase;
     private final GenerateBatchTransferFileUseCase generateBatchTransferFileUseCase;
     private final GetBatchExportHistoryUseCase getBatchExportHistoryUseCase;
+    private final CompleteBatchTransferUseCase completeBatchTransferUseCase;
     private final BatchTransferEmailService emailService;
 
     /**
@@ -247,6 +250,54 @@ public class BatchTransferController {
 
         return ResponseEntity.ok(ApiResponse.success(history));
     }
+
+    /**
+     * Complete batch transfer after admin has transferred money.
+     *
+     * POST /api/admin/batch-transfer/{batchCode}/complete
+     *
+     * This endpoint should be called after admin has:
+     * 1. Downloaded the Excel file
+     * 2. Imported it to bank's web interface
+     * 3. Bank has successfully transferred money to all users
+     *
+     * What this does:
+     * - Deducts balance from all users in the batch
+     * - Creates transaction records for each user
+     * - Marks batch as COMPLETED
+     *
+     * Response:
+     * {
+     *   "success": true,
+     *   "data": {
+     *     "batchCode": "BATCH_20251119_001",
+     *     "status": "COMPLETED",
+     *     "message": "Batch completed. 25 users processed."
+     *   }
+     * }
+     */
+    @PostMapping("/{batchCode}/complete")
+    @Operation(summary = "Complete batch transfer", description = "Mark batch as completed and deduct balance from all users")
+    public ResponseEntity<ApiResponse<CompleteBatchResponse>> completeBatchTransfer(
+            @PathVariable String batchCode) {
+
+        log.info("BatchTransferController: POST /{}/complete", batchCode);
+
+        BatchTransferExport completedBatch = completeBatchTransferUseCase.execute(batchCode);
+
+        CompleteBatchResponse response = new CompleteBatchResponse(
+                completedBatch.getBatchCode(),
+                completedBatch.getStatus().name(),
+                String.format("Batch completed. %d users processed.", completedBatch.getTotalUsers())
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * Response DTO for complete batch endpoint.
+     */
+    public record CompleteBatchResponse(String batchCode, String status, String message) {}
 
     /**
      * Request DTO for send email endpoint.

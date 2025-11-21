@@ -90,4 +90,9 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     public BigDecimal sumCashbackAmountByUserIdAndStatusIn(Long userId, List<CashbackStatus> statuses) {
         return jpaRepository.sumCashbackAmountByUserIdAndStatusIn(userId, statuses);
     }
+
+    @Override
+    public int updateStatusByUserIdAndStatus(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus) {
+        return jpaRepository.updateStatusByUserIdAndStatus(userId, oldStatus, newStatus);
+    }
 }

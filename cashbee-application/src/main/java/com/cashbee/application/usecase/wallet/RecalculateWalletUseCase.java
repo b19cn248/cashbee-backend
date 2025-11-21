@@ -20,9 +20,17 @@ import java.util.Set;
  * from the source of truth (cashback table) after import operations.
  *
  * Calculation Logic:
- * - pending_balance = SUM(cashback_amount) WHERE status IN (PENDING, CONFIRMED)
- * - total_earned = SUM(cashback_amount) WHERE status = PAID
- * - balance = total_earned - total_withdrawn
+ * - pending_balance = SUM(cashback_amount) WHERE status = PENDING
+ *   (Đơn đang chờ xác nhận, có thể bị hủy)
+ * - balance = SUM(cashback_amount) WHERE status = CONFIRMED
+ *   (Đơn đã chốt, user có thể rút tiền)
+ * - total_earned = SUM(cashback_amount) WHERE status IN (CONFIRMED, PAID)
+ *   (Tổng tiền đã kiếm được)
+ *
+ * Flow:
+ * - PENDING: Đơn đang xử lý → cộng vào pending_balance
+ * - CONFIRMED: Đơn hoàn thành → chuyển từ pending_balance sang balance
+ * - PAID: Đã thanh toán cho user → balance giảm, total_withdrawn tăng
  *
  * @author CashBee Team
  */
@@ -53,27 +61,26 @@ public class RecalculateWalletUseCase {
                 return walletRepository.save(newWallet);
             });
 
-        // Calculate pending_balance from PENDING and CONFIRMED cashbacks
-        BigDecimal pendingBalance = cashbackRepository.sumCashbackAmountByUserIdAndStatusIn(
+        // Calculate pending_balance from PENDING cashbacks only
+        // (Đơn đang chờ xác nhận, có thể bị hủy)
+        BigDecimal pendingBalance = cashbackRepository.sumCashbackAmountByUserIdAndStatus(
             userId,
-            List.of(CashbackStatus.PENDING, CashbackStatus.CONFIRMED)
+            CashbackStatus.PENDING
         );
 
-        // Calculate total_earned from PAID cashbacks
-        BigDecimal totalEarned = cashbackRepository.sumCashbackAmountByUserIdAndStatus(
+        // Calculate balance from CONFIRMED cashbacks
+        // (Đơn đã chốt, user có thể rút tiền)
+        BigDecimal balance = cashbackRepository.sumCashbackAmountByUserIdAndStatus(
             userId,
-            CashbackStatus.PAID
+            CashbackStatus.CONFIRMED
         );
 
-        // Calculate balance = total_earned - total_withdrawn
-        // Note: total_withdrawn is kept as-is (not recalculated from cashback)
-        BigDecimal balance = totalEarned.subtract(wallet.getTotalWithdrawn());
-
-        // Ensure balance is not negative
-        if (balance.compareTo(BigDecimal.ZERO) < 0) {
-            log.warn("Calculated balance is negative for user {}, setting to 0", userId);
-            balance = BigDecimal.ZERO;
-        }
+        // Calculate total_earned from CONFIRMED + PAID cashbacks
+        // (Tổng tiền đã kiếm được)
+        BigDecimal totalEarned = cashbackRepository.sumCashbackAmountByUserIdAndStatusIn(
+            userId,
+            List.of(CashbackStatus.CONFIRMED, CashbackStatus.PAID)
+        );
 
         // Update wallet
         BigDecimal oldBalance = wallet.getBalance();

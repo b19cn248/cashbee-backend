@@ -51,17 +51,17 @@ public class BatchTransferScheduler {
     private BigDecimal minBalance;
 
     /**
-     * Scheduled task: Export batch transfer file every Monday at 08:00.
+     * Scheduled task: Export batch transfer file every Tuesday at 08:00.
      *
-     * Cron expression: "0 0 8 * * MON"
+     * Cron expression: "0 0 8 * * TUE"
      * - Second: 0
      * - Minute: 0
      * - Hour: 8
      * - Day of month: * (any)
      * - Month: * (any)
-     * - Day of week: MON (Monday)
+     * - Day of week: TUE (Tuesday)
      */
-    @Scheduled(cron = "${cashbee.batch-transfer.scheduler.cron:0 0 8 * * MON}")
+    @Scheduled(cron = "${cashbee.batch-transfer.scheduler.cron:0 0 8 * * TUE}")
     public void exportAndSendBatchTransferFile() {
         log.info("BatchTransferScheduler: Starting scheduled batch transfer export");
 

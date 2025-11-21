@@ -6,17 +6,23 @@ import com.cashbee.common.exception.BusinessException;
 import com.cashbee.domain.enums.ExportStatus;
 import com.cashbee.domain.enums.ExportType;
 import com.cashbee.domain.model.BatchTransferExport;
+import com.cashbee.domain.model.BatchTransferItem;
 import com.cashbee.domain.repository.BatchTransferExportRepository;
+import com.cashbee.domain.repository.BatchTransferItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,6 +46,7 @@ import java.util.Map;
 public class ExportBatchTransferUseCase {
 
     private final BatchTransferExportRepository batchTransferExportRepository;
+    private final BatchTransferItemRepository batchTransferItemRepository;
     private final JdbcTemplate jdbcTemplate;
 
     /**
@@ -84,7 +91,7 @@ public class ExportBatchTransferUseCase {
                 .fileName(batchCode + ".xls")
                 .totalUsers(result.getTotalUsers())
                 .totalAmount(result.getTotalAmount())
-                .status(ExportStatus.COMPLETED)
+                .status(ExportStatus.PENDING)  // PENDING cho đến khi admin confirm
                 .exportType(exportType)
                 .remarkTemplate(remark)
                 .createdAt(LocalDateTime.now())
@@ -96,7 +103,12 @@ public class ExportBatchTransferUseCase {
 
         log.info("ExportBatchTransferUseCase: Saved batch export with code: {}", saved.getBatchCode());
 
-        // 7. Build response
+        // 7. Save batch items (snapshot of each user's balance and bank info)
+        saveBatchItems(saved.getId(), request.getMinBalance());
+
+        log.info("ExportBatchTransferUseCase: Saved {} batch items", saved.getTotalUsers());
+
+        // 8. Build response
         return ExportBatchTransferResponse.builder()
                 .batchCode(saved.getBatchCode())
                 .fileName(saved.getFileName())
@@ -166,6 +178,62 @@ public class ExportBatchTransferUseCase {
         LocalDate today = LocalDate.now();
         String monthYear = today.format(DateTimeFormatter.ofPattern("MM/yyyy"));
         return "Hoan tien CashBee " + monthYear;
+    }
+
+    /**
+     * Save batch items (snapshot of each user's balance and bank info).
+     *
+     * @param batchId Batch ID
+     * @param minBalance Minimum balance
+     */
+    private void saveBatchItems(Long batchId, BigDecimal minBalance) {
+        String sql = """
+                SELECT
+                    u.id as user_id,
+                    uw.id as wallet_id,
+                    uw.balance as amount,
+                    uba.account_number,
+                    uba.account_name,
+                    uba.bank_name
+                FROM user u
+                INNER JOIN user_wallet uw ON u.id = uw.user_id
+                INNER JOIN user_bank_account uba ON u.id = uba.user_id
+                WHERE uw.balance >= ?
+                AND u.deleted_at IS NULL
+                ORDER BY uw.balance DESC
+                """;
+
+        List<BatchTransferItem> items = jdbcTemplate.query(sql, new BatchTransferItemRowMapper(batchId), minBalance);
+
+        if (!items.isEmpty()) {
+            batchTransferItemRepository.saveAll(items);
+        }
+    }
+
+    /**
+     * Row mapper for BatchTransferItem.
+     */
+    private static class BatchTransferItemRowMapper implements RowMapper<BatchTransferItem> {
+
+        private final Long batchId;
+
+        public BatchTransferItemRowMapper(Long batchId) {
+            this.batchId = batchId;
+        }
+
+        @Override
+        public BatchTransferItem mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return BatchTransferItem.builder()
+                    .batchId(batchId)
+                    .userId(rs.getLong("user_id"))
+                    .walletId(rs.getLong("wallet_id"))
+                    .amount(rs.getBigDecimal("amount"))
+                    .accountNumber(rs.getString("account_number"))
+                    .accountName(rs.getString("account_name"))
+                    .bankName(rs.getString("bank_name"))
+                    .createdAt(LocalDateTime.now())
+                    .build();
+        }
     }
 
     /**

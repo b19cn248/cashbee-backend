@@ -3,6 +3,7 @@ package com.cashbee.infrastructure.persistence.repository;
 import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.infrastructure.persistence.entity.CashbackJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -73,4 +74,12 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
      */
     @Query("SELECT COALESCE(SUM(c.cashbackAmount), 0) FROM CashbackJpaEntity c WHERE c.userId = :userId AND c.status IN :statuses")
     BigDecimal sumCashbackAmountByUserIdAndStatusIn(@Param("userId") Long userId, @Param("statuses") List<CashbackStatus> statuses);
+
+    /**
+     * Update status for all cashbacks of a user with specific status.
+     * Used when batch transfer completes: CONFIRMED → PAID
+     */
+    @Modifying
+    @Query("UPDATE CashbackJpaEntity c SET c.status = :newStatus, c.paidAt = CURRENT_TIMESTAMP, c.updatedAt = CURRENT_TIMESTAMP WHERE c.userId = :userId AND c.status = :oldStatus")
+    int updateStatusByUserIdAndStatus(@Param("userId") Long userId, @Param("oldStatus") CashbackStatus oldStatus, @Param("newStatus") CashbackStatus newStatus);
 }

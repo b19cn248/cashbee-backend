@@ -43,4 +43,7 @@
     <!-- Refactor: Cashback per item -->
     <include file="db/changelog/024-refactor-cashback-per-item.xml"/>
 
+    <!-- Batch Transfer Item for confirm payment -->
+    <include file="db/changelog/025-create-batch-transfer-item-table.xml"/>
+
 </databaseChangeLog>
