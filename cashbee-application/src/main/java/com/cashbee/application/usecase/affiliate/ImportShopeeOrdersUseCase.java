@@ -134,8 +134,13 @@ public class ImportShopeeOrdersUseCase {
             });
 
             // Update total rows after parsing
+            // NOTE: Do NOT reload batch here! The batch object is already up-to-date
+            // from processBatch(). Reloading after entityManager.clear() may get stale
+            // data since the transaction hasn't committed yet, which can cause:
+            // 1. Incorrect batch counts (updatedCount = 0 instead of actual value)
+            // 2. Potential wallet data corruption from cascade effects
             batch.setTotalRows(totalRowsProcessed[0]);
-            batchRepository.save(batch);
+            batch = batchRepository.save(batch);
             log.info("UseCase: Parsed {} records from CSV using streaming", totalRowsProcessed[0]);
 
         } catch (IOException e) {
@@ -149,10 +154,9 @@ public class ImportShopeeOrdersUseCase {
         }
 
         // Step 4: Finalize import batch
-        // Reload batch to get updated counts
-        batch = batchRepository.findById(batchId)
-            .orElseThrow(() -> new NotFoundException("Import batch not found"));
-
+        // NOTE: Do NOT reload batch here! After entityManager.clear() in processBatch,
+        // reloading from DB may get stale data since transaction hasn't committed yet.
+        // The batch object is already up-to-date from processBatch.
         LocalDateTime endTime = LocalDateTime.now();
 
         if (batch.getFailedCount() == 0) {
@@ -166,7 +170,7 @@ public class ImportShopeeOrdersUseCase {
         batch.setCompletedAt(endTime);
         batch = batchRepository.save(batch);
 
-        log.info("UseCase: Import completed. Success: {}, Updated: {}, Failed: {}, Skipped: {}, Matched: {}",
+        log.info("UseCase: Import completed. New orders: {}, Updated: {}, Failed: {}, Skipped: {}, Orders matched with clicks: {}",
             batch.getSuccessCount(), batch.getUpdatedCount(), batch.getFailedCount(),
             batch.getSkippedCount(), matchedCount[0]);
 
@@ -263,14 +267,7 @@ public class ImportShopeeOrdersUseCase {
                 continue;
             }
 
-            // Skip cancelled orders
-            if (record.isCancelled()) {
-                batch.incrementSkipped();
-                log.debug("Skipping cancelled item for order: {}", record.getOrderId());
-                continue;
-            }
-
-            // Group by orderId
+            // Group by orderId (including cancelled orders - they need to be processed to cancel cashback)
             String orderId = record.getOrderId();
             if (orderId != null && !orderId.isBlank()) {
                 orderItemsMap.computeIfAbsent(orderId, k -> new ArrayList<>()).add(record);
@@ -312,14 +309,17 @@ public class ImportShopeeOrdersUseCase {
         }
 
         // Save batch after processing all records in this batch
-        batchRepository.save(batch);
+        batch = batchRepository.save(batch);
+
+        // Log BEFORE clear to show correct counts
+        log.info("Completed batch processing: {} unique orders processed ({} new, {} updated, {} failed, {} skipped)",
+            processedOrders, batch.getSuccessCount(), batch.getUpdatedCount(),
+            batch.getFailedCount(), batch.getSkippedCount());
 
         // Final flush and clear for this batch
+        // IMPORTANT: Clear AFTER logging to avoid losing batch state
         entityManager.flush();
         entityManager.clear();
-
-        log.info("Completed batch processing: {} unique orders processed, {} successful, {} failed, {} skipped",
-            processedOrders, batch.getSuccessCount(), batch.getFailedCount(), batch.getSkippedCount());
     }
 
     /**
@@ -354,13 +354,15 @@ public class ImportShopeeOrdersUseCase {
 
         // Aggregate data from all items
         // IMPORTANT: Items can have DIFFERENT statuses within the same order!
-        // We need to track commission separately for completed vs pending items
+        // We need to track commission separately for completed vs pending vs cancelled items
         BigDecimal totalCommission = BigDecimal.ZERO;           // Total commission from ALL items
         BigDecimal completedCommission = BigDecimal.ZERO;       // Commission from COMPLETED items only
         BigDecimal pendingCommission = BigDecimal.ZERO;         // Commission from PENDING items only
+        BigDecimal cancelledCommission = BigDecimal.ZERO;       // Commission from CANCELLED items only
         BigDecimal totalPrice = BigDecimal.ZERO;
         int completedItemCount = 0;
         int pendingItemCount = 0;
+        int cancelledItemCount = 0;
         StringBuilder productNames = new StringBuilder();
 
         for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
@@ -370,13 +372,19 @@ public class ImportShopeeOrdersUseCase {
             if (itemCommission != null && itemCommission.compareTo(BigDecimal.ZERO) > 0) {
                 totalCommission = totalCommission.add(itemCommission);
 
-                if (item.isCompleted()) {
+                if (item.isCancelled()) {
+                    cancelledCommission = cancelledCommission.add(itemCommission);
+                    cancelledItemCount++;
+                } else if (item.isCompleted()) {
                     completedCommission = completedCommission.add(itemCommission);
                     completedItemCount++;
                 } else {
                     pendingCommission = pendingCommission.add(itemCommission);
                     pendingItemCount++;
                 }
+            } else if (item.isCancelled()) {
+                // Count cancelled items even if commission is 0
+                cancelledItemCount++;
             }
 
             // Sum price
@@ -394,13 +402,17 @@ public class ImportShopeeOrdersUseCase {
         }
 
         // Determine order status based on items
-        // APPROVED if ALL items completed, PENDING if ANY item is pending
+        // CANCELLED if ALL items cancelled
+        // APPROVED if ALL non-cancelled items completed
+        // PENDING if ANY item is pending
+        boolean allItemsCancelled = (cancelledItemCount > 0 && completedItemCount == 0 && pendingItemCount == 0);
         boolean allItemsCompleted = (pendingItemCount == 0 && completedItemCount > 0);
         boolean isOrderCompleted = allItemsCompleted;
+        boolean isOrderCancelled = allItemsCancelled;
 
-        log.debug("Order {} aggregated: total={}, completed={} ({}items), pending={} ({}items)",
+        log.debug("Order {} aggregated: total={}, completed={} ({}items), pending={} ({}items), cancelled={} ({}items)",
             orderId, totalCommission, completedCommission, completedItemCount,
-            pendingCommission, pendingItemCount);
+            pendingCommission, pendingItemCount, cancelledCommission, cancelledItemCount);
 
         // Check for existing order
         AffiliateOrder existingOrder = orderRepository.findByOrderId(orderId).orElse(null);
@@ -412,12 +424,19 @@ public class ImportShopeeOrdersUseCase {
                 log.debug("Skipping duplicate order: {}", orderId);
                 return;
             } else if (request.getUpdateMode() == UpdateMode.UPDATE) {
-                // Update existing order with aggregated data
+                // Update existing order with aggregated data (including cancellation handling)
                 updateExistingOrderWithItems(existingOrder, items, totalCommission, totalPrice,
-                    isOrderCompleted, productNames.toString(), batch, platform.getId(),
+                    isOrderCompleted, isOrderCancelled, productNames.toString(), batch, platform.getId(),
                     completedCommission, pendingCommission, affectedUserIds);
                 return;
             }
+        }
+
+        // For new cancelled orders, skip (no need to create order/cashback for cancelled orders)
+        if (isOrderCancelled) {
+            batch.incrementSkipped();
+            log.debug("Skipping new cancelled order: {}", orderId);
+            return;
         }
 
         // Extract user ID from tracking code
@@ -538,7 +557,10 @@ public class ImportShopeeOrdersUseCase {
         // Track affected user for wallet recalculation
         affectedUserIds.add(finalUserId);
 
-        // Match with click
+        // Match with click if found
+        // Note: An order can be BOTH "new" (successCount) AND "matched" (matchedCount)
+        // - successCount tracks NEW orders created
+        // - matchedCount tracks orders that have a corresponding click record
         if (click != null && request.getAutoMatch()) {
             click.matchWithOrder(order.getId());
             clickRepository.save(click);
@@ -546,6 +568,7 @@ public class ImportShopeeOrdersUseCase {
             log.debug("Matched order {} with click {}", orderId, click.getId());
         }
 
+        // Increment success count for new order
         batch.incrementSuccess();
     }
 
@@ -573,6 +596,7 @@ public class ImportShopeeOrdersUseCase {
                                               BigDecimal totalCommission,
                                               BigDecimal totalPrice,
                                               boolean isOrderCompleted,
+                                              boolean isOrderCancelled,
                                               String productNames,
                                               ImportBatch batch,
                                               Long platformId,
@@ -580,12 +604,21 @@ public class ImportShopeeOrdersUseCase {
                                               BigDecimal pendingCommission,
                                               Set<Long> affectedUserIds) {
 
-        log.info("Updating existing order: {} (old status: {}, completed commission: {}, pending commission: {})",
-            existingOrder.getOrderId(), existingOrder.getOrderStatus(), completedCommission, pendingCommission);
+        log.info("Updating existing order: {} (old status: {}, completed: {}, cancelled: {}, completed commission: {}, pending commission: {})",
+            existingOrder.getOrderId(), existingOrder.getOrderStatus(), isOrderCompleted, isOrderCancelled,
+            completedCommission, pendingCommission);
 
         try {
             OrderStatus oldStatus = existingOrder.getOrderStatus();
-            OrderStatus newStatus = isOrderCompleted ? OrderStatus.APPROVED : OrderStatus.PENDING;
+            // Determine new status: CANCELLED > APPROVED > PENDING
+            OrderStatus newStatus;
+            if (isOrderCancelled) {
+                newStatus = OrderStatus.CANCELLED;
+            } else if (isOrderCompleted) {
+                newStatus = OrderStatus.APPROVED;
+            } else {
+                newStatus = OrderStatus.PENDING;
+            }
             boolean statusChanged = oldStatus != newStatus;
 
             // Update order with aggregated data
@@ -608,7 +641,15 @@ public class ImportShopeeOrdersUseCase {
 
             // Update order items: upsert each item by order_id + item_id
             for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
-                OrderStatus itemStatus = item.isCompleted() ? OrderStatus.APPROVED : OrderStatus.PENDING;
+                // Determine item status: CANCELLED > APPROVED > PENDING
+                OrderStatus itemStatus;
+                if (item.isCancelled()) {
+                    itemStatus = OrderStatus.CANCELLED;
+                } else if (item.isCompleted()) {
+                    itemStatus = OrderStatus.APPROVED;
+                } else {
+                    itemStatus = OrderStatus.PENDING;
+                }
 
                 // Find existing item or create new
                 AffiliateOrderItem existingItem = orderItemRepository
@@ -629,9 +670,28 @@ public class ImportShopeeOrdersUseCase {
                     existingItem.setCategoryLv3(item.getCategoryLv3());
                     existingItem.setStatus(itemStatus);
                     orderItem = orderItemRepository.save(existingItem);
-                    log.debug("Updated item {} for order {}", item.getItemId(), existingOrder.getOrderId());
+                    log.debug("Updated item {} for order {} (status: {})", item.getItemId(), existingOrder.getOrderId(), itemStatus);
                 } else {
-                    // Create new item
+                    // Item doesn't exist in DB
+                    if (item.isCancelled()) {
+                        // CRITICAL FIX: Even if item doesn't exist by itemId, we still need to
+                        // try to cancel any existing cashback for this order.
+                        // This handles the case where Shopee changes itemId when order is cancelled.
+                        log.info("Cancelled item {} not found by itemId for order {}, will try to cancel by orderId",
+                            item.getItemId(), existingOrder.getOrderId());
+
+                        // Try to cancel cashback using orderId (will search by orderId in upsertForItemWithCancellation)
+                        calculateCashbackUseCase.upsertForItemWithCancellation(
+                            existingOrder.getUserId(),
+                            existingOrder.getId(),
+                            null,  // No orderItemId since item doesn't exist
+                            platformId,
+                            BigDecimal.ZERO,  // Amount will be taken from existing cashback
+                            false,
+                            true  // isCancelled = true
+                        );
+                        continue;
+                    }
                     orderItem = AffiliateOrderItem.builder()
                         .orderId(existingOrder.getId())
                         .itemId(item.getItemId())
@@ -651,16 +711,19 @@ public class ImportShopeeOrdersUseCase {
                     log.debug("Created new item {} for order {}", item.getItemId(), existingOrder.getOrderId());
                 }
 
-                // Upsert cashback for this item
+                // Upsert cashback for this item (including cancellation handling)
                 BigDecimal itemCommission = item.getCommissionForCashback();
-                if (itemCommission != null && itemCommission.compareTo(BigDecimal.ZERO) > 0) {
-                    calculateCashbackUseCase.upsertForItem(
+                // For cancelled items, we still need to process to cancel cashback
+                // For non-cancelled items, skip if no commission
+                if (item.isCancelled() || (itemCommission != null && itemCommission.compareTo(BigDecimal.ZERO) > 0)) {
+                    calculateCashbackUseCase.upsertForItemWithCancellation(
                         existingOrder.getUserId(),
                         existingOrder.getId(),
                         orderItem.getId(),
                         platformId,
-                        itemCommission,
-                        item.isCompleted()
+                        itemCommission != null ? itemCommission : BigDecimal.ZERO,
+                        item.isCompleted(),
+                        item.isCancelled()
                     );
                 }
             }
@@ -713,18 +776,36 @@ public class ImportShopeeOrdersUseCase {
 
     /**
      * Build user-friendly message.
+     *
+     * Note:
+     * - successCount = NEW orders created
+     * - updatedCount = EXISTING orders updated
+     * - matchedCount = Orders (new or existing) that were matched with clicks
      */
     private String buildMessage(ImportBatch batch, int matchedCount) {
         StringBuilder message = new StringBuilder();
 
         if (batch.getStatus() == ImportStatus.COMPLETED) {
             message.append(String.format("Successfully processed %d rows. ", batch.getTotalRows()));
-            if (batch.getSuccessCount() > 0) {
-                message.append(String.format("%d new orders imported. ", batch.getSuccessCount()));
+
+            int totalProcessed = batch.getSuccessCount() + batch.getUpdatedCount();
+            if (totalProcessed > 0) {
+                message.append(String.format("%d orders processed ", totalProcessed));
+
+                // Break down by type
+                List<String> details = new ArrayList<>();
+                if (batch.getSuccessCount() > 0) {
+                    details.add(String.format("%d new", batch.getSuccessCount()));
+                }
+                if (batch.getUpdatedCount() > 0) {
+                    details.add(String.format("%d updated", batch.getUpdatedCount()));
+                }
+
+                if (!details.isEmpty()) {
+                    message.append("(").append(String.join(", ", details)).append("). ");
+                }
             }
-            if (batch.getUpdatedCount() > 0) {
-                message.append(String.format("%d orders updated. ", batch.getUpdatedCount()));
-            }
+
             if (matchedCount > 0) {
                 message.append(String.format("%d orders matched with clicks.", matchedCount));
             }
@@ -733,7 +814,7 @@ public class ImportShopeeOrdersUseCase {
                 batch.getSuccessCount(), batch.getUpdatedCount(),
                 batch.getFailedCount(), batch.getSkippedCount()));
             if (matchedCount > 0) {
-                message.append(String.format("%d orders matched.", matchedCount));
+                message.append(String.format("%d orders matched with clicks.", matchedCount));
             }
         } else {
             message.append(String.format("Import failed. %d orders failed to import.",

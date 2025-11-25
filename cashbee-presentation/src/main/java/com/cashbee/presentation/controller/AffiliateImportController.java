@@ -119,7 +119,7 @@ public class AffiliateImportController {
     ImportOrdersResponse response = importShopeeOrdersUseCase.execute(request);
 
     log.info(
-        "API: Import completed. Batch ID: {}, Success: {}, Updated: {}, Failed: {}, Skipped: {}, Matched: {}",
+        "API: Import completed. Batch ID: {}, New orders: {}, Updated: {}, Failed: {}, Skipped: {}, Orders matched with clicks: {}",
         response.getBatchId(),
         response.getSuccessCount(),
         response.getUpdatedCount(),

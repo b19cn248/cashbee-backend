@@ -32,7 +32,15 @@
       "WebSearch",
       "Bash(copy \"D:\\workspace\\my-app\\assets\\icon.png\" \"C:\\Users\\Windows\\workspace\\cashbee-backend\\cashbee-infrastructure\\src\\main\\resources\\static\\images\\cashbee-logo.png\")",
       "Bash(mkdir:*)",
-      "Bash(copy \"D:\\docs\\Batch_20599290.xls\" \"C:\\Users\\Windows\\workspace\\cashbee-backend\\cashbee-infrastructure\\src\\main\\resources\\templates\\vpbank_template.xls\")"
+      "Bash(copy \"D:\\docs\\Batch_20599290.xls\" \"C:\\Users\\Windows\\workspace\\cashbee-backend\\cashbee-infrastructure\\src\\main\\resources\\templates\\vpbank_template.xls\")",
+      "mcp__my_plane__get_projects",
+      "mcp__my_plane__list_project_issues",
+      "mcp__my_plane__list_states",
+      "mcp__my_plane__list_labels",
+      "mcp__my_plane__update_issue",
+      "mcp__my_plane__create_issue",
+      "Bash(./mvnw compile:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

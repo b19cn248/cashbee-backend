@@ -639,9 +639,15 @@ public class ShopeeCSVParser {
          * Check if order is cancelled.
          */
         public boolean isCancelled() {
-            // "Đã hủy" means cancelled in Vietnamese
+            // "Đã hủy" or "Đã huỷ" means cancelled in Vietnamese
+            // Note: Vietnamese has 2 ways to write "hủy":
+            //   - "hủy" (h + ủ + y) - dấu hỏi trên chữ u
+            //   - "huỷ" (hu + ỷ) - dấu hỏi trên chữ y
+            // Both are valid and used interchangeably
             return orderStatus != null &&
-                (orderStatus.contains("Đã hủy") || orderStatus.equalsIgnoreCase("Cancelled"));
+                (orderStatus.contains("Đã hủy") ||
+                 orderStatus.contains("Đã huỷ") ||
+                 orderStatus.equalsIgnoreCase("Cancelled"));
         }
 
         /**

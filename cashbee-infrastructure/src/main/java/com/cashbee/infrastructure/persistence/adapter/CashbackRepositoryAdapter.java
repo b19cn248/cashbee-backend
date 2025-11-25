@@ -47,6 +47,13 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     }
 
     @Override
+    public List<Cashback> findAllByOrderId(Long orderId) {
+        return jpaRepository.findAllByOrderId(orderId).stream()
+            .map(mapper::toDomain)
+            .collect(Collectors.toList());
+    }
+
+    @Override
     public List<Cashback> findByUserId(Long userId) {
         return jpaRepository.findByUserId(userId).stream()
             .map(mapper::toDomain)

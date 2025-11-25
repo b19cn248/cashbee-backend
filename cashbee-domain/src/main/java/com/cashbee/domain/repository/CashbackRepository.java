@@ -39,6 +39,15 @@ public interface CashbackRepository {
     Optional<Cashback> findByOrderId(Long orderId);
 
     /**
+     * Find all cashbacks by order ID.
+     * Used when an order may have multiple items with separate cashbacks.
+     *
+     * @param orderId Order ID
+     * @return List of cashbacks for the order
+     */
+    List<Cashback> findAllByOrderId(Long orderId);
+
+    /**
      * Find all cashbacks for a user.
      *
      * @param userId User ID

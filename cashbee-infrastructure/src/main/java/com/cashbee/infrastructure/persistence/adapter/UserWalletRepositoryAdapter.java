@@ -40,7 +40,8 @@ public class UserWalletRepositoryAdapter implements UserWalletRepository {
     @Override
     @Transactional
     public UserWallet save(UserWallet wallet) {
-        log.debug("Saving wallet: userId={}, balance={}", wallet.getUserId(), wallet.getBalance());
+        log.debug("Saving wallet: userId={}, balance={}, pendingBalance={}",
+            wallet.getUserId(), wallet.getBalance(), wallet.getPendingBalance());
 
         // Validate domain invariants before saving
         wallet.validate();
@@ -48,25 +49,19 @@ public class UserWalletRepositoryAdapter implements UserWalletRepository {
         // Ensure proper BigDecimal scale
         wallet.scaleBalances();
 
-        UserWalletJpaEntity entity;
+        // CRITICAL FIX: Always create entity directly from domain model
+        // DO NOT reload entity from DB/persistence context as it may have stale data
+        // The entity ID will be preserved during mapping, allowing JPA to perform UPDATE
+        UserWalletJpaEntity entity = mapper.toEntity(wallet);
 
-        if (wallet.isNew()) {
-            // New wallet - create entity
-            entity = mapper.toEntity(wallet);
-        } else {
-            // Existing wallet - update entity
-            entity = jpaRepository.findById(wallet.getId())
-                .orElseGet(() -> mapper.toEntity(wallet));
-
-            // Update fields from domain model
-            mapper.updateEntityFromDomain(wallet, entity);
-        }
+        log.debug("Entity before save: id={}, userId={}, balance={}, pendingBalance={}",
+            entity.getId(), entity.getUserId(), entity.getBalance(), entity.getPendingBalance());
 
         UserWalletJpaEntity saved = jpaRepository.save(entity);
         UserWallet result = mapper.toDomain(saved);
 
-        log.debug("Wallet saved: id={}, userId={}, balance={}",
-            result.getId(), result.getUserId(), result.getBalance());
+        log.debug("Wallet saved: id={}, userId={}, balance={}, pendingBalance={}",
+            result.getId(), result.getUserId(), result.getBalance(), result.getPendingBalance());
         return result;
     }
 
@@ -183,5 +178,50 @@ public class UserWalletRepositoryAdapter implements UserWalletRepository {
         log.warn("Deleting wallet for userId: {} - This should rarely be used!", userId);
         jpaRepository.deleteByUserId(userId);
         log.debug("Wallet deleted for userId: {}", userId);
+    }
+
+    @Override
+    @Transactional
+    public boolean confirmPendingBalanceDirectly(Long userId, BigDecimal amount) {
+        log.info("confirmPendingBalanceDirectly: userId={}, amount={}", userId, amount);
+        int updated = jpaRepository.confirmPendingBalanceDirectly(userId, amount);
+        log.info("confirmPendingBalanceDirectly: {} row(s) updated", updated);
+        return updated > 0;
+    }
+
+    @Override
+    @Transactional
+    public boolean addPendingBalanceDirectly(Long userId, BigDecimal amount) {
+        log.info("addPendingBalanceDirectly: userId={}, amount={}", userId, amount);
+        int updated = jpaRepository.addPendingBalanceDirectly(userId, amount);
+        log.info("addPendingBalanceDirectly: {} row(s) updated", updated);
+        return updated > 0;
+    }
+
+    @Override
+    @Transactional
+    public boolean addConfirmedBalanceDirectly(Long userId, BigDecimal amount) {
+        log.info("addConfirmedBalanceDirectly: userId={}, amount={}", userId, amount);
+        int updated = jpaRepository.addConfirmedBalanceDirectly(userId, amount);
+        log.info("addConfirmedBalanceDirectly: {} row(s) updated", updated);
+        return updated > 0;
+    }
+
+    @Override
+    @Transactional
+    public boolean subtractPendingBalanceDirectly(Long userId, BigDecimal amount) {
+        log.info("subtractPendingBalanceDirectly: userId={}, amount={}", userId, amount);
+        int updated = jpaRepository.subtractPendingBalanceDirectly(userId, amount);
+        log.info("subtractPendingBalanceDirectly: {} row(s) updated", updated);
+        return updated > 0;
+    }
+
+    @Override
+    @Transactional
+    public boolean reverseConfirmedBalanceDirectly(Long userId, BigDecimal amount) {
+        log.info("reverseConfirmedBalanceDirectly: userId={}, amount={}", userId, amount);
+        int updated = jpaRepository.reverseConfirmedBalanceDirectly(userId, amount);
+        log.info("reverseConfirmedBalanceDirectly: {} row(s) updated", updated);
+        return updated > 0;
     }
 }

@@ -29,6 +29,15 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
     Optional<CashbackJpaEntity> findByOrderId(Long orderId);
 
     /**
+     * Find all cashbacks by order ID.
+     * Used when an order may have multiple items with separate cashbacks.
+     *
+     * @param orderId Order ID
+     * @return List of cashback entities for the order
+     */
+    List<CashbackJpaEntity> findAllByOrderId(Long orderId);
+
+    /**
      * Find all cashbacks for a user.
      *
      * @param userId User ID
