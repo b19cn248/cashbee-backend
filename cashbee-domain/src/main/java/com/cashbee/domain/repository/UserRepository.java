@@ -1,6 +1,9 @@
 package com.cashbee.domain.repository;
 
+import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.domain.model.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -121,6 +124,34 @@ public interface UserRepository {
      * @return List of all active users
      */
     List<User> findAll();
+
+    /**
+     * Find all users with PAGINATION (excluding deleted).
+     * This is the RECOMMENDED method for listing users!
+     * Prevents memory issues when there are many users.
+     *
+     * @param pageable Pagination parameters (page, size, sort)
+     * @return Paginated users
+     */
+    Page<User> findAll(Pageable pageable);
+
+    /**
+     * Find users by status with PAGINATION.
+     *
+     * @param status User status to filter
+     * @param pageable Pagination parameters
+     * @return Paginated users
+     */
+    Page<User> findByStatus(UserStatus status, Pageable pageable);
+
+    /**
+     * Search users by email or username with PAGINATION.
+     *
+     * @param keyword Search keyword (matches email or username)
+     * @param pageable Pagination parameters
+     * @return Paginated users matching the search
+     */
+    Page<User> searchByEmailOrUsername(String keyword, Pageable pageable);
 
     /**
      * Delete user (soft delete).

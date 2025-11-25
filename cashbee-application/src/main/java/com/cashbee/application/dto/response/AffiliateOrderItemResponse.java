@@ -1,5 +1,6 @@
 package com.cashbee.application.dto.response;
 
+import com.cashbee.domain.enums.OrderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -49,6 +50,12 @@ public class AffiliateOrderItemResponse {
     private BigDecimal brandCommissionRate;
 
     private BigDecimal platformCommissionRate;
+
+    /**
+     * Item status (PENDING, APPROVED, PAID, CANCELLED).
+     * Each item can have different status within the same order.
+     */
+    private OrderStatus status;
 
     private LocalDateTime createdAt;
 }

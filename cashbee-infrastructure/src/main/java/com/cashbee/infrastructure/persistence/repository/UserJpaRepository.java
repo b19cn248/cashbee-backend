@@ -1,6 +1,8 @@
 package com.cashbee.infrastructure.persistence.repository;
 
 import com.cashbee.infrastructure.persistence.entity.UserJpaEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -117,4 +119,36 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, Long> {
      */
     @Query("SELECT COUNT(u) FROM UserJpaEntity u WHERE u.deletedAt IS NULL")
     long countActive();
+
+    /**
+     * Find all active users with PAGINATION.
+     *
+     * @param pageable Pagination parameters
+     * @return Paginated active users
+     */
+    @Query("SELECT u FROM UserJpaEntity u WHERE u.deletedAt IS NULL")
+    Page<UserJpaEntity> findAllActive(Pageable pageable);
+
+    /**
+     * Find users by status with PAGINATION (excluding deleted).
+     *
+     * @param status User status
+     * @param pageable Pagination parameters
+     * @return Paginated users with given status
+     */
+    @Query("SELECT u FROM UserJpaEntity u WHERE u.status = :status AND u.deletedAt IS NULL")
+    Page<UserJpaEntity> findByStatusActive(@Param("status") String status, Pageable pageable);
+
+    /**
+     * Search users by email or username with PAGINATION (excluding deleted).
+     * Uses LIKE for partial matching.
+     *
+     * @param keyword Search keyword
+     * @param pageable Pagination parameters
+     * @return Paginated users matching the search
+     */
+    @Query("SELECT u FROM UserJpaEntity u WHERE u.deletedAt IS NULL " +
+           "AND (LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    Page<UserJpaEntity> searchByEmailOrUsername(@Param("keyword") String keyword, Pageable pageable);
 }

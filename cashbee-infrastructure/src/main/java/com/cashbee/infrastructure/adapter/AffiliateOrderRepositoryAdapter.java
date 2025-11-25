@@ -70,10 +70,18 @@ public class AffiliateOrderRepositoryAdapter implements AffiliateOrderRepository
     }
 
     @Override
+    @Deprecated
     public List<AffiliateOrder> findByUserIdAndStatus(Long userId, OrderStatus status) {
         return jpaRepository.findByUserIdAndOrderStatus(userId, status).stream()
             .map(mapper::toDomain)
             .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<AffiliateOrder> findByUserIdAndStatus(Long userId, OrderStatus status, Pageable pageable) {
+        Page<com.cashbee.infrastructure.entity.AffiliateOrderJpaEntity> entityPage =
+            jpaRepository.findByUserIdAndOrderStatus(userId, status, pageable);
+        return entityPage.map(mapper::toDomain);
     }
 
     @Override

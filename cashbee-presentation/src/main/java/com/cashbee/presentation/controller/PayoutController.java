@@ -12,7 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,9 +30,10 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/payouts")
 @RequiredArgsConstructor
-@Slf4j
+
 @Tag(name = "Payout Management", description = "APIs for managing payout requests")
 public class PayoutController {
+    private static final Logger log = LoggerFactory.getLogger(PayoutController.class);
 
     private final CreatePayoutRequestUseCase createPayoutRequestUseCase;
     private final ApprovePayoutRequestUseCase approvePayoutRequestUseCase;

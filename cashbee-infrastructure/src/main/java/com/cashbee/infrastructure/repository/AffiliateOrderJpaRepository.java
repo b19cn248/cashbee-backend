@@ -38,9 +38,16 @@ public interface AffiliateOrderJpaRepository extends JpaRepository<AffiliateOrde
     Page<AffiliateOrderJpaEntity> findByUserId(Long userId, Pageable pageable);
 
     /**
-     * Find orders by user and status.
+     * Find orders by user and status (WITHOUT pagination).
+     * @deprecated Use findByUserIdAndOrderStatus(userId, status, pageable) for better performance
      */
+    @Deprecated
     List<AffiliateOrderJpaEntity> findByUserIdAndOrderStatus(Long userId, OrderStatus status);
+
+    /**
+     * Find orders by user and status with PAGINATION.
+     */
+    Page<AffiliateOrderJpaEntity> findByUserIdAndOrderStatus(Long userId, OrderStatus status, Pageable pageable);
 
     /**
      * Find orders by platform.

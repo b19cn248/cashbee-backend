@@ -58,9 +58,22 @@ public interface AffiliateOrderRepository {
     Page<AffiliateOrder> findByUserId(Long userId, Pageable pageable);
 
     /**
-     * Find orders by user and status.
+     * Find orders by user and status (WITHOUT pagination).
+     * @deprecated Use findByUserIdAndStatus(userId, status, pageable) for better performance
      */
+    @Deprecated
     List<AffiliateOrder> findByUserIdAndStatus(Long userId, OrderStatus status);
+
+    /**
+     * Find orders by user and status with PAGINATION.
+     * This is the RECOMMENDED method for filtering user orders by status.
+     *
+     * @param userId User ID
+     * @param status Order status to filter
+     * @param pageable Pagination parameters
+     * @return Paginated orders
+     */
+    Page<AffiliateOrder> findByUserIdAndStatus(Long userId, OrderStatus status, Pageable pageable);
 
     /**
      * Find orders by platform.

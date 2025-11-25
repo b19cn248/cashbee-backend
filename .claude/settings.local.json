@@ -40,7 +40,12 @@
       "mcp__my_plane__update_issue",
       "mcp__my_plane__create_issue",
       "Bash(./mvnw compile:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(./mvnw install:*)",
+      "Bash(curl:*)",
+      "Bash(curl.exe:*)",
+      "Bash(./mvnw dependency:tree:*)",
+      "Bash(./mvnw help:effective-pom:*)"
     ],
     "deny": [],
     "ask": []

@@ -6,7 +6,8 @@ import com.cashbee.application.service.email.BatchTransferEmailService;
 import com.cashbee.application.service.usecase.ExportBatchTransferUseCase;
 import com.cashbee.application.service.usecase.GenerateBatchTransferFileUseCase;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,7 +32,6 @@ import java.math.BigDecimal;
  */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 @ConditionalOnProperty(
         prefix = "cashbee.batch-transfer.scheduler",
         name = "enabled",
@@ -39,6 +39,8 @@ import java.math.BigDecimal;
         matchIfMissing = true
 )
 public class BatchTransferScheduler {
+
+    private static final Logger log = LoggerFactory.getLogger(BatchTransferScheduler.class);
 
     private final ExportBatchTransferUseCase exportBatchTransferUseCase;
     private final GenerateBatchTransferFileUseCase generateBatchTransferFileUseCase;
