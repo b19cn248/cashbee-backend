@@ -7,6 +7,7 @@ import com.cashbee.application.service.usecase.CompleteBatchTransferUseCase;
 import com.cashbee.application.service.usecase.ExportBatchTransferUseCase;
 import com.cashbee.application.service.usecase.GenerateBatchTransferFileUseCase;
 import com.cashbee.application.service.usecase.GetBatchExportHistoryUseCase;
+import com.cashbee.domain.enums.BankTemplate;
 import com.cashbee.domain.model.BatchTransferExport;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,7 +42,6 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 
 @Tag(name = "Batch Transfer", description = "Batch transfer management APIs")
-@PreAuthorize("hasRole('ADMIN')")
 public class BatchTransferController {
     private static final Logger log = LoggerFactory.getLogger(BatchTransferController.class);
 
@@ -96,44 +96,65 @@ public class BatchTransferController {
     /**
      * Download batch transfer Excel file.
      *
-     * GET /api/admin/batch-transfer/download?batchCode=BATCH_20251119_001
+     * GET /api/admin/batch-transfer/download?batchCode=BATCH_20251119_001&bankTemplate=VPBANK
      *
-     * Returns Excel file (.xls) as attachment.
+     * Supports two bank templates:
+     * - VPBANK (default): Returns .xls file with bank_name column
+     * - VIETINBANK: Returns .xlsx file with vietinbank_code (8 digits) column
      *
      * Note: File is generated fresh each time (realtime data).
      */
     @GetMapping("/download")
-    @Operation(summary = "Download batch transfer file", description = "Generate and download Excel file for batch transfer")
+    @Operation(summary = "Download batch transfer file",
+            description = "Generate and download Excel file for batch transfer. " +
+                    "Supports templates: VPBANK (.xls) and VIETINBANK (.xlsx)")
     public ResponseEntity<byte[]> downloadBatchTransferFile(
-            @RequestParam(required = false) String batchCode) {
+            @RequestParam(required = false) String batchCode,
+            @RequestParam(defaultValue = "VPBANK") String bankTemplate) {
 
-        log.info("BatchTransferController: GET /download - batchCode: {}", batchCode);
+        log.info("BatchTransferController: GET /download - batchCode: {}, bankTemplate: {}", batchCode, bankTemplate);
+
+        // Parse bank template
+        BankTemplate template;
+        try {
+            template = BankTemplate.valueOf(bankTemplate.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("BatchTransferController: Invalid bankTemplate '{}', defaulting to VPBANK", bankTemplate);
+            template = BankTemplate.VPBANK;
+        }
 
         byte[] excelBytes;
         String fileName;
 
         if (batchCode != null && !batchCode.isBlank()) {
-            // Generate by batch code
-            excelBytes = generateBatchTransferFileUseCase.generateByBatchCode(batchCode);
-            fileName = batchCode + ".xls";
+            // Generate by batch code with specified template
+            excelBytes = generateBatchTransferFileUseCase.generateByBatchCode(batchCode, template);
+            fileName = batchCode + template.getFileExtension();
         } else {
-            // Generate fresh with default criteria
+            // Generate fresh with default criteria and specified template
             excelBytes = generateBatchTransferFileUseCase.generateFile(
-                    java.math.BigDecimal.valueOf(50000),
-                    null // Use default remark
+                    java.math.BigDecimal.valueOf(10000),
+                    null, // Use default remark
+                    template
             );
             fileName = "BATCH_TRANSFER_" +
                     java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) +
-                    ".xls";
+                    template.getFileExtension();
         }
+
+        // Set content type based on file extension
+        MediaType contentType = template == BankTemplate.VIETINBANK
+                ? MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                : MediaType.APPLICATION_OCTET_STREAM;
 
         // Set headers for file download
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentType(contentType);
         headers.setContentDispositionFormData("attachment", fileName);
         headers.setContentLength(excelBytes.length);
 
-        log.info("BatchTransferController: Returning file {} ({} bytes)", fileName, excelBytes.length);
+        log.info("BatchTransferController: Returning file {} ({} bytes, template: {})",
+                fileName, excelBytes.length, template);
 
         return ResponseEntity.ok()
                 .headers(headers)

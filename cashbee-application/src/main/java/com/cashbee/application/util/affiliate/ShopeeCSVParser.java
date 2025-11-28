@@ -651,15 +651,35 @@ public class ShopeeCSVParser {
         }
 
         /**
+         * Check if order is unpaid (Chưa thanh toán).
+         * Unpaid orders should be skipped because:
+         * - Customer hasn't paid yet → no actual transaction
+         * - No commission will be earned until payment is made
+         * - Order may be cancelled if not paid within deadline
+         */
+        public boolean isUnpaid() {
+            return orderStatus != null &&
+                (orderStatus.contains("Chưa thanh toán") ||
+                 orderStatus.equalsIgnoreCase("Unpaid") ||
+                 orderStatus.equalsIgnoreCase("Not Paid"));
+        }
+
+        /**
+         * Check if order is in a processable state.
+         * Returns true for: Pending, Completed
+         * Returns false for: Cancelled, Unpaid
+         */
+        public boolean isProcessable() {
+            return !isCancelled() && !isUnpaid();
+        }
+
+        /**
          * Get the commission amount to use for cashback calculation.
-         * Priority: totalOrderCommission > totalProductCommission > 0
+         * Uses netAffiliateCommission (column 37: Hoa hồng ròng tiếp thị liên kết).
          */
         public BigDecimal getCommissionForCashback() {
-            if (totalOrderCommission != null && totalOrderCommission.compareTo(BigDecimal.ZERO) > 0) {
-                return totalOrderCommission;
-            }
-            if (totalProductCommission != null && totalProductCommission.compareTo(BigDecimal.ZERO) > 0) {
-                return totalProductCommission;
+            if (netAffiliateCommission != null && netAffiliateCommission.compareTo(BigDecimal.ZERO) > 0) {
+                return netAffiliateCommission;
             }
             return BigDecimal.ZERO;
         }

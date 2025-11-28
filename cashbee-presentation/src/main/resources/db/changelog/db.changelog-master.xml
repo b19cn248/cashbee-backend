@@ -46,4 +46,19 @@
     <!-- Batch Transfer Item for confirm payment -->
     <include file="db/changelog/025-create-batch-transfer-item-table.xml"/>
 
+    <!-- Add model_id to order item for variant support -->
+    <include file="db/changelog/026-add-model-id-to-order-item.xml"/>
+
+    <!-- VietinBank integration - add vietinbank_code to bank table -->
+    <include file="db/changelog/027-add-vietinbank-code-to-bank.xml"/>
+
+    <!-- VPBank integration - add vpbank_id to bank table -->
+    <include file="db/changelog/028-add-vpbank-id-to-bank.xml"/>
+
+    <!-- Update vpbank_id mapping based on VPBank official template -->
+    <include file="db/changelog/029-update-vpbank-id-mapping.xml"/>
+
+    <!-- Add min_balance to batch_transfer_export for accurate download -->
+    <include file="db/changelog/030-add-min-balance-to-batch-export.xml"/>
+
 </databaseChangeLog>

@@ -34,7 +34,14 @@ public interface AffiliateOrderItemJpaRepository extends JpaRepository<Affiliate
     long countByOrderId(Long orderId);
 
     /**
-     * Find item by order ID and item ID.
+     * Find item by order ID, item ID, and model ID (unique combination).
      */
+    Optional<AffiliateOrderItemJpaEntity> findByOrderIdAndItemIdAndModelId(Long orderId, String itemId, String modelId);
+
+    /**
+     * Find item by order ID and item ID (may return multiple).
+     * @deprecated Use findByOrderIdAndItemIdAndModelId for unique lookup
+     */
+    @Deprecated
     Optional<AffiliateOrderItemJpaEntity> findByOrderIdAndItemId(Long orderId, String itemId);
 }

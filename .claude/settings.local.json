@@ -45,7 +45,11 @@
       "Bash(curl:*)",
       "Bash(curl.exe:*)",
       "Bash(./mvnw dependency:tree:*)",
-      "Bash(./mvnw help:effective-pom:*)"
+      "Bash(./mvnw help:effective-pom:*)",
+      "Bash(python:*)",
+      "Bash(pip install xlrd pandas openpyxl)",
+      "WebFetch(domain:www.netify.ai)",
+      "WebFetch(domain:www.hardreset.info)"
     ],
     "deny": [],
     "ask": []

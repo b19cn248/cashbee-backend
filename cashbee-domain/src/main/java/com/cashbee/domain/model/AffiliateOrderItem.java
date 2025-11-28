@@ -42,6 +42,12 @@ public class AffiliateOrderItem {
     private String itemId;
 
     /**
+     * Model/Variant ID (e.g., different color/size of same item).
+     * Combined with itemId to uniquely identify a product variant.
+     */
+    private String modelId;
+
+    /**
      * Item name/title.
      */
     private String itemName;

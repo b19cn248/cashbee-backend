@@ -94,6 +94,7 @@ public class ExportBatchTransferUseCase {
                 .status(ExportStatus.PENDING)  // PENDING cho đến khi admin confirm
                 .exportType(exportType)
                 .remarkTemplate(remark)
+                .minBalance(request.getMinBalance())  // Save minBalance for accurate download
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -132,12 +133,12 @@ public class ExportBatchTransferUseCase {
      */
     private EligibleUsersResult queryEligibleUsers(BigDecimal minBalance) {
         String sql = """
-                SELECT COUNT(*) as total_users, COALESCE(SUM(u.balance), 0) as total_amount
-                FROM users u
+                SELECT COUNT(*) as total_users, COALESCE(SUM(uw.balance), 0) as total_amount
+                FROM user u
+                INNER JOIN user_wallet uw ON u.id = uw.user_id
                 INNER JOIN user_bank_account uba ON u.id = uba.user_id
-                WHERE u.balance >= ?
+                WHERE uw.balance >= ?
                 AND u.deleted_at IS NULL
-                AND uba.deleted_at IS NULL
                 """;
 
         Map<String, Object> result = jdbcTemplate.queryForMap(sql, minBalance);
@@ -200,6 +201,7 @@ public class ExportBatchTransferUseCase {
                 INNER JOIN user_bank_account uba ON u.id = uba.user_id
                 WHERE uw.balance >= ?
                 AND u.deleted_at IS NULL
+                AND uba.is_default = 1
                 ORDER BY uw.balance DESC
                 """;
 

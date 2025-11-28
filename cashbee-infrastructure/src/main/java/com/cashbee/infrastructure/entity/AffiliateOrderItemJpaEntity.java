@@ -14,11 +14,16 @@ import java.time.LocalDateTime;
  * @author CashBee Team
  */
 @Entity
-@Table(name = "affiliate_order_item", indexes = {
-    @Index(name = "idx_item_order", columnList = "order_id"),
-    @Index(name = "idx_item_id", columnList = "item_id"),
-    @Index(name = "idx_item_shop", columnList = "shop_id")
-})
+@Table(name = "affiliate_order_item",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_order_item_model", columnNames = {"order_id", "item_id", "model_id"})
+    },
+    indexes = {
+        @Index(name = "idx_item_order", columnList = "order_id"),
+        @Index(name = "idx_item_id", columnList = "item_id"),
+        @Index(name = "idx_item_shop", columnList = "shop_id")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -35,6 +40,9 @@ public class AffiliateOrderItemJpaEntity {
 
     @Column(name = "item_id", length = 50, nullable = false)
     private String itemId;
+
+    @Column(name = "model_id", length = 50)
+    private String modelId;
 
     @Column(name = "item_name", length = 255, nullable = false)
     private String itemName;

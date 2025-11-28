@@ -1,8 +1,10 @@
 package com.cashbee.application.service.usecase;
 
 import com.cashbee.application.dto.batch.BatchTransferRow;
-import com.cashbee.application.service.excel.VPBankExcelGenerator;
+import com.cashbee.application.service.excel.BatchTransferExcelGenerator;
+import com.cashbee.application.service.excel.ExcelGeneratorFactory;
 import com.cashbee.common.exception.BusinessException;
+import com.cashbee.domain.enums.BankTemplate;
 import com.cashbee.domain.model.BatchTransferExport;
 import com.cashbee.domain.repository.BatchTransferExportRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +28,12 @@ import java.util.List;
  * 1. Loads batch metadata (optional - can generate fresh)
  * 2. Queries eligible users with bank accounts (realtime data)
  * 3. Builds list of BatchTransferRow DTOs
- * 4. Calls VPBankExcelGenerator to create Excel file
+ * 4. Uses ExcelGeneratorFactory to select appropriate generator (VPBank or VietinBank)
  * 5. Returns byte array
+ *
+ * Supports multiple bank templates:
+ * - VPBANK: .xls format with bank_name
+ * - VIETINBANK: .xlsx format with vietinbank_code (8 digits)
  *
  * NOTE: This always generates fresh data (realtime).
  * Does NOT load cached/stored files.
@@ -40,30 +46,43 @@ import java.util.List;
 public class GenerateBatchTransferFileUseCase {
 
     private final BatchTransferExportRepository batchTransferExportRepository;
-    private final VPBankExcelGenerator excelGenerator;
+    private final ExcelGeneratorFactory excelGeneratorFactory;
     private final JdbcTemplate jdbcTemplate;
 
     /**
-     * Generate Excel file by batch code.
+     * Generate Excel file by batch code with default template (VPBANK).
      *
      * @param batchCode Batch code
      * @return Excel file as byte array
      */
     @Transactional(readOnly = true)
     public byte[] generateByBatchCode(String batchCode) {
-        log.info("GenerateBatchTransferFileUseCase: Generating file for batch code: {}", batchCode);
+        return generateByBatchCode(batchCode, BankTemplate.VPBANK);
+    }
+
+    /**
+     * Generate Excel file by batch code with specified bank template.
+     *
+     * @param batchCode Batch code
+     * @param bankTemplate Bank template type (VPBANK or VIETINBANK)
+     * @return Excel file as byte array
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateByBatchCode(String batchCode, BankTemplate bankTemplate) {
+        log.info("GenerateBatchTransferFileUseCase: Generating file for batch code: {}, template: {}",
+                batchCode, bankTemplate);
 
         // Load batch metadata
         BatchTransferExport batchExport = batchTransferExportRepository.findByBatchCode(batchCode)
                 .orElseThrow(() -> new BusinessException("BATCH_NOT_FOUND",
                         "Batch transfer export not found: " + batchCode));
 
-        // Generate file with stored remark template
-        return generateFile(new BigDecimal("50000"), batchExport.getRemarkTemplate());
+        // Generate file with stored minBalance and remark template
+        return generateFile(batchExport.getMinBalance(), batchExport.getRemarkTemplate(), bankTemplate);
     }
 
     /**
-     * Generate Excel file with custom criteria.
+     * Generate Excel file with custom criteria and default template (VPBANK).
      *
      * @param minBalance Minimum balance
      * @param remarkTemplate Remark template
@@ -71,7 +90,21 @@ public class GenerateBatchTransferFileUseCase {
      */
     @Transactional(readOnly = true)
     public byte[] generateFile(BigDecimal minBalance, String remarkTemplate) {
-        log.info("GenerateBatchTransferFileUseCase: Generating file with minBalance={}", minBalance);
+        return generateFile(minBalance, remarkTemplate, BankTemplate.VPBANK);
+    }
+
+    /**
+     * Generate Excel file with custom criteria and specified bank template.
+     *
+     * @param minBalance Minimum balance
+     * @param remarkTemplate Remark template
+     * @param bankTemplate Bank template type (VPBANK or VIETINBANK)
+     * @return Excel file as byte array
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateFile(BigDecimal minBalance, String remarkTemplate, BankTemplate bankTemplate) {
+        log.info("GenerateBatchTransferFileUseCase: Generating file with minBalance={}, template={}",
+                minBalance, bankTemplate);
 
         // 1. Generate remark if not provided
         String remark = remarkTemplate;
@@ -79,7 +112,7 @@ public class GenerateBatchTransferFileUseCase {
             remark = generateDefaultRemark();
         }
 
-        // 2. Query eligible users
+        // 2. Query eligible users (with vietinbank_code for VietinBank template)
         List<BatchTransferRow> rows = queryEligibleUsersWithBankAccounts(minBalance, remark);
 
         if (rows.isEmpty()) {
@@ -89,10 +122,14 @@ public class GenerateBatchTransferFileUseCase {
 
         log.info("GenerateBatchTransferFileUseCase: Found {} eligible users", rows.size());
 
-        // 3. Generate Excel file
-        byte[] excelBytes = excelGenerator.generate(rows);
+        // 3. Get appropriate generator from factory
+        BatchTransferExcelGenerator generator = excelGeneratorFactory.getGenerator(bankTemplate);
 
-        log.info("GenerateBatchTransferFileUseCase: Generated Excel file ({} bytes)", excelBytes.length);
+        // 4. Generate Excel file
+        byte[] excelBytes = generator.generate(rows);
+
+        log.info("GenerateBatchTransferFileUseCase: Generated {} file ({} bytes)",
+                bankTemplate.getFileExtension(), excelBytes.length);
 
         return excelBytes;
     }
@@ -101,21 +138,27 @@ public class GenerateBatchTransferFileUseCase {
      * Query eligible users with bank account details.
      *
      * Returns realtime data from database.
+     * Includes vietinbank_code from bank table for VietinBank template support.
      */
     private List<BatchTransferRow> queryEligibleUsersWithBankAccounts(BigDecimal minBalance, String remarkTemplate) {
         String sql = """
                 SELECT
                     u.id as user_id,
-                    u.balance,
+                    uw.balance,
                     uba.account_number,
                     uba.account_name,
-                    uba.bank_name
-                FROM users u
+                    uba.bank_name,
+                    uba.bank_code,
+                    b.vietinbank_code,
+                    COALESCE(b.vpbank_id, b.id) as vpbank_id
+                FROM user u
+                INNER JOIN user_wallet uw ON u.id = uw.user_id
                 INNER JOIN user_bank_account uba ON u.id = uba.user_id
-                WHERE u.balance >= ?
+                LEFT JOIN bank b ON uba.bank_code = b.bank_code
+                WHERE uw.balance >= ?
                 AND u.deleted_at IS NULL
-                AND uba.deleted_at IS NULL
-                ORDER BY u.balance DESC, u.id ASC
+                AND uba.is_default = 1
+                ORDER BY uw.balance DESC, u.id ASC
                 """;
 
         return jdbcTemplate.query(sql, new BatchTransferRowMapper(remarkTemplate), minBalance);
@@ -132,6 +175,7 @@ public class GenerateBatchTransferFileUseCase {
 
     /**
      * Row mapper for BatchTransferRow.
+     * Maps database result to DTO including vietinbank_code.
      */
     private static class BatchTransferRowMapper implements RowMapper<BatchTransferRow> {
 
@@ -151,6 +195,9 @@ public class GenerateBatchTransferFileUseCase {
                     .accountName(rs.getString("account_name"))
                     .amount(rs.getBigDecimal("balance"))
                     .bankName(rs.getString("bank_name"))
+                    .bankCode(rs.getString("bank_code"))
+                    .vietinbankCode(rs.getString("vietinbank_code"))
+                    .vpbankId(rs.getInt("vpbank_id"))
                     .remark(remarkTemplate)
                     .build();
         }

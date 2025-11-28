@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="029-update-vpbank-id-mapping" author="cashbee">
+        <comment>Update vpbank_id values based on VPBank's official template mapping</comment>
+
+        <!-- VPBank internal bank IDs extracted from vp_bank_template.xls -->
+        <sql>
+            UPDATE bank SET vpbank_id = 0 WHERE bank_code = 'VPBANK';
+            UPDATE bank SET vpbank_id = 3 WHERE bank_code = 'VCB' OR bank_code = 'VIETCOMBANK';
+            UPDATE bank SET vpbank_id = 7 WHERE bank_code = 'MSB';
+            UPDATE bank SET vpbank_id = 8 WHERE bank_code = 'AGRIBANK';
+            UPDATE bank SET vpbank_id = 9 WHERE bank_code = 'BIDV';
+            UPDATE bank SET vpbank_id = 10 WHERE bank_code = 'VIETINBANK';
+            UPDATE bank SET vpbank_id = 11 WHERE bank_code = 'DAB';
+            UPDATE bank SET vpbank_id = 14 WHERE bank_code = 'ACB';
+            UPDATE bank SET vpbank_id = 15 WHERE bank_code = 'MB';
+            UPDATE bank SET vpbank_id = 16 WHERE bank_code = 'SACOMBANK';
+            UPDATE bank SET vpbank_id = 17 WHERE bank_code = 'SHB';
+            UPDATE bank SET vpbank_id = 18 WHERE bank_code = 'BAB';
+            UPDATE bank SET vpbank_id = 19 WHERE bank_code = 'SEABANK';
+            UPDATE bank SET vpbank_id = 21 WHERE bank_code = 'SAIGONBANK';
+            UPDATE bank SET vpbank_id = 23 WHERE bank_code = 'ABBANK';
+            UPDATE bank SET vpbank_id = 28 WHERE bank_code = 'TCB';
+            UPDATE bank SET vpbank_id = 30 WHERE bank_code = 'NCB';
+            UPDATE bank SET vpbank_id = 35 WHERE bank_code = 'IVB';
+            UPDATE bank SET vpbank_id = 36 WHERE bank_code = 'VIETCAPITALBANK';
+            UPDATE bank SET vpbank_id = 37 WHERE bank_code = 'VIETBANK';
+            UPDATE bank SET vpbank_id = 38 WHERE bank_code = 'PGBANK';
+            UPDATE bank SET vpbank_id = 39 WHERE bank_code IN ('LIENVIETPOSTBANK', 'LPBANK');
+            UPDATE bank SET vpbank_id = 40 WHERE bank_code = 'KIENLONGBANK';
+            UPDATE bank SET vpbank_id = 43 WHERE bank_code = 'GPBANK';
+            UPDATE bank SET vpbank_id = 44 WHERE bank_code = 'VRB';
+            UPDATE bank SET vpbank_id = 46 WHERE bank_code IN ('TPBANK', 'TPB');
+            UPDATE bank SET vpbank_id = 47 WHERE bank_code = 'OCB';
+            UPDATE bank SET vpbank_id = 48 WHERE bank_code = 'COOPBANK';
+            UPDATE bank SET vpbank_id = 49 WHERE bank_code = 'HSBC';
+            UPDATE bank SET vpbank_id = 50 WHERE bank_code = 'SCB';
+            UPDATE bank SET vpbank_id = 51 WHERE bank_code = 'OJB';
+            UPDATE bank SET vpbank_id = 52 WHERE bank_code IN ('SHINHANBANK', 'SHINHAN');
+            UPDATE bank SET vpbank_id = 53 WHERE bank_code = 'PVCOMBANK';
+            UPDATE bank SET vpbank_id = 54 WHERE bank_code = 'KEBHANA';
+            UPDATE bank SET vpbank_id = 55 WHERE bank_code = 'CIMB';
+            UPDATE bank SET vpbank_id = 56 WHERE bank_code = 'HLBANK';
+            UPDATE bank SET vpbank_id = 57 WHERE bank_code = 'CAKE';
+            UPDATE bank SET vpbank_id = 58 WHERE bank_code = 'CBBANK';
+            UPDATE bank SET vpbank_id = 59 WHERE bank_code = 'UBANK';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

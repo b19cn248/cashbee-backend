@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="026-1" author="cashbee">
+        <comment>Add model_id column to affiliate_order_item for variant support</comment>
+
+        <addColumn tableName="affiliate_order_item">
+            <column name="model_id" type="VARCHAR(50)" afterColumn="item_id"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="026-2" author="cashbee">
+        <preConditions onFail="MARK_RAN">
+            <indexExists tableName="affiliate_order_item" indexName="uk_order_item"/>
+        </preConditions>
+        <comment>Drop old unique constraint uk_order_item on (order_id, item_id)</comment>
+
+        <dropUniqueConstraint tableName="affiliate_order_item" constraintName="uk_order_item"/>
+    </changeSet>
+
+    <changeSet id="026-3" author="cashbee">
+        <comment>Create new unique constraint uk_order_item_model on (order_id, item_id, model_id)</comment>
+
+        <addUniqueConstraint tableName="affiliate_order_item"
+                             constraintName="uk_order_item_model"
+                             columnNames="order_id, item_id, model_id"/>
+    </changeSet>
+
+    <changeSet id="026-4" author="cashbee">
+        <comment>Add index on model_id for faster lookups</comment>
+
+        <createIndex tableName="affiliate_order_item" indexName="idx_item_model">
+            <column name="model_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

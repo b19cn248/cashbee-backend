@@ -96,6 +96,13 @@ public class BatchTransferExportJpaEntity {
     private String remarkTemplate;
 
     /**
+     * Minimum balance criteria used when creating this batch.
+     */
+    @Column(name = "min_balance", nullable = false, precision = 15, scale = 2)
+    @Builder.Default
+    private BigDecimal minBalance = new BigDecimal("50000");
+
+    /**
      * Timestamp when batch was created (auto-populated).
      */
     @CreationTimestamp

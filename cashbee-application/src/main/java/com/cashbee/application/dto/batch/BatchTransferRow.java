@@ -18,6 +18,9 @@ import java.math.BigDecimal;
  * - Ngân Hàng Hưởng (Bank)
  * - Nội Dung (Remark)
  *
+ * For VietinBank template, additional field vietinbankCode is used
+ * instead of bankName for the bank column.
+ *
  * @author CashBee Team
  */
 @Data
@@ -48,10 +51,17 @@ public class BatchTransferRow {
     private BigDecimal amount;
 
     /**
-     * Ngân hàng hưởng.
-     * Example: "VPBANK", "VCB", "ACB"
+     * Ngân hàng hưởng (tên đầy đủ).
+     * Example: "Ngân hàng TMCP Việt Nam Thịnh Vượng"
      */
     private String bankName;
+
+    /**
+     * Mã ngân hàng (viết tắt).
+     * Example: "VPBANK", "VCB", "ACB"
+     * Used for VPBank template.
+     */
+    private String bankCode;
 
     /**
      * Nội dung chuyển khoản.
@@ -64,4 +74,21 @@ public class BatchTransferRow {
      * Used for logging/debugging only.
      */
     private Long userId;
+
+    /**
+     * Mã ngân hàng theo chuẩn VietinBank (8 chữ số).
+     * Example: "01309001" (VPBank), "01202001" (BIDV)
+     * Special: "VietinBank" for internal VietinBank transfer
+     *
+     * Used only for VietinBank template.
+     */
+    private String vietinbankCode;
+
+    /**
+     * Mã ngân hàng theo chuẩn VPBank (số nguyên).
+     * Example: 28 (Techcombank), 1 (VPBank)
+     *
+     * Used only for VPBank template (column BANKID).
+     */
+    private Integer vpbankId;
 }

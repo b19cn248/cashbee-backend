@@ -88,6 +88,13 @@ public class BatchTransferExport {
     private String remarkTemplate;
 
     /**
+     * Minimum balance criteria used when creating this batch.
+     * Default: 50,000 VND
+     */
+    @Builder.Default
+    private BigDecimal minBalance = new BigDecimal("50000");
+
+    /**
      * Timestamp when batch was created.
      */
     private LocalDateTime createdAt;

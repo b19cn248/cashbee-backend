@@ -88,6 +88,12 @@
             <artifactId>poi</artifactId>
         </dependency>
 
+        <!-- Apache POI OOXML for Excel generation (.xlsx format) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+        </dependency>
+
         <!-- Spring Boot Mail (for email service) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -81,6 +81,13 @@ public class AffiliateOrderItemRepositoryAdapter implements AffiliateOrderItemRe
     }
 
     @Override
+    public Optional<AffiliateOrderItem> findByOrderIdAndItemIdAndModelId(Long orderId, String itemId, String modelId) {
+        return jpaRepository.findByOrderIdAndItemIdAndModelId(orderId, itemId, modelId)
+            .map(mapper::toDomain);
+    }
+
+    @Override
+    @Deprecated
     public Optional<AffiliateOrderItem> findByOrderIdAndItemId(Long orderId, String itemId) {
         return jpaRepository.findByOrderIdAndItemId(orderId, itemId)
             .map(mapper::toDomain);

@@ -162,15 +162,39 @@ public class ShopeeUrlExpanderService {
     /**
      * Check if a URL is a Shopee shortened link.
      *
+     * Supported shortened URL formats:
+     * 1. s.shopee.{country} - e.g., https://s.shopee.vn/5Al0npFYE8
+     * 2. {country}.shp.ee   - e.g., https://vn.shp.ee/S5hDghe (from Android app share)
+     * 3. shope.ee           - e.g., https://shope.ee/3poh74Bvt2 (global affiliate link)
+     *
      * @param url URL to check
-     * @return true if this is a shortened link (s.shopee.vn or s.shopee.{country})
+     * @return true if this is a shortened link
      */
     public boolean isShortenedUrl(String url) {
         if (url == null || url.isBlank()) {
             return false;
         }
 
-        // Match s.shopee.vn, s.shopee.sg, s.shopee.my, etc.
-        return url.matches("https?://s\\.shopee\\.[a-z]{2,3}/.*");
+        // Pattern 1: s.shopee.{country} (e.g., s.shopee.vn, s.shopee.sg, s.shopee.my)
+        if (url.matches("https?://s\\.shopee\\.[a-z]{2,3}/.*")) {
+            log.debug("Detected shortened URL format: s.shopee.{country} - {}", url);
+            return true;
+        }
+
+        // Pattern 2: {country}.shp.ee (e.g., vn.shp.ee, id.shp.ee, ph.shp.ee, my.shp.ee)
+        // This format is used when sharing from Shopee Android app on some devices
+        if (url.matches("https?://[a-z]{2}\\.shp\\.ee/.*")) {
+            log.debug("Detected shortened URL format: {country}.shp.ee - {}", url);
+            return true;
+        }
+
+        // Pattern 3: shope.ee (global affiliate short link)
+        // This format is used for Shopee affiliate links
+        if (url.matches("https?://shope\\.ee/.*")) {
+            log.debug("Detected shortened URL format: shope.ee (global) - {}", url);
+            return true;
+        }
+
+        return false;
     }
 }

@@ -23,6 +23,7 @@ import com.cashbee.domain.repository.AffiliatePlatformRepository;
 import com.cashbee.domain.repository.ImportBatchRepository;
 import com.cashbee.domain.repository.UserRepository;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.FlushModeType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -245,6 +246,21 @@ public class ImportShopeeOrdersUseCase {
                                 int[] totalRowsProcessed,
                                 Set<Long> affectedUserIds) {
 
+        // CRITICAL FIX: Disable Hibernate auto-flush to prevent "null id" errors
+        // When auto-flush is enabled (default), Hibernate flushes the session before EVERY query
+        // to ensure data consistency. If the session contains entities with null IDs (due to
+        // previous failed persist operations), auto-flush will fail with "null id in entity entry".
+        //
+        // By setting FlushModeType.COMMIT, we tell Hibernate to only flush:
+        // 1. When we explicitly call flush()
+        // 2. When the transaction commits
+        //
+        // This allows us to continue processing orders even after some fail, without
+        // the failed entities corrupting subsequent operations.
+        FlushModeType originalFlushMode = entityManager.getFlushMode();
+        entityManager.setFlushMode(FlushModeType.COMMIT);
+        log.debug("Set FlushMode to COMMIT (was: {})", originalFlushMode);
+
         ImportBatch batch = batchRepository.findById(batchId)
             .orElseThrow(() -> new NotFoundException("Import batch not found"));
 
@@ -280,7 +296,13 @@ public class ImportShopeeOrdersUseCase {
         log.info("Grouped {} items into {} unique orders", recordBatch.size(), orderItemsMap.size());
 
         // Step 2: Process each unique order
+        // IMPORTANT: Track if any error occurred to prevent flush after exception
+        // Hibernate session becomes corrupted after an exception, and calling flush()
+        // will cause "null id in entity entry" errors for pending entities
         int processedOrders = 0;
+        int successfulOrders = 0;
+        boolean hasError = false;
+
         for (Map.Entry<String, List<ShopeeCSVParser.ShopeeOrderRecord>> entry : orderItemsMap.entrySet()) {
             String orderId = entry.getKey();
             List<ShopeeCSVParser.ShopeeOrderRecord> items = entry.getValue();
@@ -288,15 +310,21 @@ public class ImportShopeeOrdersUseCase {
             try {
                 processOrderWithItems(orderId, items, platform, batchId, request, errors, matchedCount, batch, affectedUserIds);
                 processedOrders++;
+                successfulOrders++;
 
-                // Flush and clear every 50 orders to prevent memory buildup
-                if (processedOrders % 50 == 0) {
+                // Flush and clear every 50 SUCCESSFUL orders to prevent memory buildup
+                // CRITICAL: Only flush when there are no errors - Hibernate session is corrupted after exception
+                if (!hasError && successfulOrders % 50 == 0) {
                     entityManager.flush();
                     entityManager.clear();
-                    log.debug("Flushed and cleared EntityManager after {} orders", processedOrders);
+                    // Re-fetch batch after clear to avoid detached entity issues
+                    batch = batchRepository.findById(batchId)
+                        .orElseThrow(() -> new NotFoundException("Import batch not found"));
+                    log.debug("Flushed and cleared EntityManager after {} successful orders", successfulOrders);
                 }
 
             } catch (Exception e) {
+                hasError = true;  // Mark that we had an error - don't flush anymore
                 batch.incrementFailed();
                 log.error("Failed to process order {}: {}", orderId, e.getMessage(), e);
                 errors.add(ImportOrdersResponse.ImportErrorDetail.builder()
@@ -305,6 +333,7 @@ public class ImportShopeeOrdersUseCase {
                     .error(e.getMessage())
                     .rawData(items.get(0).getRawData())
                     .build());
+                processedOrders++;
             }
         }
 
@@ -316,10 +345,23 @@ public class ImportShopeeOrdersUseCase {
             processedOrders, batch.getSuccessCount(), batch.getUpdatedCount(),
             batch.getFailedCount(), batch.getSkippedCount());
 
+        // Restore original flush mode before cleanup
+        entityManager.setFlushMode(originalFlushMode);
+        log.debug("Restored FlushMode to {}", originalFlushMode);
+
         // Final flush and clear for this batch
-        // IMPORTANT: Clear AFTER logging to avoid losing batch state
-        entityManager.flush();
-        entityManager.clear();
+        // With FlushMode.COMMIT, the session should NOT contain corrupted entities
+        // since auto-flush was disabled during processing.
+        // However, we still check hasError for safety.
+        if (!hasError) {
+            entityManager.flush();
+            entityManager.clear();
+        } else {
+            log.warn("Skipping final flush due to previous errors - clearing session only");
+            // Clear without flush to release memory
+            // The transaction manager will handle rollback of uncommitted changes
+            entityManager.clear();
+        }
     }
 
     /**
@@ -354,7 +396,7 @@ public class ImportShopeeOrdersUseCase {
 
         // Aggregate data from all items
         // IMPORTANT: Items can have DIFFERENT statuses within the same order!
-        // We need to track commission separately for completed vs pending vs cancelled items
+        // We need to track commission separately for completed vs pending vs cancelled vs unpaid items
         BigDecimal totalCommission = BigDecimal.ZERO;           // Total commission from ALL items
         BigDecimal completedCommission = BigDecimal.ZERO;       // Commission from COMPLETED items only
         BigDecimal pendingCommission = BigDecimal.ZERO;         // Commission from PENDING items only
@@ -363,6 +405,7 @@ public class ImportShopeeOrdersUseCase {
         int completedItemCount = 0;
         int pendingItemCount = 0;
         int cancelledItemCount = 0;
+        int unpaidItemCount = 0;  // Track unpaid items (Chưa thanh toán)
         StringBuilder productNames = new StringBuilder();
 
         for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
@@ -375,6 +418,10 @@ public class ImportShopeeOrdersUseCase {
                 if (item.isCancelled()) {
                     cancelledCommission = cancelledCommission.add(itemCommission);
                     cancelledItemCount++;
+                } else if (item.isUnpaid()) {
+                    // Unpaid items - don't add to pending/completed commission
+                    // They may become valid later when paid
+                    unpaidItemCount++;
                 } else if (item.isCompleted()) {
                     completedCommission = completedCommission.add(itemCommission);
                     completedItemCount++;
@@ -385,6 +432,9 @@ public class ImportShopeeOrdersUseCase {
             } else if (item.isCancelled()) {
                 // Count cancelled items even if commission is 0
                 cancelledItemCount++;
+            } else if (item.isUnpaid()) {
+                // Count unpaid items even if commission is 0
+                unpaidItemCount++;
             }
 
             // Sum price
@@ -402,17 +452,27 @@ public class ImportShopeeOrdersUseCase {
         }
 
         // Determine order status based on items
+        // Skip if ALL items are unpaid (customer hasn't paid yet)
         // CANCELLED if ALL items cancelled
         // APPROVED if ALL non-cancelled items completed
         // PENDING if ANY item is pending
-        boolean allItemsCancelled = (cancelledItemCount > 0 && completedItemCount == 0 && pendingItemCount == 0);
-        boolean allItemsCompleted = (pendingItemCount == 0 && completedItemCount > 0);
+        boolean allItemsUnpaid = (unpaidItemCount > 0 && completedItemCount == 0 && pendingItemCount == 0 && cancelledItemCount == 0);
+        boolean allItemsCancelled = (cancelledItemCount > 0 && completedItemCount == 0 && pendingItemCount == 0 && unpaidItemCount == 0);
+        boolean allItemsCompleted = (pendingItemCount == 0 && completedItemCount > 0 && unpaidItemCount == 0);
         boolean isOrderCompleted = allItemsCompleted;
         boolean isOrderCancelled = allItemsCancelled;
 
-        log.debug("Order {} aggregated: total={}, completed={} ({}items), pending={} ({}items), cancelled={} ({}items)",
+        log.debug("Order {} aggregated: total={}, completed={} ({}items), pending={} ({}items), cancelled={} ({}items), unpaid={} ({}items)",
             orderId, totalCommission, completedCommission, completedItemCount,
-            pendingCommission, pendingItemCount, cancelledCommission, cancelledItemCount);
+            pendingCommission, pendingItemCount, cancelledCommission, cancelledItemCount,
+            BigDecimal.ZERO, unpaidItemCount);
+
+        // Skip if ALL items are unpaid (customer hasn't paid yet - no commission earned)
+        if (allItemsUnpaid) {
+            batch.incrementSkipped();
+            log.debug("Skipping unpaid order: {} (all {} items are unpaid)", orderId, unpaidItemCount);
+            return;
+        }
 
         // Check for existing order
         AffiliateOrder existingOrder = orderRepository.findByOrderId(orderId).orElse(null);
@@ -514,15 +574,30 @@ public class ImportShopeeOrdersUseCase {
             orderId, order.getId(), userId, totalCommission);
 
         // Create AffiliateOrderItem records for each item, each with its own cashback
+        // Skip unpaid and cancelled items for NEW orders
         final Long savedOrderId = order.getId();
         final Long finalUserId = userId;
+        int createdItemCount = 0;
         for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
+            // Skip unpaid items - they haven't been paid yet, no commission earned
+            if (item.isUnpaid()) {
+                log.debug("Skipping unpaid item {} for order {}", item.getItemId(), orderId);
+                continue;
+            }
+
+            // Skip cancelled items for new orders
+            if (item.isCancelled()) {
+                log.debug("Skipping cancelled item {} for new order {}", item.getItemId(), orderId);
+                continue;
+            }
+
             // Determine item status
             OrderStatus itemStatus = item.isCompleted() ? OrderStatus.APPROVED : OrderStatus.PENDING;
 
             AffiliateOrderItem orderItem = AffiliateOrderItem.builder()
                 .orderId(savedOrderId)
                 .itemId(item.getItemId())
+                .modelId(item.getModelId())
                 .itemName(item.getItemName())
                 .quantity(item.getQuantity() != null ? item.getQuantity() : 1)
                 .actualAmount(item.getPrice())
@@ -536,6 +611,7 @@ public class ImportShopeeOrdersUseCase {
                 .createdAt(LocalDateTime.now())
                 .build();
             AffiliateOrderItem savedItem = orderItemRepository.save(orderItem);
+            createdItemCount++;
 
             // Create cashback for this item (each item has its own cashback)
             BigDecimal itemCommission = item.getCommissionForCashback();
@@ -552,7 +628,8 @@ public class ImportShopeeOrdersUseCase {
                     cashback.getId(), item.getItemId(), cashback.getStatus());
             }
         }
-        log.debug("Created {} order items with cashbacks for order {}", items.size(), orderId);
+        log.debug("Created {} order items with cashbacks for order {} (skipped {} unpaid/cancelled items)",
+            createdItemCount, orderId, items.size() - createdItemCount);
 
         // Track affected user for wallet recalculation
         affectedUserIds.add(finalUserId);
@@ -641,6 +718,13 @@ public class ImportShopeeOrdersUseCase {
 
             // Update order items: upsert each item by order_id + item_id
             for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
+                // Skip unpaid items - they haven't been paid yet, no commission earned
+                // When the customer pays, the order will be re-imported with a different status
+                if (item.isUnpaid()) {
+                    log.debug("Skipping unpaid item {} for order {} update", item.getItemId(), existingOrder.getOrderId());
+                    continue;
+                }
+
                 // Determine item status: CANCELLED > APPROVED > PENDING
                 OrderStatus itemStatus;
                 if (item.isCancelled()) {
@@ -651,9 +735,9 @@ public class ImportShopeeOrdersUseCase {
                     itemStatus = OrderStatus.PENDING;
                 }
 
-                // Find existing item or create new
+                // Find existing item by order_id + item_id + model_id (unique combination)
                 AffiliateOrderItem existingItem = orderItemRepository
-                    .findByOrderIdAndItemId(existingOrder.getId(), item.getItemId())
+                    .findByOrderIdAndItemIdAndModelId(existingOrder.getId(), item.getItemId(), item.getModelId())
                     .orElse(null);
 
                 AffiliateOrderItem orderItem;
@@ -695,6 +779,7 @@ public class ImportShopeeOrdersUseCase {
                     orderItem = AffiliateOrderItem.builder()
                         .orderId(existingOrder.getId())
                         .itemId(item.getItemId())
+                        .modelId(item.getModelId())
                         .itemName(item.getItemName())
                         .quantity(item.getQuantity() != null ? item.getQuantity() : 1)
                         .actualAmount(item.getPrice())
@@ -708,7 +793,7 @@ public class ImportShopeeOrdersUseCase {
                         .createdAt(LocalDateTime.now())
                         .build();
                     orderItem = orderItemRepository.save(orderItem);
-                    log.debug("Created new item {} for order {}", item.getItemId(), existingOrder.getOrderId());
+                    log.debug("Created new item {} (model: {}) for order {}", item.getItemId(), item.getModelId(), existingOrder.getOrderId());
                 }
 
                 // Upsert cashback for this item (including cancellation handling)

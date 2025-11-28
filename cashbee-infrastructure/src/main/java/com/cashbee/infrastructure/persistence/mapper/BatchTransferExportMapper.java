@@ -34,6 +34,7 @@ public class BatchTransferExportMapper {
                 .exportType(entity.getExportType())
                 .exportedBy(entity.getExportedBy())
                 .remarkTemplate(entity.getRemarkTemplate())
+                .minBalance(entity.getMinBalance())
                 .createdAt(entity.getCreatedAt())
                 .build();
     }
@@ -59,6 +60,7 @@ public class BatchTransferExportMapper {
                 .exportType(domain.getExportType())
                 .exportedBy(domain.getExportedBy())
                 .remarkTemplate(domain.getRemarkTemplate())
+                .minBalance(domain.getMinBalance())
                 .createdAt(domain.getCreatedAt())
                 .build();
     }
