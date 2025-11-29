@@ -1,5 +1,6 @@
 package com.cashbee.application.usecase.affiliate;
 
+import com.cashbee.application.dto.affiliate.FallbackMatchResult;
 import com.cashbee.application.dto.affiliate.ImportOrdersRequest;
 import com.cashbee.application.dto.affiliate.ImportOrdersResponse;
 import com.cashbee.application.usecase.cashback.CalculateCashbackUseCase;
@@ -124,6 +125,8 @@ public class ImportShopeeOrdersUseCase {
         // Step 3: Parse CSV file using STREAMING to prevent OutOfMemoryError
         List<ImportOrdersResponse.ImportErrorDetail> errors = new ArrayList<>();
         final int[] matchedCount = {0};  // Use array to allow modification in lambda
+        final int[] fallbackMatchedCount = {0};  // Track orders matched via fallback
+        final int[] multipleMatchSkippedCount = {0};  // Track orders skipped due to multiple matches
         final int[] totalRowsProcessed = {0};
         final Set<Long> affectedUserIds = new HashSet<>();  // Track users to recalculate wallets
 
@@ -131,7 +134,8 @@ public class ImportShopeeOrdersUseCase {
             // Use streaming parser to process records in batches
             csvParser.parseStreaming(request.getFileInputStream(), BATCH_SIZE, recordBatch -> {
                 // Process this batch in a separate transaction
-                processBatch(recordBatch, platform, batchId, request, errors, matchedCount, totalRowsProcessed, affectedUserIds);
+                processBatch(recordBatch, platform, batchId, request, errors, matchedCount,
+                    fallbackMatchedCount, multipleMatchSkippedCount, totalRowsProcessed, affectedUserIds);
             });
 
             // Update total rows after parsing
@@ -171,9 +175,10 @@ public class ImportShopeeOrdersUseCase {
         batch.setCompletedAt(endTime);
         batch = batchRepository.save(batch);
 
-        log.info("UseCase: Import completed. New orders: {}, Updated: {}, Failed: {}, Skipped: {}, Orders matched with clicks: {}",
+        log.info("UseCase: Import completed. New orders: {}, Updated: {}, Failed: {}, Skipped: {}, " +
+                "Orders matched with clicks: {} (fallback: {}, multiple match skipped: {})",
             batch.getSuccessCount(), batch.getUpdatedCount(), batch.getFailedCount(),
-            batch.getSkippedCount(), matchedCount[0]);
+            batch.getSkippedCount(), matchedCount[0], fallbackMatchedCount[0], multipleMatchSkippedCount[0]);
 
         // Q3 - Option B: Rollback if ANY errors occurred
         if (batch.getFailedCount() > 0) {
@@ -204,13 +209,15 @@ public class ImportShopeeOrdersUseCase {
             .skippedCount(batch.getSkippedCount())
             .updatedCount(batch.getUpdatedCount())
             .matchedCount(matchedCount[0])
+            .fallbackMatchedCount(fallbackMatchedCount[0])
+            .multipleMatchSkippedCount(multipleMatchSkippedCount[0])
             .successRate(batch.getSuccessRate())
             .errors(errors)
             .startedAt(startTime)
             .completedAt(endTime)
             .durationSeconds(durationSeconds)
             .importedBy(request.getImportedBy())
-            .message(buildMessage(batch, matchedCount[0]))
+            .message(buildMessage(batch, matchedCount[0], fallbackMatchedCount[0], multipleMatchSkippedCount[0]))
             .build();
     }
 
@@ -234,7 +241,10 @@ public class ImportShopeeOrdersUseCase {
      * @param request Import request
      * @param errors List to collect errors
      * @param matchedCount Counter for matched orders
+     * @param fallbackMatchedCount Counter for orders matched via fallback
+     * @param multipleMatchSkippedCount Counter for orders skipped due to multiple matches
      * @param totalRowsProcessed Counter for total rows processed
+     * @param affectedUserIds Set to collect affected user IDs
      */
     @Transactional(propagation = Propagation.MANDATORY)
     protected void processBatch(List<ShopeeCSVParser.ShopeeOrderRecord> recordBatch,
@@ -243,6 +253,8 @@ public class ImportShopeeOrdersUseCase {
                                 ImportOrdersRequest request,
                                 List<ImportOrdersResponse.ImportErrorDetail> errors,
                                 int[] matchedCount,
+                                int[] fallbackMatchedCount,
+                                int[] multipleMatchSkippedCount,
                                 int[] totalRowsProcessed,
                                 Set<Long> affectedUserIds) {
 
@@ -308,7 +320,8 @@ public class ImportShopeeOrdersUseCase {
             List<ShopeeCSVParser.ShopeeOrderRecord> items = entry.getValue();
 
             try {
-                processOrderWithItems(orderId, items, platform, batchId, request, errors, matchedCount, batch, affectedUserIds);
+                processOrderWithItems(orderId, items, platform, batchId, request, errors,
+                    matchedCount, fallbackMatchedCount, multipleMatchSkippedCount, batch, affectedUserIds);
                 processedOrders++;
                 successfulOrders++;
 
@@ -377,7 +390,10 @@ public class ImportShopeeOrdersUseCase {
      * @param request Import request
      * @param errors Error list
      * @param matchedCount Match counter
+     * @param fallbackMatchedCount Counter for orders matched via fallback
+     * @param multipleMatchSkippedCount Counter for orders skipped due to multiple matches
      * @param batch Import batch
+     * @param affectedUserIds Set to collect affected user IDs
      */
     private void processOrderWithItems(String orderId,
                                        List<ShopeeCSVParser.ShopeeOrderRecord> items,
@@ -386,6 +402,8 @@ public class ImportShopeeOrdersUseCase {
                                        ImportOrdersRequest request,
                                        List<ImportOrdersResponse.ImportErrorDetail> errors,
                                        int[] matchedCount,
+                                       int[] fallbackMatchedCount,
+                                       int[] multipleMatchSkippedCount,
                                        ImportBatch batch,
                                        Set<Long> affectedUserIds) {
 
@@ -502,6 +520,7 @@ public class ImportShopeeOrdersUseCase {
         // Extract user ID from tracking code
         Long userId = null;
         AffiliateClick click = null;
+        boolean isFallbackMatch = false;
 
         if (firstItem.hasTrackingCode()) {
             try {
@@ -538,13 +557,90 @@ public class ImportShopeeOrdersUseCase {
             }
         }
 
+        // ========== FALLBACK MATCHING ==========
+        // If no tracking code, try to match by context (item + shop + time window)
+        // Loop through ALL items in the order to find a match (not just firstItem)
+        if (userId == null && request.getAutoMatch()) {
+            log.info("[FALLBACK] Order {} has no tracking code, attempting fallback matching with {} items. autoMatch={}",
+                orderId, items.size(), request.getAutoMatch());
+
+            FallbackMatchResult fallbackResult = FallbackMatchResult.noMatch();
+            ShopeeCSVParser.ShopeeOrderRecord matchedItem = null;
+
+            // Try fallback matching with each item in the order
+            for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
+                log.info("[FALLBACK] Order {} - Checking item: itemId={}, shopId={}, orderTime={}",
+                    orderId, item.getItemId(), item.getShopId(), item.getOrderTime());
+
+                if (item.getItemId() == null || item.getShopId() == null) {
+                    log.warn("[FALLBACK] Order {} - Skipping item with null itemId or shopId", orderId);
+                    continue; // Skip items without itemId/shopId
+                }
+
+                LocalDateTime effectiveOrderTime = item.getOrderTime() != null ? item.getOrderTime() : firstItem.getOrderTime();
+                log.info("[FALLBACK] Order {} - Calling attemptFallbackMatch(platformId={}, itemId={}, shopId={}, orderTime={})",
+                    orderId, platform.getId(), item.getItemId(), item.getShopId(), effectiveOrderTime);
+
+                fallbackResult = attemptFallbackMatch(
+                    platform.getId(),
+                    item.getItemId(),
+                    item.getShopId(),
+                    effectiveOrderTime
+                );
+
+                log.info("[FALLBACK] Order {} - Result: isUniqueMatch={}, hasMultipleMatches={}, matchCount={}",
+                    orderId, fallbackResult.isUniqueMatch(), fallbackResult.hasMultipleMatches(),
+                    fallbackResult.getMatchCount());
+
+                if (fallbackResult.isUniqueMatch() || fallbackResult.hasMultipleMatches()) {
+                    matchedItem = item;
+                    log.info("[FALLBACK] Order {} - Found match using item {} from shop {}",
+                        orderId, item.getItemId(), item.getShopId());
+                    break; // Found a match, stop searching
+                }
+            }
+
+            if (fallbackResult.isUniqueMatch()) {
+                // Found exactly one matching click - auto-assign
+                click = fallbackResult.getClick();
+                userId = click.getUserId();
+                isFallbackMatch = true;
+                fallbackMatchedCount[0]++;
+                log.info("[FALLBACK] SUCCESS! Order {} matched with click {} (user {}) via item {} shop {}",
+                    orderId, click.getId(), userId,
+                    matchedItem != null ? matchedItem.getItemId() : "unknown",
+                    matchedItem != null ? matchedItem.getShopId() : "unknown");
+            } else if (fallbackResult.hasMultipleMatches()) {
+                // Multiple possible matches - skip and log for admin review
+                multipleMatchSkippedCount[0]++;
+                batch.incrementSkipped();
+                log.warn("[FALLBACK] Order {} has {} possible matches from different users, skipping: {}",
+                    orderId, fallbackResult.getMatchCount(), fallbackResult.getPossibleUserIds());
+                errors.add(ImportOrdersResponse.ImportErrorDetail.builder()
+                    .rowNumber(firstItem.getRowNumber())
+                    .orderId(orderId)
+                    .error(String.format("Multiple fallback matches found (%d users: %s). Manual review required.",
+                        fallbackResult.getMatchCount(), fallbackResult.getPossibleUserIds()))
+                    .rawData(firstItem.getRawData())
+                    .build());
+                return;
+            } else {
+                // No matches found after trying all items
+                log.warn("[FALLBACK] Order {} - NO MATCH found after trying {} items",
+                    orderId, items.size());
+            }
+        } else if (userId == null) {
+            log.info("[FALLBACK] Order {} - Skipped fallback matching. userId={}, autoMatch={}",
+                orderId, userId, request.getAutoMatch());
+        }
+
         if (userId == null) {
             batch.incrementSkipped();
-            log.warn("No tracking code found for order {}", orderId);
+            log.warn("No tracking code and no fallback match for order {}", orderId);
             errors.add(ImportOrdersResponse.ImportErrorDetail.builder()
                 .rowNumber(firstItem.getRowNumber())
                 .orderId(orderId)
-                .error("No tracking code (Sub_id1) found")
+                .error("No tracking code (Sub_id1) and no fallback match found")
                 .rawData(firstItem.getRawData())
                 .build());
             return;
@@ -555,7 +651,7 @@ public class ImportShopeeOrdersUseCase {
             .platformId(platform.getId())
             .userId(userId)
             .orderId(orderId)
-            .clickId(firstItem.getTrackingCode())
+            .clickId(isFallbackMatch ? null : firstItem.getTrackingCode())  // No tracking code for fallback
             .productName(truncateString(productNames.toString(), 255))
             .productPrice(totalPrice)
             .commissionAmount(totalCommission)  // TOTAL commission from all items
@@ -564,6 +660,7 @@ public class ImportShopeeOrdersUseCase {
             .orderStatus(isOrderCompleted ? OrderStatus.APPROVED : OrderStatus.PENDING)
             .source("IMPORT")
             .importBatchId(batchId)
+            .fallbackMatch(isFallbackMatch)  // Track if this was a fallback match
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
             .build();
@@ -866,8 +963,10 @@ public class ImportShopeeOrdersUseCase {
      * - successCount = NEW orders created
      * - updatedCount = EXISTING orders updated
      * - matchedCount = Orders (new or existing) that were matched with clicks
+     * - fallbackMatchedCount = Orders matched via fallback (context-based)
+     * - multipleMatchSkippedCount = Orders skipped due to multiple possible matches
      */
-    private String buildMessage(ImportBatch batch, int matchedCount) {
+    private String buildMessage(ImportBatch batch, int matchedCount, int fallbackMatchedCount, int multipleMatchSkippedCount) {
         StringBuilder message = new StringBuilder();
 
         if (batch.getStatus() == ImportStatus.COMPLETED) {
@@ -892,14 +991,29 @@ public class ImportShopeeOrdersUseCase {
             }
 
             if (matchedCount > 0) {
-                message.append(String.format("%d orders matched with clicks.", matchedCount));
+                message.append(String.format("%d orders matched with clicks", matchedCount));
+                if (fallbackMatchedCount > 0) {
+                    message.append(String.format(" (%d via fallback)", fallbackMatchedCount));
+                }
+                message.append(". ");
+            }
+
+            if (multipleMatchSkippedCount > 0) {
+                message.append(String.format("%d orders skipped (multiple matches, needs review). ", multipleMatchSkippedCount));
             }
         } else if (batch.getStatus() == ImportStatus.PARTIAL) {
             message.append(String.format("Partially processed: %d new, %d updated, %d failed, %d skipped. ",
                 batch.getSuccessCount(), batch.getUpdatedCount(),
                 batch.getFailedCount(), batch.getSkippedCount()));
             if (matchedCount > 0) {
-                message.append(String.format("%d orders matched with clicks.", matchedCount));
+                message.append(String.format("%d orders matched with clicks", matchedCount));
+                if (fallbackMatchedCount > 0) {
+                    message.append(String.format(" (%d via fallback)", fallbackMatchedCount));
+                }
+                message.append(". ");
+            }
+            if (multipleMatchSkippedCount > 0) {
+                message.append(String.format("%d orders need manual review. ", multipleMatchSkippedCount));
             }
         } else {
             message.append(String.format("Import failed. %d orders failed to import.",
@@ -907,5 +1021,85 @@ public class ImportShopeeOrdersUseCase {
         }
 
         return message.toString().trim();
+    }
+
+    /**
+     * Attempt to match an order without tracking code by context.
+     * SIMPLIFIED VERSION: Only matches by itemId + shopId (NO time restriction).
+     *
+     * Matching criteria:
+     * - Same platform (Shopee)
+     * - Same item ID (product that was clicked)
+     * - Same shop ID (store that was clicked)
+     * - Click not already matched with another order
+     *
+     * Logic:
+     * - If exactly 1 match → auto-assign to that user
+     * - If multiple matches from SAME user → use most recent click
+     * - If multiple matches from DIFFERENT users → flag for admin review
+     *
+     * @param platformId Platform ID
+     * @param itemId Item ID from order
+     * @param shopId Shop ID from order
+     * @param orderTime When the order was placed (for logging only)
+     * @return FallbackMatchResult indicating match status
+     */
+    private FallbackMatchResult attemptFallbackMatch(
+            Long platformId,
+            String itemId,
+            String shopId,
+            LocalDateTime orderTime) {
+
+        // Skip if missing required fields
+        if (itemId == null || shopId == null) {
+            log.warn("[FALLBACK-QUERY] Cannot attempt fallback match: itemId={}, shopId={}",
+                itemId, shopId);
+            return FallbackMatchResult.noMatch();
+        }
+
+        // Debug: Log exact values with length to detect hidden characters/whitespace
+        log.info("[FALLBACK-QUERY] Searching clicks by itemId+shopId only (NO time restriction): platformId={}, itemId='{}' (len={}), shopId='{}' (len={})",
+            platformId, itemId, itemId.length(), shopId, shopId.length());
+
+        // Find clicks matching by itemId + shopId only (NO time restriction)
+        List<AffiliateClick> possibleMatches = clickRepository.findPossibleMatchesByItemAndShop(
+            platformId,
+            itemId,
+            shopId
+        );
+
+        log.info("[FALLBACK-QUERY] Found {} possible matches for itemId={}, shopId={}",
+            possibleMatches.size(), itemId, shopId);
+
+        if (possibleMatches.isEmpty()) {
+            log.warn("[FALLBACK-QUERY] No clicks found matching criteria. Check if click exists with: " +
+                "platformId={}, itemId={}, shopId={}, orderMatched=false",
+                platformId, itemId, shopId);
+            return FallbackMatchResult.noMatch();
+        }
+
+        if (possibleMatches.size() == 1) {
+            AffiliateClick click = possibleMatches.get(0);
+            log.info("[FALLBACK-QUERY] Found exactly 1 match: clickId={}, userId={}", click.getId(), click.getUserId());
+            return FallbackMatchResult.uniqueMatch(click);
+        }
+
+        // Multiple matches - check if all from same user
+        long distinctUsers = possibleMatches.stream()
+            .map(AffiliateClick::getUserId)
+            .distinct()
+            .count();
+
+        if (distinctUsers == 1) {
+            // All clicks from same user - safe to match with most recent click
+            AffiliateClick mostRecentClick = possibleMatches.get(0); // Already sorted by createdAt DESC
+            log.info("[FALLBACK-QUERY] Multiple clicks ({}) from same user {}, using most recent click {}",
+                possibleMatches.size(), mostRecentClick.getUserId(), mostRecentClick.getId());
+            return FallbackMatchResult.uniqueMatch(mostRecentClick);
+        }
+
+        // Multiple users - needs admin review
+        log.warn("[FALLBACK-QUERY] Multiple clicks from {} different users found, needs admin review", distinctUsers);
+        return FallbackMatchResult.multipleMatches(possibleMatches);
     }
 }

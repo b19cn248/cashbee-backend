@@ -79,6 +79,18 @@ public class ImportOrdersResponse {
     private Integer matchedCount;
 
     /**
+     * Number of orders matched using fallback (context-based) matching.
+     * These orders had no Sub_id1 but were matched by item/shop/time window.
+     */
+    private Integer fallbackMatchedCount;
+
+    /**
+     * Number of orders skipped due to multiple possible fallback matches.
+     * These need manual review by admin.
+     */
+    private Integer multipleMatchSkippedCount;
+
+    /**
      * Success rate as percentage (0-100).
      */
     private Double successRate;

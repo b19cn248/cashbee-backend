@@ -49,7 +49,9 @@
       "Bash(python:*)",
       "Bash(pip install xlrd pandas openpyxl)",
       "WebFetch(domain:www.netify.ai)",
-      "WebFetch(domain:www.hardreset.info)"
+      "WebFetch(domain:www.hardreset.info)",
+      "WebFetch(domain:banhang.shopee.vn)",
+      "Bash(del /f \"C:\\Users\\Windows\\workspace\\cashbee-backend\\scripts\\migration\\V20251129_add_fallback_matching_support.sql\")"
     ],
     "deny": [],
     "ask": []

@@ -61,4 +61,7 @@
     <!-- Add min_balance to batch_transfer_export for accurate download -->
     <include file="db/changelog/030-add-min-balance-to-batch-export.xml"/>
 
+    <!-- Fallback matching support for orders without Sub_id1 -->
+    <include file="db/changelog/031-add-fallback-matching-support.xml"/>
+
 </databaseChangeLog>
