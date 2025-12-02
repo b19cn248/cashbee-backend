@@ -66,6 +66,7 @@ public class GetBatchExportHistoryUseCase {
                 .totalUsers(batchExport.getTotalUsers())
                 .totalAmount(batchExport.getTotalAmount())
                 .exportedAt(batchExport.getCreatedAt())
+                .status(batchExport.getStatus().name())
                 .message(String.format(
                         "%s export: %d users, %,d VND",
                         batchExport.getExportType().name(),

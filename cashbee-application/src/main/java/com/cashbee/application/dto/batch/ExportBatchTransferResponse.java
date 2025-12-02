@@ -54,4 +54,10 @@ public class ExportBatchTransferResponse {
      * Example: "Export completed. 25 users eligible for transfer (total: 15,500,000 VND)"
      */
     private String message;
+
+    /**
+     * Export status.
+     * Values: PENDING, COMPLETED, FAILED
+     */
+    private String status;
 }
