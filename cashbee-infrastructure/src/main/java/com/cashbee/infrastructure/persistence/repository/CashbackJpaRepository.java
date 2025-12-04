@@ -87,8 +87,36 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
     /**
      * Update status for all cashbacks of a user with specific status.
      * Used when batch transfer completes: CONFIRMED → PAID
+     * @deprecated Use {@link #updateStatusByUserIdAndStatusWithBatchId} instead
      */
+    @Deprecated
     @Modifying
     @Query("UPDATE CashbackJpaEntity c SET c.status = :newStatus, c.paidAt = CURRENT_TIMESTAMP, c.updatedAt = CURRENT_TIMESTAMP WHERE c.userId = :userId AND c.status = :oldStatus")
     int updateStatusByUserIdAndStatus(@Param("userId") Long userId, @Param("oldStatus") CashbackStatus oldStatus, @Param("newStatus") CashbackStatus newStatus);
+
+    /**
+     * Update status for unpaid cashbacks of a user with specific status.
+     * Only updates cashbacks where paid_batch_id IS NULL (not yet paid).
+     * Also records which batch paid these cashbacks for traceability.
+     *
+     * Key differences from deprecated method:
+     * 1. Only updates cashbacks where paidBatchId IS NULL
+     * 2. Sets paidBatchId to track which batch paid
+     */
+    @Modifying
+    @Query("UPDATE CashbackJpaEntity c SET c.status = :newStatus, c.paidAt = CURRENT_TIMESTAMP, c.updatedAt = CURRENT_TIMESTAMP, c.paidBatchId = :batchId WHERE c.userId = :userId AND c.status = :oldStatus AND c.paidBatchId IS NULL")
+    int updateStatusByUserIdAndStatusWithBatchId(@Param("userId") Long userId, @Param("oldStatus") CashbackStatus oldStatus, @Param("newStatus") CashbackStatus newStatus, @Param("batchId") Long batchId);
+
+    /**
+     * Find all cashbacks paid by a specific batch.
+     * Used for traceability: batchCode → cashbacks → orders
+     */
+    List<CashbackJpaEntity> findByPaidBatchId(Long paidBatchId);
+
+    /**
+     * Sum cashback amount for unpaid CONFIRMED cashbacks of a user.
+     * Only counts cashbacks where paidBatchId IS NULL.
+     */
+    @Query("SELECT COALESCE(SUM(c.cashbackAmount), 0) FROM CashbackJpaEntity c WHERE c.userId = :userId AND c.status = 'CONFIRMED' AND c.paidBatchId IS NULL")
+    BigDecimal sumUnpaidConfirmedCashbackByUserId(@Param("userId") Long userId);
 }

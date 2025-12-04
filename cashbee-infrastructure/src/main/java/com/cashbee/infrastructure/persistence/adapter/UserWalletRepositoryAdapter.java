@@ -181,7 +181,8 @@ public class UserWalletRepositoryAdapter implements UserWalletRepository {
     }
 
     @Override
-    @Transactional
+    // NOTE: Removed @Transactional - this is called from ImportShopeeOrdersUseCase
+    // which already has a transaction. Nested @Transactional causes rollback-only issues.
     public boolean confirmPendingBalanceDirectly(Long userId, BigDecimal amount) {
         log.info("confirmPendingBalanceDirectly: userId={}, amount={}", userId, amount);
         int updated = jpaRepository.confirmPendingBalanceDirectly(userId, amount);
@@ -190,7 +191,7 @@ public class UserWalletRepositoryAdapter implements UserWalletRepository {
     }
 
     @Override
-    @Transactional
+    // NOTE: Removed @Transactional - called from import flow which has transaction
     public boolean addPendingBalanceDirectly(Long userId, BigDecimal amount) {
         log.info("addPendingBalanceDirectly: userId={}, amount={}", userId, amount);
         int updated = jpaRepository.addPendingBalanceDirectly(userId, amount);
@@ -199,7 +200,7 @@ public class UserWalletRepositoryAdapter implements UserWalletRepository {
     }
 
     @Override
-    @Transactional
+    // NOTE: Removed @Transactional - called from import flow which has transaction
     public boolean addConfirmedBalanceDirectly(Long userId, BigDecimal amount) {
         log.info("addConfirmedBalanceDirectly: userId={}, amount={}", userId, amount);
         int updated = jpaRepository.addConfirmedBalanceDirectly(userId, amount);
@@ -208,7 +209,7 @@ public class UserWalletRepositoryAdapter implements UserWalletRepository {
     }
 
     @Override
-    @Transactional
+    // NOTE: Removed @Transactional - called from import flow which has transaction
     public boolean subtractPendingBalanceDirectly(Long userId, BigDecimal amount) {
         log.info("subtractPendingBalanceDirectly: userId={}, amount={}", userId, amount);
         int updated = jpaRepository.subtractPendingBalanceDirectly(userId, amount);
@@ -217,7 +218,7 @@ public class UserWalletRepositoryAdapter implements UserWalletRepository {
     }
 
     @Override
-    @Transactional
+    // NOTE: Removed @Transactional - called from import flow which has transaction
     public boolean reverseConfirmedBalanceDirectly(Long userId, BigDecimal amount) {
         log.info("reverseConfirmedBalanceDirectly: userId={}, amount={}", userId, amount);
         int updated = jpaRepository.reverseConfirmedBalanceDirectly(userId, amount);

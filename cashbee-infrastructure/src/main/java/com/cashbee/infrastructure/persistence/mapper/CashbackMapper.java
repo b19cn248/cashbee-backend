@@ -40,6 +40,7 @@ public class CashbackMapper {
             .paidAt(domain.getPaidAt())
             .cancelledAt(domain.getCancelledAt())
             .updatedAt(domain.getUpdatedAt())
+            .paidBatchId(domain.getPaidBatchId())
             .build();
     }
 
@@ -71,6 +72,7 @@ public class CashbackMapper {
             .paidAt(entity.getPaidAt())
             .cancelledAt(entity.getCancelledAt())
             .updatedAt(entity.getUpdatedAt())
+            .paidBatchId(entity.getPaidBatchId())
             .build();
     }
 }

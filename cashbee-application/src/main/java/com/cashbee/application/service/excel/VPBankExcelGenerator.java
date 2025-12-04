@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 
 /**
  * Service to generate VPBank batch transfer Excel file (.xls format).
- *
+ * <p>
  * VPBank template structure (7 columns):
  * - Col 0: # (STT)
  * - Col 1: Số Tài Khoản (Account Number)
@@ -99,7 +99,7 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
     /**
      * Load template file from resources.
      */
-    private HSSFWorkbook loadTemplate() throws Exception {
+    private HSSFWorkbook loadTemplate() {
         log.debug("VPBankExcelGenerator: Loading template from {}", TEMPLATE_PATH);
 
         try {
@@ -222,7 +222,7 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
      * 1. Remove Vietnamese accents
      * 2. Convert to UPPERCASE
      * 3. Remove special characters like "&"
-     *
+     * <p>
      * Example: "Nguyễn Văn A" -> "NGUYEN VAN A"
      */
     private String processAccountName(String accountName) {
@@ -247,7 +247,7 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
 
     /**
      * Remove Vietnamese accents from string.
-     *
+     * <p>
      * Example: "Nguyễn Văn" -> "Nguyen Van"
      */
     private String removeVietnameseAccents(String str) {

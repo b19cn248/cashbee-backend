@@ -99,7 +99,25 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     }
 
     @Override
+    @Deprecated
     public int updateStatusByUserIdAndStatus(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus) {
         return jpaRepository.updateStatusByUserIdAndStatus(userId, oldStatus, newStatus);
+    }
+
+    @Override
+    public int updateStatusByUserIdAndStatusWithBatchId(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId) {
+        return jpaRepository.updateStatusByUserIdAndStatusWithBatchId(userId, oldStatus, newStatus, batchId);
+    }
+
+    @Override
+    public List<Cashback> findByPaidBatchId(Long batchId) {
+        return jpaRepository.findByPaidBatchId(batchId).stream()
+            .map(mapper::toDomain)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public BigDecimal sumUnpaidConfirmedCashbackByUserId(Long userId) {
+        return jpaRepository.sumUnpaidConfirmedCashbackByUserId(userId);
     }
 }

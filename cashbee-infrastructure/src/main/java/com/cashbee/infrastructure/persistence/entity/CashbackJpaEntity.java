@@ -79,6 +79,13 @@ public class CashbackJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /**
+     * Batch that paid this cashback (FK to batch_transfer_export).
+     * NULL = not paid yet OR paid before batch tracking feature.
+     */
+    @Column(name = "paid_batch_id")
+    private Long paidBatchId;
+
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();

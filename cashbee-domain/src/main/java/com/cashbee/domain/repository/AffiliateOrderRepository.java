@@ -1,5 +1,6 @@
 package com.cashbee.domain.repository;
 
+import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.AffiliateOrder;
 import org.springframework.data.domain.Page;
@@ -104,4 +105,21 @@ public interface AffiliateOrderRepository {
      * Count total orders for user.
      */
     long countByUserId(Long userId);
+
+    /**
+     * Find orders by user and cashback status with PAGINATION.
+     * This method joins with cashback table to filter by cashback status
+     * instead of order status.
+     *
+     * Use cases:
+     * - PAID: Orders where cashback has been transferred to user
+     * - CONFIRMED: Orders where cashback is confirmed but not yet paid
+     * - PENDING: Orders where cashback is pending confirmation
+     *
+     * @param userId User ID
+     * @param cashbackStatus Cashback status to filter
+     * @param pageable Pagination parameters
+     * @return Paginated orders matching the cashback status
+     */
+    Page<AffiliateOrder> findByUserIdAndCashbackStatus(Long userId, CashbackStatus cashbackStatus, Pageable pageable);
 }

@@ -19,22 +19,6 @@
     {
       "path": "/v3/api-docs/*",
       "enforcement-mode": "DISABLED"
-    },
-    {
-      "path": "/api/payouts/*",
-      "enforcement-mode": "DISABLED"
-    },
-    {
-      "path": "/api/admin/platforms/*",
-      "enforcement-mode": "DISABLED"
-    },
-    {
-      "path": "/api/users/*",
-      "enforcement-mode": "DISABLED"
-    },
-    {
-      "path": "/api/*",
-      "enforcement-mode": "DISABLED"
     }
   ]
 }

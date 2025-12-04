@@ -176,17 +176,24 @@ public class CalculateCashbackUseCase {
      * @param isItemCompleted Whether item is already completed
      * @return Created Cashback
      */
-    @Transactional
+    /**
+     * NOTE: Removed @Transactional to prevent nested transaction issues.
+     * This method is called from ImportShopeeOrdersUseCase which already has a transaction.
+     * Having @Transactional here causes "rollback-only" marking when exceptions occur,
+     * leading to UnexpectedRollbackException even when errors are caught.
+     */
     public Cashback executeForItem(Long userId, Long orderId, Long orderItemId, Long platformId,
                                    BigDecimal commissionAmount, boolean isItemCompleted) {
 
-        log.info("UseCase: Calculating cashback for item {} (order: {}, user: {}, commission: {}, completed: {})",
-            orderItemId, orderId, userId, commissionAmount, isItemCompleted);
+        log.info("[DEBUG-CASHBACK] executeForItem START: userId={}, orderId={}, orderItemId={}, platformId={}, commission={}, completed={}",
+            userId, orderId, orderItemId, platformId, commissionAmount, isItemCompleted);
 
         // Validate inputs
         if (orderItemId == null || orderItemId <= 0) {
+            log.error("[DEBUG-CASHBACK] VALIDATION FAILED: orderItemId is null or <= 0: {}", orderItemId);
             throw new IllegalArgumentException("Invalid order item ID: " + orderItemId);
         }
+        log.info("[DEBUG-CASHBACK] orderItemId validation passed: {}", orderItemId);
 
         // Check if cashback already exists for this item
         if (cashbackRepository.existsByOrderItemId(orderItemId)) {
@@ -242,7 +249,9 @@ public class CalculateCashbackUseCase {
      * @param isItemCompleted Whether item is already completed
      * @return Created or updated Cashback
      */
-    @Transactional
+    /**
+     * NOTE: Removed @Transactional - called from ImportShopeeOrdersUseCase which has transaction.
+     */
     public Cashback upsertForItem(Long userId, Long orderId, Long orderItemId, Long platformId,
                                   BigDecimal commissionAmount, boolean isItemCompleted) {
         return upsertForItemWithCancellation(userId, orderId, orderItemId, platformId,
@@ -267,13 +276,19 @@ public class CalculateCashbackUseCase {
      * @param isCancelled Whether item is cancelled
      * @return Created or updated Cashback, or null if cancelled order has no existing cashback
      */
-    @Transactional
+    /**
+     * NOTE: Removed @Transactional to prevent nested transaction issues.
+     * This method is called from ImportShopeeOrdersUseCase.updateExistingOrderWithItems()
+     * which already runs within a transaction. Having @Transactional here causes
+     * "rollback-only" marking when any exception occurs (even if caught),
+     * leading to UnexpectedRollbackException at commit time.
+     */
     public Cashback upsertForItemWithCancellation(Long userId, Long orderId, Long orderItemId, Long platformId,
                                                    BigDecimal commissionAmount, boolean isItemCompleted,
                                                    boolean isCancelled) {
 
-        log.info("UseCase: Upserting cashback for item {} (order: {}, user: {}, completed: {}, cancelled: {})",
-            orderItemId, orderId, userId, isItemCompleted, isCancelled);
+        log.info("[DEBUG-CASHBACK] START upsertForItemWithCancellation: userId={}, orderId={}, orderItemId={}, platformId={}, commission={}, completed={}, cancelled={}",
+            userId, orderId, orderItemId, platformId, commissionAmount, isItemCompleted, isCancelled);
 
         // CRITICAL FIX: First try to find by orderItemId (if not null), then fallback to orderId
         // This handles the case where orderItem gets recreated with a new ID or doesn't exist
@@ -400,13 +415,17 @@ public class CalculateCashbackUseCase {
 
         // For cancelled orders without existing cashback, nothing to do
         if (isCancelled) {
-            log.info("UseCase: Cancelled order {} has no existing cashback, nothing to cancel", orderId);
+            log.info("[DEBUG-CASHBACK] Cancelled order {} has no existing cashback, nothing to cancel - returning null", orderId);
             return null;
         }
 
         // Create new cashback
-        log.info("UseCase: No existing cashback found, creating NEW cashback for item {}", orderItemId);
-        return executeForItem(userId, orderId, orderItemId, platformId, commissionAmount, isItemCompleted);
+        log.info("[DEBUG-CASHBACK] No existing cashback found, calling executeForItem for item {}", orderItemId);
+        log.info("[DEBUG-CASHBACK] executeForItem params: userId={}, orderId={}, orderItemId={}, platformId={}, commission={}, completed={}",
+            userId, orderId, orderItemId, platformId, commissionAmount, isItemCompleted);
+        Cashback result = executeForItem(userId, orderId, orderItemId, platformId, commissionAmount, isItemCompleted);
+        log.info("[DEBUG-CASHBACK] executeForItem returned: {}", result != null ? result.getId() : "NULL");
+        return result;
     }
 
     private BigDecimal getDefaultCashbackRate(Long platformId) {
@@ -458,15 +477,18 @@ public class CalculateCashbackUseCase {
      * @param status Cashback status (PENDING or CONFIRMED)
      */
     private void updateWalletForNewCashback(Long userId, BigDecimal amount, CashbackStatus status) {
+        log.info("[DEBUG-WALLET] updateWalletForNewCashback START: userId={}, amount={}, status={}", userId, amount, status);
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("updateWalletForNewCashback: Skipping, amount is null or <= 0: {}", amount);
+            log.warn("[DEBUG-WALLET] updateWalletForNewCashback: Skipping, amount is null or <= 0: {}", amount);
             return;
         }
 
         // Ensure wallet exists first
+        log.info("[DEBUG-WALLET] Calling ensureWalletExists for userId={}", userId);
         ensureWalletExists(userId);
+        log.info("[DEBUG-WALLET] ensureWalletExists completed for userId={}", userId);
 
-        log.info("updateWalletForNewCashback: User {}, amount {}, status {}", userId, amount, status);
+        log.info("[DEBUG-WALLET] updateWalletForNewCashback: User {}, amount {}, status {}", userId, amount, status);
 
         boolean success;
         if (status == CashbackStatus.PENDING) {
@@ -506,17 +528,19 @@ public class CalculateCashbackUseCase {
      */
     private void updateWalletForStatusChange(Long userId, BigDecimal amount,
                                               CashbackStatus oldStatus, CashbackStatus newStatus) {
+        log.info("[DEBUG-WALLET] updateWalletForStatusChange START: userId={}, amount={}, {} → {}",
+            userId, amount, oldStatus, newStatus);
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("updateWalletForStatusChange: Skipping, amount is null or <= 0: {}", amount);
+            log.warn("[DEBUG-WALLET] updateWalletForStatusChange: Skipping, amount is null or <= 0: {}", amount);
             return;
         }
 
         if (oldStatus == newStatus) {
-            log.warn("updateWalletForStatusChange: Skipping, oldStatus == newStatus: {}", oldStatus);
+            log.warn("[DEBUG-WALLET] updateWalletForStatusChange: Skipping, oldStatus == newStatus: {}", oldStatus);
             return; // No change
         }
 
-        log.info("updateWalletForStatusChange: User {}, amount {}, {} → {}",
+        log.info("[DEBUG-WALLET] updateWalletForStatusChange: User {}, amount {}, {} → {}",
             userId, amount, oldStatus, newStatus);
 
         if (oldStatus == CashbackStatus.PENDING && newStatus == CashbackStatus.CONFIRMED) {
@@ -553,12 +577,14 @@ public class CalculateCashbackUseCase {
      * @param oldStatus Previous cashback status before cancellation
      */
     private void updateWalletForCancellation(Long userId, BigDecimal amount, CashbackStatus oldStatus) {
+        log.info("[DEBUG-WALLET] updateWalletForCancellation START: userId={}, amount={}, oldStatus={}",
+            userId, amount, oldStatus);
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("updateWalletForCancellation: Skipping, amount is null or <= 0: {}", amount);
+            log.warn("[DEBUG-WALLET] updateWalletForCancellation: Skipping, amount is null or <= 0: {}", amount);
             return;
         }
 
-        log.info("updateWalletForCancellation: User {}, amount {}, oldStatus {}",
+        log.info("[DEBUG-WALLET] updateWalletForCancellation: User {}, amount {}, oldStatus {}",
             userId, amount, oldStatus);
 
         boolean success;

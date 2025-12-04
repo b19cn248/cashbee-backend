@@ -1,8 +1,11 @@
 package com.cashbee.presentation.controller;
 
 import com.cashbee.application.dto.affiliate.CreateTrackingLinkRequest;
+import com.cashbee.application.dto.affiliate.EstimateCashbackRequest;
+import com.cashbee.application.dto.affiliate.EstimateCashbackResponse;
 import com.cashbee.application.dto.affiliate.TrackingLinkResponse;
 import com.cashbee.application.usecase.affiliate.CreateTrackingLinkUseCase;
+import com.cashbee.application.usecase.affiliate.EstimateCashbackUseCase;
 import com.cashbee.application.usecase.affiliate.HandleClickRedirectUseCase;
 import com.cashbee.application.util.SecurityUtils;
 import com.cashbee.presentation.dto.ApiResponse;
@@ -26,6 +29,7 @@ import java.net.URI;
  *
  * Endpoints:
  * - POST /api/affiliate/tracking/create-link - Create tracking link
+ * - POST /api/affiliate/tracking/estimate-cashback - Estimate cashback amount
  * - GET /api/affiliate/tracking/redirect/{clickId} - Handle click redirect
  *
  * User endpoints for creating tracking links and clicking them.
@@ -41,6 +45,7 @@ public class AffiliateTrackingController {
     private static final Logger log = LoggerFactory.getLogger(AffiliateTrackingController.class);
 
     private final CreateTrackingLinkUseCase createTrackingLinkUseCase;
+    private final EstimateCashbackUseCase estimateCashbackUseCase;
     private final HandleClickRedirectUseCase handleClickRedirectUseCase;
     private final SecurityUtils securityUtils;
 
@@ -87,6 +92,44 @@ public class AffiliateTrackingController {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
             ApiResponse.success(response, "Tracking link created successfully")
+        );
+    }
+
+    /**
+     * Estimate cashback amount for a Shopee product.
+     *
+     * This is a PUBLIC endpoint (no authentication required) to allow users
+     * to check cashback amounts before signing up.
+     *
+     * Flow:
+     * 1. User pastes Shopee product URL
+     * 2. System calls ChietKhau.Pro API to get commission data
+     * 3. System calculates CashBee cashback: commission * 2 * 0.96
+     * 4. Returns estimated cashback amount and product details
+     *
+     * Why this formula?
+     * - ChietKhau.Pro gives ~52% of Shopee commission to users
+     * - We want to give ~100% in early stage to attract users
+     * - commission * 2 ≈ full Shopee commission
+     * - * 0.96 = minus 4% for operational costs
+     *
+     * @param request Request containing Shopee URL
+     * @return Estimated cashback amount and product details
+     */
+    @PostMapping("/estimate-cashback")
+    @Operation(
+        summary = "Estimate cashback amount",
+        description = "Get estimated cashback amount for a Shopee product. No authentication required."
+    )
+    public ResponseEntity<ApiResponse<EstimateCashbackResponse>> estimateCashback(
+        @Valid @RequestBody EstimateCashbackRequest request) {
+
+        log.info("API: Estimating cashback for URL: {}", request.getShopeeUrl());
+
+        EstimateCashbackResponse response = estimateCashbackUseCase.execute(request);
+
+        return ResponseEntity.ok(
+            ApiResponse.success(response, "Cashback estimated successfully")
         );
     }
 

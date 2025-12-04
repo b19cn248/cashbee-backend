@@ -102,10 +102,10 @@ public class CashbackPolicyController {
 
     /**
      * Update cashback policy by ID.
-     *
+     * <p>
      * This endpoint allows admin to update cashback policy settings.
      * Only non-null fields in the request will be updated (partial update).
-     *
+     * <p>
      * Example request:
      * {
      *   "cashbackRate": 75.00,

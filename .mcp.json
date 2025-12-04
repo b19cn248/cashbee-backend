@@ -22,7 +22,7 @@
       ],
       "env": {
         "PLANE_API_KEY": "plane_api_96b454194e4c4cc591ec7cbd85d4ff75",
-        "PLANE_API_HOST_URL": "https://plane.openlearnhub.io.vn/",
+        "PLANE_API_HOST_URL": "https://plane.olhub.org/",
         "PLANE_WORKSPACE_SLUG": "oplh"
       }
     },

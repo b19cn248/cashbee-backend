@@ -246,7 +246,18 @@ public class ImportShopeeOrdersUseCase {
      * @param totalRowsProcessed Counter for total rows processed
      * @param affectedUserIds Set to collect affected user IDs
      */
-    @Transactional(propagation = Propagation.MANDATORY)
+    /**
+     * NOTE: Removed @Transactional(propagation = Propagation.MANDATORY) to fix UnexpectedRollbackException.
+     *
+     * ROOT CAUSE: When @Transactional is present, Spring AOP intercepts exceptions and marks
+     * the transaction as rollback-only BEFORE the exception propagates to the caller.
+     * Even if we catch the exception inside this method, the transaction is already marked
+     * for rollback, causing UnexpectedRollbackException when the outer transaction commits.
+     *
+     * This method is already running within execute()'s transaction (Propagation.REQUIRED),
+     * so removing @Transactional allows proper exception handling without premature rollback marking.
+     */
+    @SuppressWarnings("java:S3776") // Complexity is acceptable for debug logging
     protected void processBatch(List<ShopeeCSVParser.ShopeeOrderRecord> recordBatch,
                                 AffiliatePlatform platform,
                                 Long batchId,
@@ -674,8 +685,15 @@ public class ImportShopeeOrdersUseCase {
         // Skip unpaid and cancelled items for NEW orders
         final Long savedOrderId = order.getId();
         final Long finalUserId = userId;
+
+        // CRITICAL FIX: Deduplicate items by itemId + modelId to prevent duplicate key errors
+        // Shopee CSV may contain multiple rows for the same item (e.g., different status snapshots)
+        // We keep the most recent/relevant record and aggregate commission
+        Map<String, ShopeeCSVParser.ShopeeOrderRecord> uniqueItems = deduplicateItems(items);
+        log.debug("Deduplicated {} items to {} unique items for order {}", items.size(), uniqueItems.size(), orderId);
+
         int createdItemCount = 0;
-        for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
+        for (ShopeeCSVParser.ShopeeOrderRecord item : uniqueItems.values()) {
             // Skip unpaid items - they haven't been paid yet, no commission earned
             if (item.isUnpaid()) {
                 log.debug("Skipping unpaid item {} for order {}", item.getItemId(), orderId);
@@ -814,11 +832,22 @@ public class ImportShopeeOrdersUseCase {
                 existingOrder.getOrderId(), oldStatus, newStatus, totalCommission);
 
             // Update order items: upsert each item by order_id + item_id
-            for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
+            // CRITICAL FIX: Deduplicate items by itemId + modelId to prevent duplicate processing
+            Map<String, ShopeeCSVParser.ShopeeOrderRecord> uniqueItems = deduplicateItems(items);
+            log.info("[DEBUG] Processing {} items for order {} (deduplicated from {})",
+                uniqueItems.size(), existingOrder.getOrderId(), items.size());
+
+            int itemIndex = 0;
+            for (ShopeeCSVParser.ShopeeOrderRecord item : uniqueItems.values()) {
+                itemIndex++;
+                log.info("[DEBUG] Item {}/{}: itemId={}, modelId={}, cancelled={}, completed={}, unpaid={}, commission={}",
+                    itemIndex, uniqueItems.size(), item.getItemId(), item.getModelId(),
+                    item.isCancelled(), item.isCompleted(), item.isUnpaid(), item.getCommissionForCashback());
+
                 // Skip unpaid items - they haven't been paid yet, no commission earned
                 // When the customer pays, the order will be re-imported with a different status
                 if (item.isUnpaid()) {
-                    log.debug("Skipping unpaid item {} for order {} update", item.getItemId(), existingOrder.getOrderId());
+                    log.info("[DEBUG] SKIP unpaid item {} for order {}", item.getItemId(), existingOrder.getOrderId());
                     continue;
                 }
 
@@ -831,11 +860,15 @@ public class ImportShopeeOrdersUseCase {
                 } else {
                     itemStatus = OrderStatus.PENDING;
                 }
+                log.info("[DEBUG] Item {} determined status: {}", item.getItemId(), itemStatus);
 
                 // Find existing item by order_id + item_id + model_id (unique combination)
+                log.info("[DEBUG] Searching existingItem: orderId={}, itemId={}, modelId={}",
+                    existingOrder.getId(), item.getItemId(), item.getModelId());
                 AffiliateOrderItem existingItem = orderItemRepository
                     .findByOrderIdAndItemIdAndModelId(existingOrder.getId(), item.getItemId(), item.getModelId())
                     .orElse(null);
+                log.info("[DEBUG] existingItem found: {}", existingItem != null ? existingItem.getId() : "NULL");
 
                 AffiliateOrderItem orderItem;
                 if (existingItem != null) {
@@ -854,14 +887,16 @@ public class ImportShopeeOrdersUseCase {
                     log.debug("Updated item {} for order {} (status: {})", item.getItemId(), existingOrder.getOrderId(), itemStatus);
                 } else {
                     // Item doesn't exist in DB
+                    log.info("[DEBUG] existingItem is NULL, item.isCancelled()={}", item.isCancelled());
                     if (item.isCancelled()) {
                         // CRITICAL FIX: Even if item doesn't exist by itemId, we still need to
                         // try to cancel any existing cashback for this order.
                         // This handles the case where Shopee changes itemId when order is cancelled.
-                        log.info("Cancelled item {} not found by itemId for order {}, will try to cancel by orderId",
+                        log.info("[DEBUG] Cancelled item {} not found by itemId for order {}, will try to cancel by orderId",
                             item.getItemId(), existingOrder.getOrderId());
 
                         // Try to cancel cashback using orderId (will search by orderId in upsertForItemWithCancellation)
+                        log.info("[DEBUG] Calling upsertForItemWithCancellation with orderItemId=NULL for cancelled item");
                         calculateCashbackUseCase.upsertForItemWithCancellation(
                             existingOrder.getUserId(),
                             existingOrder.getId(),
@@ -871,6 +906,7 @@ public class ImportShopeeOrdersUseCase {
                             false,
                             true  // isCancelled = true
                         );
+                        log.info("[DEBUG] upsertForItemWithCancellation completed for cancelled item without existing DB record");
                         continue;
                     }
                     orderItem = AffiliateOrderItem.builder()
@@ -897,7 +933,12 @@ public class ImportShopeeOrdersUseCase {
                 BigDecimal itemCommission = item.getCommissionForCashback();
                 // For cancelled items, we still need to process to cancel cashback
                 // For non-cancelled items, skip if no commission
+                log.info("[DEBUG] Checking if should call upsertForItemWithCancellation: isCancelled={}, itemCommission={}",
+                    item.isCancelled(), itemCommission);
                 if (item.isCancelled() || (itemCommission != null && itemCommission.compareTo(BigDecimal.ZERO) > 0)) {
+                    log.info("[DEBUG] Calling upsertForItemWithCancellation: userId={}, orderId={}, orderItemId={}, platformId={}, commission={}, completed={}, cancelled={}",
+                        existingOrder.getUserId(), existingOrder.getId(), orderItem.getId(), platformId,
+                        itemCommission != null ? itemCommission : BigDecimal.ZERO, item.isCompleted(), item.isCancelled());
                     calculateCashbackUseCase.upsertForItemWithCancellation(
                         existingOrder.getUserId(),
                         existingOrder.getId(),
@@ -907,6 +948,9 @@ public class ImportShopeeOrdersUseCase {
                         item.isCompleted(),
                         item.isCancelled()
                     );
+                    log.info("[DEBUG] upsertForItemWithCancellation completed for orderItem {}", orderItem.getId());
+                } else {
+                    log.info("[DEBUG] SKIP upsertForItemWithCancellation - no commission and not cancelled");
                 }
             }
 
@@ -1101,5 +1145,77 @@ public class ImportShopeeOrdersUseCase {
         // Multiple users - needs admin review
         log.warn("[FALLBACK-QUERY] Multiple clicks from {} different users found, needs admin review", distinctUsers);
         return FallbackMatchResult.multipleMatches(possibleMatches);
+    }
+
+    /**
+     * Deduplicate items by itemId + modelId.
+     *
+     * Shopee CSV may contain duplicate rows for the same item. This can happen when:
+     * 1. An item appears in multiple status snapshots (e.g., pending then completed)
+     * 2. Data export includes redundant records
+     *
+     * Strategy:
+     * - Use itemId + modelId as unique key
+     * - When duplicates found, prefer: completed > pending > cancelled > unpaid
+     * - Keep the record with higher status priority
+     *
+     * @param items List of items from CSV
+     * @return Map of unique items keyed by "itemId|modelId"
+     */
+    private Map<String, ShopeeCSVParser.ShopeeOrderRecord> deduplicateItems(
+            List<ShopeeCSVParser.ShopeeOrderRecord> items) {
+
+        Map<String, ShopeeCSVParser.ShopeeOrderRecord> uniqueItems = new HashMap<>();
+
+        for (ShopeeCSVParser.ShopeeOrderRecord item : items) {
+            String key = item.getItemId() + "|" + item.getModelId();
+
+            ShopeeCSVParser.ShopeeOrderRecord existing = uniqueItems.get(key);
+            if (existing == null) {
+                uniqueItems.put(key, item);
+            } else {
+                // Duplicate found - choose the better record
+                // Priority: completed > pending > cancelled > unpaid
+                int existingPriority = getStatusPriority(existing);
+                int newPriority = getStatusPriority(item);
+
+                if (newPriority > existingPriority) {
+                    log.debug("Replacing duplicate item {}|{}: {} -> {} (priority {} -> {})",
+                        item.getItemId(), item.getModelId(),
+                        getStatusDescription(existing), getStatusDescription(item),
+                        existingPriority, newPriority);
+                    uniqueItems.put(key, item);
+                } else {
+                    log.debug("Keeping existing item {}|{}: {} (priority {}) over {} (priority {})",
+                        item.getItemId(), item.getModelId(),
+                        getStatusDescription(existing), existingPriority,
+                        getStatusDescription(item), newPriority);
+                }
+            }
+        }
+
+        return uniqueItems;
+    }
+
+    /**
+     * Get priority score for item status.
+     * Higher = better (more valuable for processing)
+     */
+    private int getStatusPriority(ShopeeCSVParser.ShopeeOrderRecord item) {
+        if (item.isCompleted()) return 4;
+        if (!item.isCompleted() && !item.isCancelled() && !item.isUnpaid()) return 3; // pending
+        if (item.isCancelled()) return 2;
+        if (item.isUnpaid()) return 1;
+        return 0;
+    }
+
+    /**
+     * Get human-readable status description.
+     */
+    private String getStatusDescription(ShopeeCSVParser.ShopeeOrderRecord item) {
+        if (item.isCompleted()) return "COMPLETED";
+        if (item.isCancelled()) return "CANCELLED";
+        if (item.isUnpaid()) return "UNPAID";
+        return "PENDING";
     }
 }

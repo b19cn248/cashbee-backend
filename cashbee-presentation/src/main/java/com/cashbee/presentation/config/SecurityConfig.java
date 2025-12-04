@@ -88,6 +88,8 @@ public class SecurityConfig {
                 // Affiliate tracking redirect endpoints - Public (no auth required)
                 // These are the actual tracking links that users click
                 "/api/affiliate/tracking/redirect/**",
+                // Estimate cashback - Public (allows users to check before signup)
+                "/api/affiliate/tracking/estimate-cashback",
                 // Authentication endpoints - Public (no auth required)
                 "/api/auth/register",
                 "/api/auth/verify-otp",
@@ -143,7 +145,7 @@ public class SecurityConfig {
                     PolicyEnforcerConfig.class
                 );
               } catch (IOException e) {
-                throw new RuntimeException("Failed to load policy-enforcer.json", e);
+                throw new RuntimeException("Failed to load policy-enforcer-dev.json", e);
               }
             }
           }

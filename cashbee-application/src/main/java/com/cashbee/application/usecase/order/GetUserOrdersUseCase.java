@@ -4,6 +4,8 @@ import com.cashbee.application.dto.common.PageResponse;
 import com.cashbee.application.dto.order.GetUserOrdersQuery;
 import com.cashbee.application.dto.response.AffiliateOrderItemResponse;
 import com.cashbee.application.dto.response.AffiliateOrderResponse;
+import com.cashbee.domain.enums.CashbackStatus;
+import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.AffiliateOrder;
 import com.cashbee.domain.model.AffiliateOrderItem;
 import com.cashbee.domain.repository.AffiliateOrderItemRepository;
@@ -70,12 +72,22 @@ public class GetUserOrdersUseCase {
         );
 
         // Fetch orders based on filter
+        // Note: When status is PAID, we filter by cashback.status instead of order.order_status
+        // This is because PAID represents "cashback paid to user", not "order status from platform"
         Page<AffiliateOrder> orderPage;
         if (query.getStatus() != null) {
-            // Filter by status
-            orderPage = orderRepository.findByUserIdAndStatus(userId, query.getStatus(), pageable);
-            log.debug("Found {} orders with status {} for user {}",
-                    orderPage.getTotalElements(), query.getStatus(), userId);
+            CashbackStatus cashbackStatus = mapOrderStatusToCashbackStatus(query.getStatus());
+            if (cashbackStatus != null) {
+                // Filter by cashback status (joins with cashback table)
+                orderPage = orderRepository.findByUserIdAndCashbackStatus(userId, cashbackStatus, pageable);
+                log.debug("Found {} orders with cashback status {} for user {}",
+                        orderPage.getTotalElements(), cashbackStatus, userId);
+            } else {
+                // For statuses that don't map to cashback (e.g., REJECTED), use order status
+                orderPage = orderRepository.findByUserIdAndStatus(userId, query.getStatus(), pageable);
+                log.debug("Found {} orders with order status {} for user {}",
+                        orderPage.getTotalElements(), query.getStatus(), userId);
+            }
         } else {
             // Get all orders
             orderPage = orderRepository.findByUserId(userId, pageable);
@@ -167,5 +179,27 @@ public class GetUserOrdersUseCase {
                 .status(item.getStatus())
                 .createdAt(item.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Map OrderStatus (API filter) to CashbackStatus (database query).
+     *
+     * This mapping allows users to filter by meaningful statuses:
+     * - PENDING: Orders where cashback is pending confirmation
+     * - APPROVED: Orders where cashback is confirmed but not yet paid
+     * - PAID: Orders where cashback has been transferred to user
+     * - CANCELLED: Orders where cashback was cancelled
+     *
+     * @param orderStatus The order status from API request
+     * @return Corresponding CashbackStatus, or null if no mapping exists
+     */
+    private CashbackStatus mapOrderStatusToCashbackStatus(OrderStatus orderStatus) {
+        return switch (orderStatus) {
+            case PENDING -> CashbackStatus.PENDING;
+            case APPROVED -> CashbackStatus.CONFIRMED;
+            case PAID -> CashbackStatus.PAID;
+            case CANCELLED -> CashbackStatus.CANCELLED;
+            case REJECTED -> null; // No corresponding cashback status
+        };
     }
 }

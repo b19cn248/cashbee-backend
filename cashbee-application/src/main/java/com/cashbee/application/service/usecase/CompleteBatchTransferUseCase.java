@@ -86,10 +86,10 @@ public class CompleteBatchTransferUseCase {
         int successCount = 0;
         int failCount = 0;
 
-        // 4. Process each item
+        // 4. Process each item (pass batch.getId() for cashback tracking)
         for (BatchTransferItem item : items) {
             try {
-                processItem(item, batchCode);
+                processItem(item, batch.getId(), batchCode);
                 successCount++;
             } catch (Exception e) {
                 log.error("CompleteBatchTransferUseCase: Failed to process item {} for user {}: {}",
@@ -112,9 +112,21 @@ public class CompleteBatchTransferUseCase {
      * Process single batch item.
      *
      * @param item Batch transfer item
-     * @param batchCode Batch code for reference
+     * @param batchId Batch ID for cashback tracking
+     * @param batchCode Batch code for transaction description
      */
-    private void processItem(BatchTransferItem item, String batchCode) {
+    private void processItem(BatchTransferItem item, Long batchId, String batchCode) {
+        // 0. Validate: batch_transfer_item.amount should match sum of unpaid CONFIRMED cashbacks
+        BigDecimal unpaidCashbackSum = cashbackRepository.sumUnpaidConfirmedCashbackByUserId(item.getUserId());
+        if (unpaidCashbackSum.compareTo(item.getAmount()) != 0) {
+            log.warn("CompleteBatchTransferUseCase: User {} amount mismatch! " +
+                            "Batch item amount: {}, Unpaid CONFIRMED cashback sum: {}. " +
+                            "This may indicate new cashbacks were confirmed after batch creation.",
+                    item.getUserId(), item.getAmount(), unpaidCashbackSum);
+            // Note: We continue processing but log the warning for audit
+            // The actual deduction will be based on wallet balance, not cashback sum
+        }
+
         // 1. Find wallet
         UserWallet wallet = walletRepository.findById(item.getWalletId())
                 .orElseThrow(() -> NotFoundException.of("WALLET_NOT_FOUND",
@@ -161,14 +173,17 @@ public class CompleteBatchTransferUseCase {
         transaction.validate();
         transactionRepository.save(transaction);
 
-        // 5. Update cashback status: CONFIRMED → PAID
-        int updatedCashbacks = cashbackRepository.updateStatusByUserIdAndStatus(
+        // 5. Update cashback status: CONFIRMED → PAID (with batch tracking)
+        // Only updates cashbacks where paid_batch_id IS NULL (unpaid cashbacks)
+        // This ensures newly CONFIRMED cashbacks (after batch creation) are NOT updated
+        int updatedCashbacks = cashbackRepository.updateStatusByUserIdAndStatusWithBatchId(
                 item.getUserId(),
                 CashbackStatus.CONFIRMED,
-                CashbackStatus.PAID
+                CashbackStatus.PAID,
+                batchId  // Record which batch paid these cashbacks
         );
-        log.debug("CompleteBatchTransferUseCase: Updated {} cashbacks to PAID for user {}",
-                updatedCashbacks, item.getUserId());
+        log.debug("CompleteBatchTransferUseCase: Updated {} unpaid CONFIRMED cashbacks to PAID for user {} (batchId={})",
+                updatedCashbacks, item.getUserId(), batchId);
 
         // 6. Mark item as completed
         item.markAsCompleted();

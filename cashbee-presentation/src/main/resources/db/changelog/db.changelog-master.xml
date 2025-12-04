@@ -64,4 +64,7 @@
     <!-- Fallback matching support for orders without Sub_id1 -->
     <include file="db/changelog/031-add-fallback-matching-support.xml"/>
 
+    <!-- Add paid_batch_id to cashback for batch traceability -->
+    <include file="db/changelog/032-add-paid-batch-id-to-cashback.xml"/>
+
 </databaseChangeLog>

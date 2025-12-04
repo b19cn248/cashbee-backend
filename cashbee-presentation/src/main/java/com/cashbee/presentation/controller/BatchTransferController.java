@@ -1,11 +1,13 @@
 package com.cashbee.presentation.controller;
 
+import com.cashbee.application.dto.batch.BatchCashbackResponse;
 import com.cashbee.application.dto.batch.ExportBatchTransferRequest;
 import com.cashbee.application.dto.batch.ExportBatchTransferResponse;
 import com.cashbee.application.service.email.BatchTransferEmailService;
 import com.cashbee.application.service.usecase.CompleteBatchTransferUseCase;
 import com.cashbee.application.service.usecase.ExportBatchTransferUseCase;
 import com.cashbee.application.service.usecase.GenerateBatchTransferFileUseCase;
+import com.cashbee.application.service.usecase.GetBatchCashbacksUseCase;
 import com.cashbee.application.service.usecase.GetBatchExportHistoryUseCase;
 import com.cashbee.domain.enums.BankTemplate;
 import com.cashbee.domain.model.BatchTransferExport;
@@ -49,6 +51,7 @@ public class BatchTransferController {
     private final GenerateBatchTransferFileUseCase generateBatchTransferFileUseCase;
     private final GetBatchExportHistoryUseCase getBatchExportHistoryUseCase;
     private final CompleteBatchTransferUseCase completeBatchTransferUseCase;
+    private final GetBatchCashbacksUseCase getBatchCashbacksUseCase;
     private final BatchTransferEmailService emailService;
 
     /**
@@ -313,6 +316,48 @@ public class BatchTransferController {
                 completedBatch.getStatus().name(),
                 String.format("Batch completed. %d users processed.", completedBatch.getTotalUsers())
         );
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * Get all cashbacks paid by a specific batch.
+     *
+     * GET /api/admin/batch-transfer/{batchCode}/cashbacks
+     *
+     * This endpoint enables traceability: batchCode → cashbacks → orders
+     * Use this to see which orders were paid in a specific batch.
+     *
+     * Response:
+     * {
+     *   "success": true,
+     *   "data": {
+     *     "batchCode": "BATCH_20251119_001",
+     *     "status": "COMPLETED",
+     *     "totalCashbacks": 50,
+     *     "totalCashbackAmount": 2500000,
+     *     "cashbacks": [
+     *       {
+     *         "cashbackId": 123,
+     *         "userId": 456,
+     *         "orderId": 789,
+     *         "orderItemId": 101,
+     *         "cashbackAmount": 50000,
+     *         "paidAt": "2025-11-19T14:30:00"
+     *       }
+     *     ]
+     *   }
+     * }
+     */
+    @GetMapping("/{batchCode}/cashbacks")
+    @Operation(summary = "Get batch cashbacks",
+            description = "Get all cashbacks paid by a specific batch. Enables traceability: batchCode → cashbacks → orders")
+    public ResponseEntity<ApiResponse<BatchCashbackResponse>> getBatchCashbacks(
+            @PathVariable String batchCode) {
+
+        log.info("BatchTransferController: GET /{}/cashbacks", batchCode);
+
+        BatchCashbackResponse response = getBatchCashbacksUseCase.execute(batchCode);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

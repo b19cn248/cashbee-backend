@@ -1,5 +1,6 @@
 package com.cashbee.infrastructure.adapter;
 
+import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.AffiliateOrder;
 import com.cashbee.domain.repository.AffiliateOrderRepository;
@@ -118,5 +119,12 @@ public class AffiliateOrderRepositoryAdapter implements AffiliateOrderRepository
     @Override
     public long countByUserId(Long userId) {
         return jpaRepository.countByUserId(userId);
+    }
+
+    @Override
+    public Page<AffiliateOrder> findByUserIdAndCashbackStatus(Long userId, CashbackStatus cashbackStatus, Pageable pageable) {
+        Page<com.cashbee.infrastructure.entity.AffiliateOrderJpaEntity> entityPage =
+            jpaRepository.findByUserIdAndCashbackStatus(userId, cashbackStatus, pageable);
+        return entityPage.map(mapper::toDomain);
     }
 }

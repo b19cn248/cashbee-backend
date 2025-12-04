@@ -121,6 +121,41 @@ public interface CashbackRepository {
      * @param oldStatus Current status to match
      * @param newStatus New status to set
      * @return Number of records updated
+     * @deprecated Use {@link #updateStatusByUserIdAndStatusWithBatchId} instead for proper batch tracking
      */
+    @Deprecated
     int updateStatusByUserIdAndStatus(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus);
+
+    /**
+     * Update status for unpaid cashbacks of a user with specific status.
+     * Only updates cashbacks where paid_batch_id IS NULL (not yet paid).
+     * Also records which batch paid these cashbacks for traceability.
+     *
+     * Used when batch transfer completes: CONFIRMED → PAID
+     *
+     * @param userId User ID
+     * @param oldStatus Current status to match (typically CONFIRMED)
+     * @param newStatus New status to set (typically PAID)
+     * @param batchId Batch ID that is paying these cashbacks
+     * @return Number of records updated
+     */
+    int updateStatusByUserIdAndStatusWithBatchId(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId);
+
+    /**
+     * Find all cashbacks paid by a specific batch.
+     * Used for traceability: batchCode → cashbacks → orders
+     *
+     * @param batchId Batch ID
+     * @return List of cashbacks paid by this batch
+     */
+    List<Cashback> findByPaidBatchId(Long batchId);
+
+    /**
+     * Sum cashback amount for unpaid CONFIRMED cashbacks of a user.
+     * Used for validation: batch_transfer_item.amount should match this sum.
+     *
+     * @param userId User ID
+     * @return Sum of unpaid CONFIRMED cashback amounts
+     */
+    java.math.BigDecimal sumUnpaidConfirmedCashbackByUserId(Long userId);
 }
