@@ -167,7 +167,7 @@ keycloak:
   realm: ${KEYCLOAK_REALM:cashbee}
   resource: ${KEYCLOAK_CLIENT_ID:cashbee-backend}
   credentials:
-    secret: ${KEYCLOAK_CLIENT_SECRET:OuRhlczFR6yz6gNKSBapX028DKbjKl4y}
+    secret: ${KEYCLOAK_CLIENT_SECRET:YQbb2bIhxpsMpnfOA8U2hvkG5CqrXNJr}
 
   # Admin Client Configuration
   admin:
@@ -182,7 +182,7 @@ keycloak:
     # Service account client credentials (RECOMMENDED for production)
     # This client must have "realm-management" roles assigned
     client-id: ${KEYCLOAK_CLIENT_ID:cashbee-backend}
-    client-secret: ${KEYCLOAK_CLIENT_SECRET:OuRhlczFR6yz6gNKSBapX028DKbjKl4y}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET:YQbb2bIhxpsMpnfOA8U2hvkG5CqrXNJr}
 
     # Admin credentials (ALTERNATIVE - not recommended for production)
     # Can use admin username/password instead of client credentials
