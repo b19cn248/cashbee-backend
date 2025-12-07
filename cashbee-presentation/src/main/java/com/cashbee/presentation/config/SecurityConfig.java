@@ -93,7 +93,8 @@ public class SecurityConfig {
                 // Authentication endpoints - Public (no auth required)
                 "/api/auth/register",
                 "/api/auth/verify-otp",
-                "/api/auth/resend-otp"
+                "/api/auth/resend-otp",
+                "/api/users/sync"
             ).permitAll()
             // Protected endpoints - Authentication required
             // All other /api/** endpoints now require valid JWT token

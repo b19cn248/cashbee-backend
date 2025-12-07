@@ -19,6 +19,10 @@
     {
       "path": "/v3/api-docs/*",
       "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/users/sync",
+      "enforcement-mode": "DISABLED"
     }
   ]
 }
