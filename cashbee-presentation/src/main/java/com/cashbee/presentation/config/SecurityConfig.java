@@ -162,6 +162,7 @@ public class SecurityConfig {
     CorsConfiguration config = new CorsConfiguration();
     config.setAllowedOrigins(List.of("http://localhost:3000",
         "https://cashbee.nguocchieuvangle.io.vn/",
+        "https://cashbee.com.vn/",
         "https://video.management.v1.openlearnhub.io.vn/",
         "https://auth.nguocchieuvangle.io.vn/"));
     config.setAllowedHeaders(
