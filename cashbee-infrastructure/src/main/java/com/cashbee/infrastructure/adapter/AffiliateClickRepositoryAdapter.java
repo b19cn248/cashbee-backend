@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 /**
@@ -163,5 +164,40 @@ public class AffiliateClickRepositoryAdapter implements AffiliateClickRepository
     return entities.stream()
         .map(mapper::toDomain)
         .toList();
+  }
+
+  @Override
+  public List<AffiliateClick> findAllWithFilters(
+      Long userId,
+      Long platformId,
+      ClickStatus status,
+      Boolean orderMatched,
+      String search,
+      int page,
+      int size) {
+
+    log.debug("[ADAPTER] findAllWithFilters - userId={}, platformId={}, status={}, orderMatched={}, search='{}', page={}, size={}",
+        userId, platformId, status, orderMatched, search, page, size);
+
+    var pageable = PageRequest.of(page, size);
+    var entities = jpaRepository.findAllWithFilters(
+        userId, platformId, status, orderMatched, search, pageable);
+
+    log.debug("[ADAPTER] findAllWithFilters returned {} entities", entities.size());
+
+    return entities.stream()
+        .map(mapper::toDomain)
+        .toList();
+  }
+
+  @Override
+  public long countWithFilters(
+      Long userId,
+      Long platformId,
+      ClickStatus status,
+      Boolean orderMatched,
+      String search) {
+
+    return jpaRepository.countWithFilters(userId, platformId, status, orderMatched, search);
   }
 }

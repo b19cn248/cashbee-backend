@@ -127,4 +127,46 @@ public interface AffiliateClickRepository {
         String itemId,
         String shopId
     );
+
+    /**
+     * Find all clicks with pagination and optional filters.
+     * Used by Admin to view all tracking links.
+     *
+     * @param userId Filter by user ID (optional, null = all users)
+     * @param platformId Filter by platform ID (optional, null = all platforms)
+     * @param status Filter by click status (optional, null = all statuses)
+     * @param orderMatched Filter by order matched flag (optional, null = both)
+     * @param search Search keyword for trackingCode or productName (optional)
+     * @param page Page number (0-indexed)
+     * @param size Page size
+     * @return List of clicks for the requested page
+     */
+    List<AffiliateClick> findAllWithFilters(
+        Long userId,
+        Long platformId,
+        ClickStatus status,
+        Boolean orderMatched,
+        String search,
+        int page,
+        int size
+    );
+
+    /**
+     * Count total clicks matching the filters.
+     * Used for pagination metadata.
+     *
+     * @param userId Filter by user ID (optional)
+     * @param platformId Filter by platform ID (optional)
+     * @param status Filter by click status (optional)
+     * @param orderMatched Filter by order matched flag (optional)
+     * @param search Search keyword (optional)
+     * @return Total count of matching clicks
+     */
+    long countWithFilters(
+        Long userId,
+        Long platformId,
+        ClickStatus status,
+        Boolean orderMatched,
+        String search
+    );
 }

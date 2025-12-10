@@ -107,4 +107,57 @@ public interface AffiliateClickJpaRepository extends JpaRepository<AffiliateClic
         @Param("itemId") String itemId,
         @Param("shopId") String shopId
     );
+
+    /**
+     * Find all clicks with optional filters and pagination.
+     * Supports filtering by userId, platformId, status, orderMatched, and search keyword.
+     *
+     * @param userId Filter by user ID (null = all users)
+     * @param platformId Filter by platform ID (null = all platforms)
+     * @param status Filter by status (null = all statuses)
+     * @param orderMatched Filter by orderMatched flag (null = both)
+     * @param search Search keyword for trackingCode or productName (null = no search)
+     * @param pageable Spring Pageable for pagination
+     * @return Page of matching clicks
+     */
+    @Query("""
+        SELECT c FROM AffiliateClickJpaEntity c
+        WHERE (:userId IS NULL OR c.userId = :userId)
+        AND (:platformId IS NULL OR c.platformId = :platformId)
+        AND (:status IS NULL OR c.status = :status)
+        AND (:orderMatched IS NULL OR c.orderMatched = :orderMatched)
+        AND (:search IS NULL OR :search = ''
+             OR LOWER(c.trackingCode) LIKE LOWER(CONCAT('%', :search, '%'))
+             OR LOWER(c.productName) LIKE LOWER(CONCAT('%', :search, '%')))
+        ORDER BY c.createdAt DESC
+        """)
+    List<AffiliateClickJpaEntity> findAllWithFilters(
+        @Param("userId") Long userId,
+        @Param("platformId") Long platformId,
+        @Param("status") ClickStatus status,
+        @Param("orderMatched") Boolean orderMatched,
+        @Param("search") String search,
+        org.springframework.data.domain.Pageable pageable
+    );
+
+    /**
+     * Count total clicks matching the filters.
+     */
+    @Query("""
+        SELECT COUNT(c) FROM AffiliateClickJpaEntity c
+        WHERE (:userId IS NULL OR c.userId = :userId)
+        AND (:platformId IS NULL OR c.platformId = :platformId)
+        AND (:status IS NULL OR c.status = :status)
+        AND (:orderMatched IS NULL OR c.orderMatched = :orderMatched)
+        AND (:search IS NULL OR :search = ''
+             OR LOWER(c.trackingCode) LIKE LOWER(CONCAT('%', :search, '%'))
+             OR LOWER(c.productName) LIKE LOWER(CONCAT('%', :search, '%')))
+        """)
+    long countWithFilters(
+        @Param("userId") Long userId,
+        @Param("platformId") Long platformId,
+        @Param("status") ClickStatus status,
+        @Param("orderMatched") Boolean orderMatched,
+        @Param("search") String search
+    );
 }
