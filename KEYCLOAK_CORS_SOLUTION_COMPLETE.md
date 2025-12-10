@@ -40,7 +40,7 @@ Browser → Spring Boot CORS ✅
 
 ### Bước 1: Đăng nhập Keycloak
 ```
-URL: https://auth.nguocchieuvangle.io.vn/
+URL: https://auth.cashbee.com.vn/
 → Administration Console
 → Login với admin credentials
 ```

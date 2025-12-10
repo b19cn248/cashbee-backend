@@ -71,8 +71,8 @@ spring:
           # Keycloak issuer URI - Spring Boot auto-downloads public keys for JWT validation
           # Format: {keycloak-url}/realms/{realm-name}
           # Example: http://localhost:8080/realms/cashbee
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.nguocchieuvangle.io.vn/realms/cashbee}
-          jwk-set-uri: https://auth.nguocchieuvangle.io.vn//realms/cashbee/protocol/openid-connect/certs
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.cashbee.com.vn/realms/cashbee}
+          jwk-set-uri: https://auth.cashbee.com.vn/realms/cashbee/protocol/openid-connect/certs
           # Alternative: JWK Set URI (if you want to specify directly)
           # jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/cashbee/protocol/openid-connect/certs}
 
@@ -163,7 +163,7 @@ management:
 # - Admin Client: Used by backend to manage users, roles, etc.
 keycloak:
   # Policy Enforcer Configuration
-  auth-server-url: ${KEYCLOAK_SERVER_URL:https://auth.nguocchieuvangle.io.vn/}
+  auth-server-url: ${KEYCLOAK_SERVER_URL:https://auth.cashbee.com.vn/}
   realm: ${KEYCLOAK_REALM:cashbee}
   resource: ${KEYCLOAK_CLIENT_ID:cashbee-backend}
   credentials:
@@ -173,7 +173,7 @@ keycloak:
   admin:
     # Keycloak server URL (without /realms suffix)
     # Example: http://localhost:8080 or https://keycloak.yourdomain.com
-    server-url: ${KEYCLOAK_SERVER_URL:https://auth.nguocchieuvangle.io.vn/}
+    server-url: ${KEYCLOAK_SERVER_URL:https://auth.cashbee.com.vn/}
 
     # Realm name where users/roles are managed
     # Must match the realm in issuer-uri above

@@ -57,11 +57,11 @@ services:
       SPRING_LIQUIBASE_DEFAULT_SCHEMA: cashbee
 
       # Keycloak Configuration
-      KEYCLOAK_SERVER_URL: https://auth.nguocchieuvangle.io.vn
+      KEYCLOAK_SERVER_URL: https://auth.cashbee.com.vn
       KEYCLOAK_REALM: cashbee
       KEYCLOAK_CLIENT_ID: cashbee-backend
       KEYCLOAK_CLIENT_SECRET: YQbb2bIhxpsMpnfOA8U2hvkG5CqrXNJr
-      KEYCLOAK_ISSUER_URI: https://auth.nguocchieuvangle.io.vn/realms/cashbee
+      KEYCLOAK_ISSUER_URI: https://auth.cashbee.com.vn/realms/cashbee
       KEYCLOAK_ADMIN_USERNAME: admin
       KEYCLOAK_ADMIN_PASSWORD: 1234
 

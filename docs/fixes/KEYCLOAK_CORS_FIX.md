@@ -53,7 +53,7 @@ Browser (localhost:3000) → Backend API (https://cashbee.api.nguocchieuvangle.i
 
 ### Bước 1: Đăng nhập Keycloak Admin Console
 
-1. Truy cập: `https://auth.nguocchieuvangle.io.vn/`
+1. Truy cập: `https://auth.cashbee.com.vn/`
 2. Click **Administration Console**
 3. Đăng nhập với admin credentials
 
@@ -324,14 +324,14 @@ tail -f /app/logs/cashbee-backend.log | grep -i "cors\|keycloak"
 
 ```bash
 # Get Keycloak access token
-TOKEN=$(curl -X POST "https://auth.nguocchieuvangle.io.vn/realms/cashbee/protocol/openid-connect/token" \
+TOKEN=$(curl -X POST "https://auth.cashbee.com.vn/realms/cashbee/protocol/openid-connect/token" \
   -d "client_id=admin-cli" \
   -d "username=admin" \
   -d "password=YOUR_PASSWORD" \
   -d "grant_type=password" | jq -r '.access_token')
 
 # Get client configuration
-curl -X GET "https://auth.nguocchieuvangle.io.vn/admin/realms/cashbee/clients" \
+curl -X GET "https://auth.cashbee.com.vn/admin/realms/cashbee/clients" \
   -H "Authorization: Bearer $TOKEN" | jq '.[] | select(.clientId=="cashbee-backend") | {webOrigins, redirectUris}'
 ```
 

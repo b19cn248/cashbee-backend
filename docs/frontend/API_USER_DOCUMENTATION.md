@@ -45,7 +45,7 @@ Authorization: Bearer {JWT_TOKEN}
 
 ```javascript
 const keycloak = new Keycloak({
-  url: 'https://auth.nguocchieuvangle.io.vn/',
+  url: 'https://auth.cashbee.com.vn/',
   realm: 'cashbee',
   clientId: 'cashbee-frontend'
 });
@@ -250,7 +250,7 @@ const response = await fetch('/api/users/sync', {
 import Keycloak from 'keycloak-js';
 
 const keycloak = new Keycloak({
-  url: 'https://auth.nguocchieuvangle.io.vn/',
+  url: 'https://auth.cashbee.com.vn/',
   realm: 'cashbee',
   clientId: 'cashbee-frontend'
 });

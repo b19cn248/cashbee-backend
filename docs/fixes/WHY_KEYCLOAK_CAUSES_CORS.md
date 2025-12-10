@@ -93,7 +93,7 @@ public CorsFilter corsFilter() {
 
 ```json
 {
-  "auth-server-url": "https://auth.nguocchieuvangle.io.vn/",
+  "auth-server-url": "https://auth.cashbee.com.vn/",
   "realm": "cashbee",
   "resource": "cashbee-backend"
 }
@@ -143,7 +143,7 @@ public CorsFilter corsFilter() {
 │  [4] Policy Enforcer Filter  ⚠️ CRITICAL!                   │
 │      ↓                                                       │
 │      Call Keycloak Authorization Server                     │
-│      URL: https://auth.nguocchieuvangle.io.vn               │
+│      URL: https://auth.cashbee.com.vn               │
 │      Request: Check permissions for /api/admin/platforms    │
 │                                                              │
 └──────────────────────┬───────────────────────────────────────┘
@@ -265,7 +265,7 @@ public CorsFilter corsFilter() {
 
 ### Cách 1: Qua Keycloak UI
 
-1. Login: https://auth.nguocchieuvangle.io.vn/
+1. Login: https://auth.cashbee.com.vn/
 2. Administration Console
 3. Realm: cashbee
 4. Clients → cashbee-backend
@@ -277,14 +277,14 @@ public CorsFilter corsFilter() {
 
 ```bash
 # Get admin token
-TOKEN=$(curl -X POST "https://auth.nguocchieuvangle.io.vn/realms/master/protocol/openid-connect/token" \
+TOKEN=$(curl -X POST "https://auth.cashbee.com.vn/realms/master/protocol/openid-connect/token" \
   -d "client_id=admin-cli" \
   -d "username=admin" \
   -d "password=YOUR_PASSWORD" \
   -d "grant_type=password" | jq -r '.access_token')
 
 # Get client config
-curl -X GET "https://auth.nguocchieuvangle.io.vn/admin/realms/cashbee/clients" \
+curl -X GET "https://auth.cashbee.com.vn/admin/realms/cashbee/clients" \
   -H "Authorization: Bearer $TOKEN" \
   | jq '.[] | select(.clientId=="cashbee-backend") | .webOrigins'
 ```

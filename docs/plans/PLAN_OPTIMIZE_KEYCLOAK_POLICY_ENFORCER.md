@@ -127,7 +127,7 @@ public class CachedPolicyEnforcerFilter extends OncePerRequestFilter {
 1. Update `policy-enforcer-dev.json`:
 ```json
 {
-  "auth-server-url": "https://auth.nguocchieuvangle.io.vn/",
+  "auth-server-url": "https://auth.cashbee.com.vn/",
   "realm": "cashbee",
   "resource": "cashbee-backend",
   "credentials": {

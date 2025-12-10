@@ -164,7 +164,7 @@ public class SecurityConfig {
         "https://cashbee.nguocchieuvangle.io.vn/",
         "https://cashbee.com.vn/",
         "https://video.management.v1.openlearnhub.io.vn/",
-        "https://auth.nguocchieuvangle.io.vn/"));
+        "https://auth.cashbee.com.vn/"));
     config.setAllowedHeaders(
         Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Requested-With"));
     config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

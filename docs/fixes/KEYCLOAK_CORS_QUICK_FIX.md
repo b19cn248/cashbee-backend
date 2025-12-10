@@ -13,7 +13,7 @@ Sau khi thay đổi Keycloak config → Bị CORS error
 ### 1️⃣ Đăng nhập Keycloak Admin
 
 ```
-URL: https://auth.nguocchieuvangle.io.vn/
+URL: https://auth.cashbee.com.vn/
 → Click "Administration Console"
 → Đăng nhập với admin credentials
 ```
