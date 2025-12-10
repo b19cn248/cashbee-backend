@@ -23,6 +23,18 @@
     {
       "path": "/api/users/sync",
       "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/auth/register/*",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/auth/verify-otp/*",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/auth/resend-otp/*",
+      "enforcement-mode": "DISABLED"
     }
   ]
 }
