@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 033: Fix VPBank ID Mapping
+        Author: CashBee Team
+        Date: 2025-12-15
+        Source: NAPAS 247 Member List (CV 871/2021/CV.NAPAS-QHNH dated 23/12/2021)
+        Description: Update vpbank_id values based on official NAPAS IBFT member list
+    -->
+
+    <changeSet id="033-fix-vpbank-id-mapping" author="cashbee">
+        <comment>Fix vpbank_id values based on official NAPAS 247 IBFT member list</comment>
+
+        <sql>
+            -- STT 1: VPBank (ID = 0)
+            UPDATE bank SET vpbank_id = 0 WHERE bank_code = 'VPBANK';
+
+            -- STT 2: MHB - NH Phat Trien Nha DBSCL (ID = 7)
+            UPDATE bank SET vpbank_id = 7 WHERE bank_code = 'MHB';
+
+            -- STT 3: AGRIBANK - NH Nong Nghiep va PTNT VN (ID = 8)
+            UPDATE bank SET vpbank_id = 8 WHERE bank_code = 'AGRIBANK';
+
+            -- STT 4: BIDV - NH Dau Tu va Phat Trien Viet Nam (ID = 9)
+            UPDATE bank SET vpbank_id = 9 WHERE bank_code = 'BIDV';
+
+            -- STT 5: VIETINBANK - NH Cong Thuong Viet Nam (ID = 10)
+            UPDATE bank SET vpbank_id = 10 WHERE bank_code = 'VIETINBANK';
+
+            -- STT 6: VIETCOMBANK - NH Ngoai Thuong (ID = 11)
+            UPDATE bank SET vpbank_id = 11 WHERE bank_code IN ('VCB', 'VIETCOMBANK');
+
+            -- STT 7: HDBANK - NH Phat Trien TP HCM (ID = 13)
+            UPDATE bank SET vpbank_id = 13 WHERE bank_code = 'HDBANK';
+
+            -- STT 8: ACB - NH A Chau (ID = 15)
+            UPDATE bank SET vpbank_id = 15 WHERE bank_code = 'ACB';
+
+            -- STT 9: DONGA BANK - NH Dong A (ID = 16)
+            UPDATE bank SET vpbank_id = 16 WHERE bank_code = 'DAB';
+
+            -- STT 10: NAMABANK - NH Nam A (ID = 17)
+            UPDATE bank SET vpbank_id = 17 WHERE bank_code IN ('NAMABANK', 'NAM A BANK');
+
+            -- STT 11: BAB - NH Bac A (ID = 18)
+            UPDATE bank SET vpbank_id = 18 WHERE bank_code = 'BAB';
+
+            -- STT 12: VIETABANK - NH Viet A (ID = 19)
+            UPDATE bank SET vpbank_id = 19 WHERE bank_code = 'VAB';
+
+            -- STT 13: SEABANK - NH Dong Nam A (ID = 20)
+            UPDATE bank SET vpbank_id = 20 WHERE bank_code IN ('SEABANK', 'SEAB');
+
+            -- STT 14: OCEANBANK - NH Dai Duong (ID = 21)
+            UPDATE bank SET vpbank_id = 21 WHERE bank_code = 'OJB';
+
+            -- STT 15: ABBANK - NH An Binh (ID = 23)
+            UPDATE bank SET vpbank_id = 23 WHERE bank_code = 'ABBANK';
+
+            -- STT 16: VIET CAPITAL BANK - NH Ban Viet Gia Dinh (ID = 24)
+            UPDATE bank SET vpbank_id = 24 WHERE bank_code = 'VIETCAPITALBANK';
+
+            -- STT 17: MBBANK - NH Quan Doi (ID = 25)
+            UPDATE bank SET vpbank_id = 25 WHERE bank_code = 'MB';
+
+            -- STT 18: GP BANK - NH Dau Khi Toan Cau (ID = 26)
+            UPDATE bank SET vpbank_id = 26 WHERE bank_code = 'GPBANK';
+
+            -- STT 19: PG BANK - NH Xang Dau Petrolimex (ID = 27)
+            UPDATE bank SET vpbank_id = 27 WHERE bank_code = 'PGBANK';
+
+            -- STT 20: TECHCOMBANK - NH Ky Thuong (ID = 28)
+            UPDATE bank SET vpbank_id = 28 WHERE bank_code = 'TCB';
+
+            -- STT 21: MSB - NH Hang Hai (ID = 29)
+            UPDATE bank SET vpbank_id = 29 WHERE bank_code = 'MSB';
+
+            -- STT 22: EXIMBANK - NH Xuat Nhap Khau Viet Nam (ID = 30)
+            UPDATE bank SET vpbank_id = 30 WHERE bank_code = 'EIB';
+
+            -- STT 23: OCB - NH Phuong Dong (ID = 32)
+            UPDATE bank SET vpbank_id = 32 WHERE bank_code = 'OCB';
+
+            -- STT 24: VIB - NH Quoc Te (ID = 34)
+            UPDATE bank SET vpbank_id = 34 WHERE bank_code = 'VIB';
+
+            -- STT 25: CONSTRUCTION BANK - NH Xay Dung Viet Nam (ID = 35)
+            UPDATE bank SET vpbank_id = 35 WHERE bank_code = 'CBBANK';
+
+            -- STT 26: VIET BANK - NH Viet Nam Thuong Tin (ID = 37)
+            UPDATE bank SET vpbank_id = 37 WHERE bank_code = 'VIETBANK';
+
+            -- STT 27: PVCOMBANK - NH Dai Chung Viet Nam (ID = 38)
+            UPDATE bank SET vpbank_id = 38 WHERE bank_code = 'PVCOMBANK';
+
+            -- STT 28: LPBank - NH Buu Dien Lien Viet (ID = 39)
+            UPDATE bank SET vpbank_id = 39 WHERE bank_code IN ('LPBANK', 'LIENVIETPOSTBANK');
+
+            -- STT 29: TPBANK - NH Tien Phong (ID = 40)
+            UPDATE bank SET vpbank_id = 40 WHERE bank_code IN ('TPB', 'TPBANK');
+
+            -- STT 30: BAOVIET BANK - NH Bao Viet (ID = 41)
+            UPDATE bank SET vpbank_id = 41 WHERE bank_code = 'BVB';
+
+            -- STT 31: KIENLONGBANK - NH Kien Long (ID = 42)
+            UPDATE bank SET vpbank_id = 42 WHERE bank_code = 'KIENLONGBANK';
+
+            -- STT 32: SACOMBANK - NH Sai Gon Thuong Tin (ID = 44)
+            UPDATE bank SET vpbank_id = 44 WHERE bank_code = 'SACOMBANK';
+
+            -- STT 33: SCB - NH Sai Gon (ID = 45)
+            UPDATE bank SET vpbank_id = 45 WHERE bank_code = 'SCB';
+
+            -- STT 34: SHB - NH Sai Gon Ha Noi (ID = 46)
+            UPDATE bank SET vpbank_id = 46 WHERE bank_code = 'SHB';
+
+            -- STT 35: SAIGON BANK - NH Sai Gon Cong Thuong (ID = 47)
+            UPDATE bank SET vpbank_id = 47 WHERE bank_code = 'SAIGONBANK';
+
+            -- STT 36: PUBLIC BANK - NH Public Bank Viet Nam (ID = 48)
+            UPDATE bank SET vpbank_id = 48 WHERE bank_code = 'VID';
+
+            -- STT 37: IVB - NH TNHH Indovina (ID = 49)
+            UPDATE bank SET vpbank_id = 49 WHERE bank_code = 'IVB';
+
+            -- STT 38: VRB - Ngan hang Lien Doanh Viet Nga (ID = 52)
+            UPDATE bank SET vpbank_id = 52 WHERE bank_code = 'VRB';
+
+            -- STT 39: STANDARD CHARTERED - NH Standard Chartered Viet Nam (ID = 54)
+            UPDATE bank SET vpbank_id = 54 WHERE bank_code = 'STANDARDCHARTERED';
+
+            -- STT 40: HSBC - NH HSBC Viet Nam (ID = 61)
+            UPDATE bank SET vpbank_id = 61 WHERE bank_code = 'HSBC';
+
+            -- STT 41: WRB - Woori Bank (ID = 64)
+            UPDATE bank SET vpbank_id = 64 WHERE bank_code = 'WRB';
+
+            -- STT 42: HLB - Hong Leong Bank (ID = 68)
+            UPDATE bank SET vpbank_id = 68 WHERE bank_code = 'HLB';
+
+            -- STT 43: CO-OPBANK - NH Hop Tac Xa Viet Nam (ID = 69)
+            UPDATE bank SET vpbank_id = 69 WHERE bank_code = 'COOPBANK';
+
+            -- STT 44: SHINHAN VIETNAM BANK LIMITED (ID = 73)
+            UPDATE bank SET vpbank_id = 73 WHERE bank_code IN ('SHINHAN', 'SHINHANBANK');
+
+            -- STT 45: DBS BANK LTD (ID = 84)
+            UPDATE bank SET vpbank_id = 84 WHERE bank_code = 'DBS';
+
+            -- STT 46: INDUSTRIAL BANK OF KOREA (ID = 89)
+            UPDATE bank SET vpbank_id = 89 WHERE bank_code = 'IBK';
+
+            -- STT 47: KOOKMIN BANK CN HN (ID = 91)
+            UPDATE bank SET vpbank_id = 91 WHERE bank_code = 'KOOKMIN';
+
+            -- STT 48: UOB - United Overseas Bank (ID = 100)
+            UPDATE bank SET vpbank_id = 100 WHERE bank_code = 'UOB';
+
+            -- STT 49: NCB - NH Quoc Dan (ID = 102)
+            UPDATE bank SET vpbank_id = 102 WHERE bank_code = 'NCB';
+
+            -- STT 50: NH TNHH MTV CIMB VIET NAM (ID = 107)
+            UPDATE bank SET vpbank_id = 107 WHERE bank_code = 'CIMB';
+
+            -- STT 51: NONG HYUP BANK (ID = 108)
+            UPDATE bank SET vpbank_id = 108 WHERE bank_code = 'NONGHYUP';
+
+            -- STT 52: UBANK by VPBANK (ID = 110)
+            UPDATE bank SET vpbank_id = 110 WHERE bank_code = 'UBANK';
+
+            -- STT 53: CAKE by VPBANK (ID = 112)
+            UPDATE bank SET vpbank_id = 112 WHERE bank_code = 'CAKE';
+
+            -- STT 54: KOOKMIN BANK CN HCM (ID = 113)
+            UPDATE bank SET vpbank_id = 113 WHERE bank_code = 'KOOKMINHCM';
+
+            -- STT 55: Kasikornbank (ID = 114)
+            UPDATE bank SET vpbank_id = 114 WHERE bank_code = 'KBANK';
+
+            -- STT 56: NGAN HANG SO UMEE BY KIENLONGBANK (ID = 115)
+            UPDATE bank SET vpbank_id = 115 WHERE bank_code = 'UMEE';
+
+            -- STT 57: KEBHANAHN - KEB Hana CN Ha Noi (ID = 116)
+            UPDATE bank SET vpbank_id = 116 WHERE bank_code = 'KEBHANAHN';
+
+            -- STT 58: KEBHANAHCM - KEB Hana CN HCM (ID = 117)
+            UPDATE bank SET vpbank_id = 117 WHERE bank_code = 'KEBHANAHCM';
+
+            -- STT 59: VBSP - NH Chinh sach Xa hoi Viet Nam (ID = 118)
+            UPDATE bank SET vpbank_id = 118 WHERE bank_code = 'VBSP';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

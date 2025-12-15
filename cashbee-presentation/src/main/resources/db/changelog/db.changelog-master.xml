@@ -67,4 +67,7 @@
     <!-- Add paid_batch_id to cashback for batch traceability -->
     <include file="db/changelog/032-add-paid-batch-id-to-cashback.xml"/>
 
+    <!-- Fix vpbank_id mapping based on official NAPAS 247 IBFT member list -->
+    <include file="db/changelog/033-fix-vpbank-id-mapping.xml"/>
+
 </databaseChangeLog>

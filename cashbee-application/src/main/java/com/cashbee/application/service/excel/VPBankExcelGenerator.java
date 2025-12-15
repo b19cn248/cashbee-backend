@@ -74,7 +74,7 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
             }
 
             // Add data rows
-            addDataRows(sheet, rows);
+            addDataRows(sheet, rows, workbook);
 
             // Auto-size columns
             autoSizeColumns(sheet);
@@ -168,10 +168,14 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
     }
 
     /**
-     * Add data rows to sheet (7 columns, General format).
+     * Add data rows to sheet (7 columns).
+     * Account number is stored as TEXT to preserve leading zeros.
      */
-    private void addDataRows(HSSFSheet sheet, List<BatchTransferRow> rows) {
+    private void addDataRows(HSSFSheet sheet, List<BatchTransferRow> rows, HSSFWorkbook workbook) {
         log.debug("VPBankExcelGenerator: Adding {} data rows", rows.size());
+
+        // Create text style for account number (preserves leading zeros)
+        HSSFCellStyle textStyle = createTextStyle(workbook);
 
         int rowNum = 1; // Start from row 1 (row 0 is header)
 
@@ -182,16 +186,10 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
             Cell sttCell = row.createCell(0);
             sttCell.setCellValue(data.getStt());
 
-            // Col 1: Số Tài Khoản - NUMBER (to match template)
+            // Col 1: Số Tài Khoản - TEXT (to preserve leading zeros like "0123456789")
             Cell accountNumberCell = row.createCell(1);
-            try {
-                // Try to parse as number (VPBank expects number format)
-                double accountNum = Double.parseDouble(data.getAccountNumber());
-                accountNumberCell.setCellValue(accountNum);
-            } catch (NumberFormatException e) {
-                // Fallback to string if not a valid number
-                accountNumberCell.setCellValue(data.getAccountNumber());
-            }
+            accountNumberCell.setCellValue(data.getAccountNumber());
+            accountNumberCell.setCellStyle(textStyle);
 
             // Col 2: Tên Tài Khoản - TEXT (UPPERCASE, no accents)
             Cell accountNameCell = row.createCell(2);
@@ -266,6 +264,18 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
         result = result.replace("đ", "d").replace("Đ", "D");
 
         return result;
+    }
+
+    /**
+     * Create text cell style to preserve leading zeros in account numbers.
+     * Uses format "@" which tells Excel to treat the value as text.
+     */
+    private HSSFCellStyle createTextStyle(HSSFWorkbook workbook) {
+        HSSFCellStyle style = workbook.createCellStyle();
+        // Format "@" = Text format, preserves leading zeros
+        DataFormat format = workbook.createDataFormat();
+        style.setDataFormat(format.getFormat("@"));
+        return style;
     }
 
     /**

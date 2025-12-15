@@ -82,9 +82,8 @@
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "ghost-mcp",
-    "plane",
-    "mcp_server_mysql",
-    "local_server_mysql",
+    "team_plane",
+    "my_plane",
     "cashbee_server_mysql"
   ]
 }
