@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="034-add-referral-fields-to-user" author="cashbee-team">
+        <comment>Add user_level, total_completed_orders, and referral_activated_at fields to user table for referral system</comment>
+
+        <!-- User tier level: NORMAL, VIP, SUPER -->
+        <addColumn tableName="user">
+            <column name="user_level" type="VARCHAR(20)" defaultValue="NORMAL">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <!-- Total completed orders count for milestone tracking -->
+        <addColumn tableName="user">
+            <column name="total_completed_orders" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <!-- Timestamp when referee reaches 3 orders and referral is activated -->
+        <addColumn tableName="user">
+            <column name="referral_activated_at" type="DATETIME"/>
+        </addColumn>
+
+        <!-- Index for user level queries -->
+        <createIndex tableName="user" indexName="idx_user_user_level">
+            <column name="user_level"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex tableName="user" indexName="idx_user_user_level"/>
+            <dropColumn tableName="user" columnName="referral_activated_at"/>
+            <dropColumn tableName="user" columnName="total_completed_orders"/>
+            <dropColumn tableName="user" columnName="user_level"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

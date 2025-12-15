@@ -70,4 +70,9 @@
     <!-- Fix vpbank_id mapping based on official NAPAS 247 IBFT member list -->
     <include file="db/changelog/033-fix-vpbank-id-mapping.xml"/>
 
+    <!-- Referral System -->
+    <include file="db/changelog/034-add-referral-fields-to-user.xml"/>
+    <include file="db/changelog/035-create-referral-reward-table.xml"/>
+    <include file="db/changelog/036-create-referrer-commission-table.xml"/>
+
 </databaseChangeLog>

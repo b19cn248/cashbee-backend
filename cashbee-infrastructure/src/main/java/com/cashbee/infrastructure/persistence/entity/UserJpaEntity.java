@@ -61,6 +61,15 @@ public class UserJpaEntity {
     @Column(name = "referred_by", length = 20)
     private String referredBy;
 
+    @Column(name = "user_level", nullable = false, length = 20)
+    private String userLevel;
+
+    @Column(name = "total_completed_orders", nullable = false)
+    private Integer totalCompletedOrders;
+
+    @Column(name = "referral_activated_at")
+    private LocalDateTime referralActivatedAt;
+
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 
@@ -83,6 +92,12 @@ public class UserJpaEntity {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        if (this.userLevel == null) {
+            this.userLevel = "NORMAL";
+        }
+        if (this.totalCompletedOrders == null) {
+            this.totalCompletedOrders = 0;
+        }
     }
 
     @PreUpdate

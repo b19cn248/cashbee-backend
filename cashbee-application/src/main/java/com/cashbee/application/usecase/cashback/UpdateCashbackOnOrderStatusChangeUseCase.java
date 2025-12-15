@@ -1,5 +1,6 @@
 package com.cashbee.application.usecase.cashback;
 
+import com.cashbee.application.usecase.referral.ProcessReferralOnOrderCompletedUseCase;
 import com.cashbee.common.exception.NotFoundException;
 import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.Cashback;
@@ -42,6 +43,7 @@ public class UpdateCashbackOnOrderStatusChangeUseCase {
 
     private final CashbackRepository cashbackRepository;
     private final AddCashbackToWalletUseCase addCashbackToWalletUseCase;
+    private final ProcessReferralOnOrderCompletedUseCase processReferralUseCase;
 
     /**
      * Update cashback when order status changes.
@@ -73,6 +75,21 @@ public class UpdateCashbackOnOrderStatusChangeUseCase {
 
         // Handle different status transitions
         handleStatusTransition(orderId, oldStatus, newStatus, cashback);
+
+        // Process referral rewards when order is completed (APPROVED or PAID)
+        processReferralRewards(orderId, oldStatus, newStatus);
+    }
+
+    /**
+     * Process referral rewards when order status changes to completed.
+     */
+    private void processReferralRewards(Long orderId, OrderStatus oldStatus, OrderStatus newStatus) {
+        try {
+            processReferralUseCase.execute(orderId, oldStatus, newStatus);
+        } catch (Exception e) {
+            log.error("Failed to process referral for order {}: {}", orderId, e.getMessage(), e);
+            // Don't fail the cashback update if referral processing fails
+        }
     }
 
     /**

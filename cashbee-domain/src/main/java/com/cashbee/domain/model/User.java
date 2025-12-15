@@ -1,5 +1,6 @@
 package com.cashbee.domain.model;
 
+import com.cashbee.domain.enums.UserLevel;
 import com.cashbee.domain.enums.UserStatus;
 import lombok.*;
 
@@ -75,6 +76,27 @@ public class User {
      * Null if user was not referred by anyone.
      */
     private String referredBy;
+
+    /**
+     * User tier level for cashback rate differentiation.
+     * NORMAL (80%), VIP (83%), SUPER (85%).
+     */
+    @Builder.Default
+    private UserLevel userLevel = UserLevel.NORMAL;
+
+    /**
+     * Total number of completed (PAID) orders.
+     * Used for milestone tracking and tier upgrades.
+     */
+    @Builder.Default
+    private Integer totalCompletedOrders = 0;
+
+    /**
+     * Timestamp when referee reaches 3 orders and referral is activated.
+     * From this point, referrer receives 5% commission for 3 months.
+     * Null if not yet activated.
+     */
+    private LocalDateTime referralActivatedAt;
 
     /**
      * User account status.
@@ -249,5 +271,110 @@ public class User {
         if (this.status == null) {
             throw new IllegalStateException("Status is required");
         }
+    }
+
+    // ===== Referral System Methods =====
+
+    /**
+     * Increment the total completed orders count.
+     * Should be called when an order status changes to PAID.
+     */
+    public void incrementCompletedOrders() {
+        this.totalCompletedOrders = (this.totalCompletedOrders == null ? 0 : this.totalCompletedOrders) + 1;
+    }
+
+    /**
+     * Check if the referral has been activated (reached 3 orders).
+     *
+     * @return true if referral is activated
+     */
+    public boolean isReferralActivated() {
+        return this.referralActivatedAt != null;
+    }
+
+    /**
+     * Activate the referral relationship.
+     * Should be called when user reaches 3 completed orders.
+     * After activation, referrer will receive 5% commission for 3 months.
+     */
+    public void activateReferral() {
+        if (this.referralActivatedAt == null) {
+            this.referralActivatedAt = LocalDateTime.now();
+        }
+    }
+
+    /**
+     * Get the expiration date for referrer commission.
+     * Commission is valid for 3 months after activation.
+     *
+     * @return expiration timestamp, or null if not activated
+     */
+    public LocalDateTime getReferralExpiresAt() {
+        if (this.referralActivatedAt == null) {
+            return null;
+        }
+        return this.referralActivatedAt.plusMonths(3);
+    }
+
+    /**
+     * Check if the referral commission period is still active.
+     * Valid for 3 months after referral activation.
+     *
+     * @return true if within the 3-month commission period
+     */
+    public boolean isWithinReferralPeriod() {
+        if (!isReferralActivated()) {
+            return false;
+        }
+        return LocalDateTime.now().isBefore(getReferralExpiresAt());
+    }
+
+    /**
+     * Upgrade user to a new tier level.
+     *
+     * @param newLevel the new tier level
+     */
+    public void upgradeTo(UserLevel newLevel) {
+        if (newLevel == null) {
+            throw new IllegalArgumentException("New level cannot be null");
+        }
+        this.userLevel = newLevel;
+    }
+
+    /**
+     * Check if user's tier can be upgraded based on completed orders.
+     *
+     * @return true if eligible for tier upgrade
+     */
+    public boolean isEligibleForTierUpgrade() {
+        if (this.totalCompletedOrders == null) {
+            return false;
+        }
+        // VIP at 40 orders, SUPER at 150 orders
+        if (this.userLevel == UserLevel.NORMAL && this.totalCompletedOrders >= 40) {
+            return true;
+        }
+        if (this.userLevel == UserLevel.VIP && this.totalCompletedOrders >= 150) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get the next tier level based on current completed orders.
+     *
+     * @return next tier level, or current level if not eligible
+     */
+    public UserLevel getNextTierLevel() {
+        if (this.totalCompletedOrders == null) {
+            return this.userLevel;
+        }
+        if (this.totalCompletedOrders >= 150) {
+            return UserLevel.SUPER;
+        }
+        if (this.totalCompletedOrders >= 40) {
+            return UserLevel.VIP;
+        }
+        return UserLevel.NORMAL;
     }
 }

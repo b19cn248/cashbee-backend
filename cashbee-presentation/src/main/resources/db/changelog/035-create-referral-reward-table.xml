@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="035-create-referral-reward-table" author="cashbee-team">
+        <comment>Create referral_reward table to track milestone bonuses and tier upgrades</comment>
+
+        <createTable tableName="referral_reward">
+            <!-- Primary Key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- User who receives the reward (referee) -->
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- User who referred (referrer) - optional for tracking -->
+            <column name="referrer_id" type="BIGINT"/>
+
+            <!-- Reward type: MILESTONE_BONUS or TIER_UPGRADE -->
+            <column name="reward_type" type="VARCHAR(30)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Milestone reached: 3, 10, 40, 150 -->
+            <column name="milestone" type="INT"/>
+
+            <!-- Bonus amount (for MILESTONE_BONUS): 10000, 20000 -->
+            <column name="amount" type="DECIMAL(19,2)" defaultValueNumeric="0"/>
+
+            <!-- New tier (for TIER_UPGRADE): VIP, SUPER -->
+            <column name="new_tier" type="VARCHAR(20)"/>
+
+            <!-- Status: PENDING, GRANTED -->
+            <column name="status" type="VARCHAR(20)" defaultValue="GRANTED">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- When the reward was granted -->
+            <column name="granted_at" type="DATETIME"/>
+
+            <!-- When the record was created -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for efficient querying -->
+        <createIndex tableName="referral_reward" indexName="idx_referral_reward_user_id">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex tableName="referral_reward" indexName="idx_referral_reward_referrer_id">
+            <column name="referrer_id"/>
+        </createIndex>
+
+        <createIndex tableName="referral_reward" indexName="idx_referral_reward_user_milestone">
+            <column name="user_id"/>
+            <column name="milestone"/>
+        </createIndex>
+
+        <createIndex tableName="referral_reward" indexName="idx_referral_reward_status">
+            <column name="status"/>
+        </createIndex>
+
+        <!-- Foreign key to user table -->
+        <addForeignKeyConstraint
+            baseTableName="referral_reward"
+            baseColumnNames="user_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_referral_reward_user"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="referral_reward"
+            baseColumnNames="referrer_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_referral_reward_referrer"
+            onDelete="SET NULL"/>
+
+        <rollback>
+            <dropTable tableName="referral_reward"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
