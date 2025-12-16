@@ -139,6 +139,12 @@ public class UpdateCashbackPolicyUseCase {
           policy.getPolicyName(), request.getPolicyName());
       policy.setPolicyName(request.getPolicyName());
     }
+
+    if (request.getPlatformId() != null) {
+      log.debug("Updating platformId: {} -> {}",
+          policy.getPlatformId(), request.getPlatformId());
+      policy.setPlatformId(request.getPlatformId());
+    }
   }
 
   /**

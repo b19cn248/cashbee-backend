@@ -923,15 +923,626 @@ Copy the API service code above and start using it!
 
 ---
 
+### 3. Get Cashback Policy by ID
+
+Retrieve a specific cashback policy by its ID.
+
+**Endpoint**: `GET /api/admin/cashback-policies/{id}`
+
+**Method**: `GET`
+
+**Path Parameters**:
+- `id` (number, required) - Policy ID
+
+**Request Example**:
+
+```bash
+curl -X GET http://localhost:8080/api/admin/cashback-policies/1 \
+  -H "Authorization: Bearer {JWT_TOKEN}" \
+  -H "Content-Type: application/json"
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "message": "Policy retrieved successfully",
+  "data": {
+    "id": 1,
+    "policyName": "Shopee Normal User Policy",
+    "policyCode": "SHOPEE_NORMAL_2025",
+    "platformId": 1,
+    "userLevel": "NORMAL",
+    "cashbackRate": 70.00,
+    "minOrderValue": 0.00,
+    "maxCashbackPerOrder": null,
+    "isActive": true,
+    "priority": 0,
+    "effectiveFrom": "2025-01-01T00:00:00",
+    "effectiveTo": null
+  },
+  "timestamp": "2025-12-16T10:30:00"
+}
+```
+
+**Status Codes**:
+- `200 OK` - Success
+- `404 Not Found` - Policy not found
+- `401 Unauthorized` - Missing or invalid JWT token
+
+---
+
+### 4. Update Cashback Policy ⭐ NEW
+
+Update an existing cashback policy. **Supports partial update** - only provided fields will be updated.
+
+**Endpoint**: `PUT /api/admin/cashback-policies/{id}`
+
+**Method**: `PUT`
+
+**Path Parameters**:
+- `id` (number, required) - Policy ID to update
+
+**Request Body** (all fields optional - only send fields you want to update):
+
+```typescript
+interface UpdateCashbackPolicyRequest {
+  policyName?: string;           // Policy display name (max 255 chars)
+  platformId?: number;           // Platform ID (1=Shopee, 2=Lazada, 3=TikTok, null=All) ⭐ NEW
+  cashbackRate?: number;         // Percentage (0-100)
+  minOrderValue?: number;        // Minimum order value (>= 0)
+  maxCashbackPerOrder?: number;  // Maximum cashback cap (>= 0)
+  isActive?: boolean;            // Enable/disable policy
+  priority?: number;             // Priority (>= 0, higher = preferred)
+  effectiveFrom?: string;        // Start date (ISO 8601)
+  effectiveTo?: string;          // End date (ISO 8601, null = permanent)
+}
+```
+
+**Request Examples**:
+
+#### Example 1: Update cashback rate only
+
+```bash
+curl -X PUT http://localhost:8080/api/admin/cashback-policies/1 \
+  -H "Authorization: Bearer {JWT_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cashbackRate": 75.00
+  }'
+```
+
+#### Example 2: Change platform (⭐ NEW feature)
+
+```bash
+# Move policy from Shopee (id=1) to Lazada (id=2)
+curl -X PUT http://localhost:8080/api/admin/cashback-policies/1 \
+  -H "Authorization: Bearer {JWT_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platformId": 2
+  }'
+```
+
+#### Example 3: Make policy universal (apply to ALL platforms)
+
+```bash
+# Set platformId to null to apply to all platforms
+# Note: Send 0 or use special handling - see notes below
+curl -X PUT http://localhost:8080/api/admin/cashback-policies/1 \
+  -H "Authorization: Bearer {JWT_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platformId": null
+  }'
+```
+
+#### Example 4: Update multiple fields at once
+
+```bash
+curl -X PUT http://localhost:8080/api/admin/cashback-policies/1 \
+  -H "Authorization: Bearer {JWT_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "policyName": "Shopee Premium User Policy",
+    "platformId": 1,
+    "cashbackRate": 85.00,
+    "isActive": true,
+    "priority": 15
+  }'
+```
+
+#### Example 5: Deactivate policy
+
+```bash
+curl -X PUT http://localhost:8080/api/admin/cashback-policies/1 \
+  -H "Authorization: Bearer {JWT_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "isActive": false
+  }'
+```
+
+#### Example 6: Set effective date range
+
+```bash
+curl -X PUT http://localhost:8080/api/admin/cashback-policies/1 \
+  -H "Authorization: Bearer {JWT_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "effectiveFrom": "2025-01-01T00:00:00",
+    "effectiveTo": "2025-12-31T23:59:59"
+  }'
+```
+
+**Response (Success)**:
+
+```json
+{
+  "success": true,
+  "message": "Cashback policy updated successfully",
+  "data": {
+    "id": 1,
+    "policyName": "Shopee Premium User Policy",
+    "policyCode": "SHOPEE_NORMAL_2025",
+    "platformId": 1,
+    "userLevel": "NORMAL",
+    "cashbackRate": 85.00,
+    "minOrderValue": 0.00,
+    "maxCashbackPerOrder": null,
+    "isActive": true,
+    "priority": 15,
+    "effectiveFrom": "2025-01-01T00:00:00",
+    "effectiveTo": null
+  },
+  "timestamp": "2025-12-16T10:30:00"
+}
+```
+
+**Response (Error - Policy not found)**:
+
+```json
+{
+  "success": false,
+  "message": "Cashback policy not found with ID: 999",
+  "data": null,
+  "timestamp": "2025-12-16T10:30:00"
+}
+```
+
+**Response (Error - Validation failed)**:
+
+```json
+{
+  "success": false,
+  "message": "Cashback rate cannot exceed 100%",
+  "data": null,
+  "timestamp": "2025-12-16T10:30:00"
+}
+```
+
+**Response (Error - No fields provided)**:
+
+```json
+{
+  "success": false,
+  "message": "No fields provided for update",
+  "data": null,
+  "timestamp": "2025-12-16T10:30:00"
+}
+```
+
+**Status Codes**:
+- `200 OK` - Update successful
+- `400 Bad Request` - Validation error or no fields provided
+- `404 Not Found` - Policy not found
+- `401 Unauthorized` - Missing or invalid JWT token
+
+**Validation Rules**:
+
+| Field | Rule |
+|-------|------|
+| `policyName` | Max 255 characters |
+| `platformId` | Must be valid platform ID (1, 2, 3) or null |
+| `cashbackRate` | 0 ≤ value ≤ 100 |
+| `minOrderValue` | ≥ 0 |
+| `maxCashbackPerOrder` | ≥ 0 |
+| `priority` | ≥ 0 |
+| `effectiveTo` | Must be after `effectiveFrom` if both provided |
+
+---
+
+## 🎨 Frontend Implementation for Update Policy
+
+### React Component Example
+
+```tsx
+import React, { useState, useEffect } from 'react';
+
+interface UpdatePolicyFormData {
+  policyName?: string;
+  platformId?: number | null;
+  cashbackRate?: number;
+  minOrderValue?: number;
+  maxCashbackPerOrder?: number;
+  isActive?: boolean;
+  priority?: number;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+}
+
+interface Platform {
+  id: number;
+  name: string;
+  code: string;
+}
+
+const UpdatePolicyForm: React.FC<{ policyId: number; onSuccess: () => void }> = ({
+  policyId,
+  onSuccess
+}) => {
+  const [formData, setFormData] = useState<UpdatePolicyFormData>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [originalPolicy, setOriginalPolicy] = useState<any>(null);
+
+  // Available platforms
+  const platforms: Platform[] = [
+    { id: 1, name: 'Shopee', code: 'shopee' },
+    { id: 2, name: 'Lazada', code: 'lazada' },
+    { id: 3, name: 'TikTok Shop', code: 'tiktok' },
+  ];
+
+  // Load current policy data
+  useEffect(() => {
+    loadPolicy();
+  }, [policyId]);
+
+  const loadPolicy = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8080/api/admin/cashback-policies/${policyId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+      const result = await response.json();
+      if (result.success) {
+        setOriginalPolicy(result.data);
+        // Pre-fill form with current values
+        setFormData({
+          policyName: result.data.policyName,
+          platformId: result.data.platformId,
+          cashbackRate: result.data.cashbackRate,
+          minOrderValue: result.data.minOrderValue,
+          maxCashbackPerOrder: result.data.maxCashbackPerOrder,
+          isActive: result.data.isActive,
+          priority: result.data.priority,
+        });
+      }
+    } catch (err) {
+      setError('Failed to load policy');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    // Only send changed fields
+    const changedFields: UpdatePolicyFormData = {};
+
+    if (formData.policyName !== originalPolicy?.policyName) {
+      changedFields.policyName = formData.policyName;
+    }
+    if (formData.platformId !== originalPolicy?.platformId) {
+      changedFields.platformId = formData.platformId;
+    }
+    if (formData.cashbackRate !== originalPolicy?.cashbackRate) {
+      changedFields.cashbackRate = formData.cashbackRate;
+    }
+    if (formData.isActive !== originalPolicy?.isActive) {
+      changedFields.isActive = formData.isActive;
+    }
+    if (formData.priority !== originalPolicy?.priority) {
+      changedFields.priority = formData.priority;
+    }
+
+    // Check if any fields changed
+    if (Object.keys(changedFields).length === 0) {
+      setError('No changes detected');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:8080/api/admin/cashback-policies/${policyId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(changedFields),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('Policy updated successfully!');
+        onSuccess();
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      setError('Failed to update policy');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!originalPolicy) {
+    return <div>Loading policy...</div>;
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="update-policy-form">
+      <h3>Update Policy: {originalPolicy.policyCode}</h3>
+
+      {error && <div className="alert alert-danger">{error}</div>}
+
+      {/* Policy Name */}
+      <div className="form-group">
+        <label>Policy Name</label>
+        <input
+          type="text"
+          className="form-control"
+          value={formData.policyName || ''}
+          onChange={(e) => setFormData({ ...formData, policyName: e.target.value })}
+          maxLength={255}
+        />
+      </div>
+
+      {/* Platform Selection - ⭐ NEW */}
+      <div className="form-group">
+        <label>Platform</label>
+        <select
+          className="form-control"
+          value={formData.platformId ?? 'null'}
+          onChange={(e) => {
+            const value = e.target.value;
+            setFormData({
+              ...formData,
+              platformId: value === 'null' ? null : Number(value),
+            });
+          }}
+        >
+          <option value="null">All Platforms (Universal)</option>
+          {platforms.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <small className="form-text text-muted">
+          Select "All Platforms" to apply this policy to all platforms (fallback policy)
+        </small>
+      </div>
+
+      {/* Cashback Rate */}
+      <div className="form-group">
+        <label>Cashback Rate (%)</label>
+        <input
+          type="number"
+          className="form-control"
+          value={formData.cashbackRate || 0}
+          onChange={(e) => setFormData({ ...formData, cashbackRate: Number(e.target.value) })}
+          min={0}
+          max={100}
+          step={0.01}
+        />
+        <small className="form-text text-muted">
+          Percentage of commission given to user as cashback (0-100)
+        </small>
+      </div>
+
+      {/* Priority */}
+      <div className="form-group">
+        <label>Priority</label>
+        <input
+          type="number"
+          className="form-control"
+          value={formData.priority || 0}
+          onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) })}
+          min={0}
+        />
+        <small className="form-text text-muted">
+          Higher priority wins when multiple policies match (recommended: 0-100)
+        </small>
+      </div>
+
+      {/* Is Active */}
+      <div className="form-group form-check">
+        <input
+          type="checkbox"
+          className="form-check-input"
+          id="isActive"
+          checked={formData.isActive || false}
+          onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+        />
+        <label className="form-check-label" htmlFor="isActive">
+          Active
+        </label>
+      </div>
+
+      {/* Submit Button */}
+      <button
+        type="submit"
+        className="btn btn-primary"
+        disabled={loading}
+      >
+        {loading ? 'Updating...' : 'Update Policy'}
+      </button>
+    </form>
+  );
+};
+
+export default UpdatePolicyForm;
+```
+
+### API Service with Update Method
+
+```typescript
+// services/cashbackPolicyService.ts
+
+interface UpdateCashbackPolicyRequest {
+  policyName?: string;
+  platformId?: number | null;
+  cashbackRate?: number;
+  minOrderValue?: number;
+  maxCashbackPerOrder?: number;
+  isActive?: boolean;
+  priority?: number;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+}
+
+class CashbackPolicyService {
+  private baseUrl = 'http://localhost:8080/api';
+
+  /**
+   * Update a cashback policy (partial update)
+   * Only send fields that need to be updated
+   */
+  async updatePolicy(
+    id: number,
+    updates: UpdateCashbackPolicyRequest
+  ): Promise<CashbackPolicyResponse> {
+    const token = localStorage.getItem('token');
+
+    const response = await fetch(
+      `${this.baseUrl}/admin/cashback-policies/${id}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update policy');
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Update only the platform of a policy
+   */
+  async updatePlatform(id: number, platformId: number | null): Promise<CashbackPolicyResponse> {
+    return this.updatePolicy(id, { platformId });
+  }
+
+  /**
+   * Update only the cashback rate
+   */
+  async updateCashbackRate(id: number, cashbackRate: number): Promise<CashbackPolicyResponse> {
+    return this.updatePolicy(id, { cashbackRate });
+  }
+
+  /**
+   * Activate or deactivate a policy
+   */
+  async setActive(id: number, isActive: boolean): Promise<CashbackPolicyResponse> {
+    return this.updatePolicy(id, { isActive });
+  }
+
+  /**
+   * Get policy by ID
+   */
+  async getById(id: number): Promise<CashbackPolicyResponse> {
+    const token = localStorage.getItem('token');
+
+    const response = await fetch(
+      `${this.baseUrl}/admin/cashback-policies/${id}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch policy');
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
+}
+
+export default new CashbackPolicyService();
+```
+
+### Usage Examples
+
+```typescript
+import cashbackPolicyService from './services/cashbackPolicyService';
+
+// Example 1: Update cashback rate
+await cashbackPolicyService.updateCashbackRate(1, 75.00);
+
+// Example 2: Change platform from Shopee to Lazada
+await cashbackPolicyService.updatePlatform(1, 2);
+
+// Example 3: Make policy universal (all platforms)
+await cashbackPolicyService.updatePlatform(1, null);
+
+// Example 4: Deactivate policy
+await cashbackPolicyService.setActive(1, false);
+
+// Example 5: Update multiple fields
+await cashbackPolicyService.updatePolicy(1, {
+  policyName: 'New Policy Name',
+  platformId: 1,
+  cashbackRate: 80.00,
+  priority: 10,
+  isActive: true,
+});
+```
+
+---
+
+## 📊 Platform ID Reference
+
+| Platform ID | Name | Code | Status |
+|-------------|------|------|--------|
+| 1 | Shopee | `shopee` | Active |
+| 2 | Lazada | `lazada` | Inactive |
+| 3 | TikTok Shop | `tiktok` | Inactive |
+| `null` | All Platforms | - | Universal/Fallback |
+
+**Note**: When `platformId` is `null`, the policy applies to ALL platforms and acts as a fallback when no platform-specific policy exists.
+
+---
+
 ## 🔄 Upcoming Features
 
 These endpoints will be added in future phases:
 
 - `POST /api/admin/cashback-policies` - Create new policy
-- `PUT /api/admin/cashback-policies/{id}` - Update policy
 - `DELETE /api/admin/cashback-policies/{id}` - Delete policy
-- `PUT /api/admin/cashback-policies/{id}/activate` - Activate policy
-- `PUT /api/admin/cashback-policies/{id}/deactivate` - Deactivate policy
 
 ---
 
@@ -956,6 +1567,18 @@ If you encounter issues:
 
 ---
 
-**Last Updated**: 2025-11-01
+**Last Updated**: 2025-12-16
 **Backend Version**: 1.0.0-SNAPSHOT
 **Status**: ✅ Ready for Frontend Integration
+
+---
+
+## 📋 Changelog
+
+### 2025-12-16
+- ⭐ **NEW**: Added `platformId` field to Update Policy API
+- ⭐ **NEW**: Added `GET /api/admin/cashback-policies/{id}` endpoint documentation
+- ⭐ **NEW**: Added detailed Update Policy API documentation with examples
+- ⭐ **NEW**: Added React component example for Update Policy form
+- ⭐ **NEW**: Added API Service examples with TypeScript
+- Updated Platform ID Reference table

@@ -77,6 +77,12 @@ public class UpdateCashbackPolicyRequest {
     private String policyName;
 
     /**
+     * Platform ID this policy applies to.
+     * Null means applies to ALL platforms.
+     */
+    private Long platformId;
+
+    /**
      * Check if at least one field is provided for update.
      *
      * @return true if at least one field is non-null
@@ -89,6 +95,7 @@ public class UpdateCashbackPolicyRequest {
             || priority != null
             || effectiveFrom != null
             || effectiveTo != null
-            || policyName != null;
+            || policyName != null
+            || platformId != null;
     }
 }
