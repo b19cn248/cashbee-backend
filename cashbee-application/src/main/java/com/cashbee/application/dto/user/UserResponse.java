@@ -65,6 +65,12 @@ public class UserResponse {
     private String status;
 
     /**
+     * User tier level (NORMAL, VIP, SUPER, DIAMOND).
+     * Determines cashback rate percentage.
+     */
+    private String userLevel;
+
+    /**
      * Account creation timestamp.
      */
     private LocalDateTime createdAt;

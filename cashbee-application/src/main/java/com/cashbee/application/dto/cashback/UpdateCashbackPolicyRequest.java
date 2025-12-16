@@ -1,5 +1,6 @@
 package com.cashbee.application.dto.cashback;
 
+import com.cashbee.domain.enums.UserLevel;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -83,6 +84,12 @@ public class UpdateCashbackPolicyRequest {
     private Long platformId;
 
     /**
+     * User level this policy applies to.
+     * NORMAL (80%), VIP (83%), SUPER (85%), DIAMOND (100%).
+     */
+    private UserLevel userLevel;
+
+    /**
      * Check if at least one field is provided for update.
      *
      * @return true if at least one field is non-null
@@ -96,6 +103,7 @@ public class UpdateCashbackPolicyRequest {
             || effectiveFrom != null
             || effectiveTo != null
             || policyName != null
-            || platformId != null;
+            || platformId != null
+            || userLevel != null;
     }
 }

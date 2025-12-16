@@ -145,6 +145,12 @@ public class UpdateCashbackPolicyUseCase {
           policy.getPlatformId(), request.getPlatformId());
       policy.setPlatformId(request.getPlatformId());
     }
+
+    if (request.getUserLevel() != null) {
+      log.debug("Updating userLevel: {} -> {}",
+          policy.getUserLevel(), request.getUserLevel());
+      policy.setUserLevel(request.getUserLevel());
+    }
   }
 
   /**

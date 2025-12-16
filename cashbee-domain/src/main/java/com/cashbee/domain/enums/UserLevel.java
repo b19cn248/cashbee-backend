@@ -9,6 +9,7 @@ import java.math.BigDecimal;
  * - NORMAL: 80% of full commission
  * - VIP: 83% of full commission
  * - SUPER: 85% of full commission
+ * - DIAMOND: 100% of full commission (special customers only)
  *
  * This allows for loyalty programs and VIP benefits.
  *
@@ -33,7 +34,14 @@ public enum UserLevel {
      * Receives 85% of full commission as cashback.
      * Unlocked at 150 completed orders.
      */
-    SUPER(85);
+    SUPER(85),
+
+    /**
+     * Diamond user (special tier).
+     * Receives 100% of full commission as cashback.
+     * Manually assigned by admin for special customers.
+     */
+    DIAMOND(100);
 
     /**
      * Cashback rate percentage for this user level.

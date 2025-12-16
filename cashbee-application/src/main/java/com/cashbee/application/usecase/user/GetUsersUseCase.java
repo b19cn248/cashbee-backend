@@ -108,6 +108,7 @@ public class GetUsersUseCase {
                 .referralCode(user.getReferralCode())
                 .referredBy(user.getReferredBy())
                 .status(user.getStatus() != null ? user.getStatus().name() : null)
+                .userLevel(user.getUserLevel() != null ? user.getUserLevel().name() : null)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

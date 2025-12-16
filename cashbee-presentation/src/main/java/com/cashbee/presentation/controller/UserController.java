@@ -1,10 +1,12 @@
 package com.cashbee.presentation.controller;
 
 import com.cashbee.application.dto.user.UpdateUserCommand;
+import com.cashbee.application.dto.user.UpdateUserLevelCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.dto.user.UserSyncCommand;
 import com.cashbee.application.usecase.user.GetUserByKeycloakIdUseCase;
 import com.cashbee.application.usecase.user.SyncUserFromKeycloakUseCase;
+import com.cashbee.application.usecase.user.UpdateUserLevelUseCase;
 import com.cashbee.application.usecase.user.UpdateUserUseCase;
 import com.cashbee.application.util.SecurityUtils;
 import com.cashbee.presentation.dto.ApiResponse;
@@ -46,6 +48,7 @@ public class UserController {
   private final SyncUserFromKeycloakUseCase syncUserFromKeycloakUseCase;
   private final GetUserByKeycloakIdUseCase getUserByKeycloakIdUseCase;
   private final UpdateUserUseCase updateUserUseCase;
+  private final UpdateUserLevelUseCase updateUserLevelUseCase;
   private final SecurityUtils securityUtils;
 
   /**
@@ -178,5 +181,36 @@ public class UserController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(ApiResponse.success(user, "User updated successfully"));
+  }
+
+  /**
+   * Update user level (admin operation).
+   * <p>
+   * This endpoint allows admin to change a user's tier level.
+   * Useful for promoting special customers to DIAMOND level (100% cashback).
+   * <p>
+   * Available levels: NORMAL (80%), VIP (83%), SUPER (85%), DIAMOND (100%)
+   *
+   * @param userId  User ID to update
+   * @param command Command containing new user level
+   * @return Updated user information
+   */
+  @PutMapping("/{userId}/level")
+  @Operation(summary = "Update user level",
+      description = "Admin endpoint to update user's tier level (NORMAL, VIP, SUPER, DIAMOND)")
+  public ResponseEntity<ApiResponse<UserResponse>> updateUserLevel(
+      @PathVariable Long userId,
+      @Valid @RequestBody UpdateUserLevelCommand command) {
+
+    log.info("API: Updating user level: userId={}, newLevel={}", userId, command.getUserLevel());
+
+    UserResponse user = updateUserLevelUseCase.execute(userId, command);
+
+    log.info("API: User level updated successfully: userId={}, level={}",
+        user.getId(), user.getUserLevel());
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ApiResponse.success(user, "User level updated successfully"));
   }
 }
