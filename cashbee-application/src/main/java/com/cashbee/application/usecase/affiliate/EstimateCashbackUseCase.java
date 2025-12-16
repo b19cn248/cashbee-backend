@@ -4,6 +4,7 @@ import com.cashbee.application.dto.affiliate.EstimateCashbackRequest;
 import com.cashbee.application.dto.affiliate.EstimateCashbackResponse;
 import com.cashbee.application.util.affiliate.ShopeeUrlParser;
 import com.cashbee.common.exception.BusinessException;
+import com.cashbee.domain.enums.UserLevel;
 import com.cashbee.domain.service.ProductCommissionService;
 import com.cashbee.domain.service.ProductCommissionService.ProductCommissionInfo;
 import lombok.RequiredArgsConstructor;
@@ -22,20 +23,22 @@ import java.util.Optional;
  * This use case:
  * 1. Validates and parses the Shopee URL
  * 2. Calls external API (via ProductCommissionService port) to get commission data
- * 3. Calculates CashBee's cashback amount using formula:
- *    cashback = externalCommission * (80/60) = externalCommission * 4/3
+ * 3. Calculates CashBee's cashback amount based on user level
  * 4. Returns estimated cashback with product details
  *
- * Why multiply by 4/3 (≈1.3333)?
- * - Tui3Gang API returns 60% of full Shopee commission to users
- * - CashBee wants to give 80% of full commission to users
- * - Formula: (commission / 0.6) * 0.8 = commission * (0.8 / 0.6) = commission * 4/3
+ * Formula: cashback = commission / 60 * userPercentage
  *
- * Example:
- * - Tui3Gang returns: 17,009đ (60% of full commission)
- * - Full commission: 17,009 / 0.6 = 28,348đ
- * - CashBee gives 80%: 28,348 * 0.8 = 22,679đ
- * - Or simply: 17,009 * (4/3) = 22,679đ
+ * User Level Rates:
+ * - NORMAL: 80% of full commission
+ * - VIP: 83% of full commission
+ * - SUPER: 85% of full commission
+ *
+ * Example (commission = 17,009đ from T3 API):
+ * - T3 API returns 60% of full commission
+ * - Full commission = 17,009 / 0.6 = 28,348đ
+ * - NORMAL (80%): 28,348 * 0.8 = 22,679đ → commission / 60 * 80
+ * - VIP (83%):    28,348 * 0.83 = 23,529đ → commission / 60 * 83
+ * - SUPER (85%):  28,348 * 0.85 = 24,096đ → commission / 60 * 85
  *
  * @author CashBee Team
  */
@@ -46,20 +49,16 @@ public class EstimateCashbackUseCase {
 
     /**
      * Port for getting product commission data.
-     * Implementation is provided by Infrastructure layer (ChietKhauProductCommissionAdapter).
+     * Implementation is provided by Infrastructure layer (Tui3GangProductCommissionAdapter).
      */
     private final ProductCommissionService productCommissionService;
     private final ShopeeUrlParser shopeeUrlParser;
 
     /**
-     * Tui3Gang gives 60% of full commission to users.
+     * T3 API returns commission as 60% of full commission.
+     * We use 60 as divisor in formula: commission / 60 * userPercentage
      */
-    private static final BigDecimal TUI3GANG_SHARE_RATE = new BigDecimal("0.6");
-
-    /**
-     * CashBee wants to give 80% of full commission to users.
-     */
-    private static final BigDecimal CASHBEE_SHARE_RATE = new BigDecimal("0.8");
+    private static final BigDecimal T3_COMMISSION_BASE = new BigDecimal("60");
 
     /**
      * Number formatter for Vietnamese currency.
@@ -70,11 +69,13 @@ public class EstimateCashbackUseCase {
      * Execute the use case to estimate cashback.
      *
      * @param request Request containing Shopee URL
+     * @param userLevel User level for cashback rate calculation
      * @return Response with estimated cashback and product details
      * @throws BusinessException if URL is invalid or API call fails
      */
-    public EstimateCashbackResponse execute(EstimateCashbackRequest request) {
-        log.info("EstimateCashbackUseCase: Estimating cashback for URL: {}", request.getShopeeUrl());
+    public EstimateCashbackResponse execute(EstimateCashbackRequest request, UserLevel userLevel) {
+        log.info("EstimateCashbackUseCase: Estimating cashback for URL: {} with userLevel: {}",
+            request.getShopeeUrl(), userLevel);
 
         // Step 1: Validate and parse URL to ensure it's a valid Shopee URL
         String productUrl = request.getShopeeUrl();
@@ -99,17 +100,19 @@ public class EstimateCashbackUseCase {
 
         ProductCommissionInfo productInfo = productInfoOpt.get();
 
-        // Step 3: Calculate cashback
+        // Step 3: Calculate cashback based on user level
         BigDecimal externalCommission = productInfo.commission();
         BigDecimal price = productInfo.price();
 
-        // Formula: cashback = externalCommission * (80/60) = externalCommission * CASHBEE_SHARE_RATE / TUI3GANG_SHARE_RATE
-        // Example: 17,009 * 0.8 / 0.6 = 22,679đ
+        // Formula: cashback = commission / 60 * userPercentage
+        // Example for NORMAL (80%): 17,009 / 60 * 80 = 22,679đ
+        // Example for VIP (83%):    17,009 / 60 * 83 = 23,515đ
+        // Example for SUPER (85%):  17,009 / 60 * 85 = 24,074đ
         BigDecimal estimatedCashback = externalCommission
-            .multiply(CASHBEE_SHARE_RATE)
-            .divide(TUI3GANG_SHARE_RATE, 0, RoundingMode.HALF_UP);  // Round to whole number (VND)
+            .multiply(userLevel.getCashbackRateDecimal())
+            .divide(T3_COMMISSION_BASE, 0, RoundingMode.HALF_UP);  // Round to whole number (VND)
 
-        // Calculate cashback rate as percentage
+        // Calculate cashback rate as percentage of price
         BigDecimal cashbackRate = BigDecimal.ZERO;
         if (price.compareTo(BigDecimal.ZERO) > 0) {
             cashbackRate = estimatedCashback
@@ -118,8 +121,8 @@ public class EstimateCashbackUseCase {
                 .setScale(2, RoundingMode.HALF_UP);
         }
 
-        log.info("EstimateCashbackUseCase: Calculated cashback - Tui3Gang (60%): {}, CashBee (80%): {}, Rate: {}%",
-            externalCommission, estimatedCashback, cashbackRate);
+        log.info("EstimateCashbackUseCase: Calculated cashback - T3 (60%): {}, {} ({}%): {}, Rate: {}%",
+            externalCommission, userLevel.name(), userLevel.getCashbackRate(), estimatedCashback, cashbackRate);
 
         // Step 4: Build response
         String formattedCashback = VND_FORMAT.format(estimatedCashback) + "đ";
@@ -140,6 +143,8 @@ public class EstimateCashbackUseCase {
             .cashbackRate(cashbackRate)
             .isCapped(productInfo.isCapped())
             .maxCap(productInfo.maxCap())
+            .userLevel(userLevel.name())
+            .appliedCashbackRate(userLevel.getCashbackRate())
             .message(message)
             .build();
     }

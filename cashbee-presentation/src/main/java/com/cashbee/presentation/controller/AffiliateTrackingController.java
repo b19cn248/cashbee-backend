@@ -8,6 +8,7 @@ import com.cashbee.application.usecase.affiliate.CreateTrackingLinkUseCase;
 import com.cashbee.application.usecase.affiliate.EstimateCashbackUseCase;
 import com.cashbee.application.usecase.affiliate.HandleClickRedirectUseCase;
 import com.cashbee.application.util.SecurityUtils;
+import com.cashbee.domain.model.User;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -98,35 +99,42 @@ public class AffiliateTrackingController {
     /**
      * Estimate cashback amount for a Shopee product.
      *
-     * This is a PUBLIC endpoint (no authentication required) to allow users
-     * to check cashback amounts before signing up.
+     * REQUIRES AUTHENTICATION - user must be logged in.
+     * Cashback rate is calculated based on user's level:
+     * - NORMAL: 80% of full commission
+     * - VIP: 83% of full commission
+     * - SUPER: 85% of full commission
      *
      * Flow:
-     * 1. User pastes Shopee product URL
-     * 2. System calls ChietKhau.Pro API to get commission data
-     * 3. System calculates CashBee cashback: commission * 2 * 0.96
-     * 4. Returns estimated cashback amount and product details
-     *
-     * Why this formula?
-     * - ChietKhau.Pro gives ~52% of Shopee commission to users
-     * - We want to give ~100% in early stage to attract users
-     * - commission * 2 ≈ full Shopee commission
-     * - * 0.96 = minus 4% for operational costs
+     * 1. User logs in and gets JWT token
+     * 2. User pastes Shopee product URL
+     * 3. System extracts user level from JWT token
+     * 4. System calls Tui3Gang API to get commission data
+     * 5. System calculates cashback: commission / 60 * userPercentage
+     * 6. Returns estimated cashback amount and product details
      *
      * @param request Request containing Shopee URL
+     * @param jwt JWT token from authenticated user
      * @return Estimated cashback amount and product details
      */
     @PostMapping("/estimate-cashback")
     @Operation(
         summary = "Estimate cashback amount",
-        description = "Get estimated cashback amount for a Shopee product. No authentication required."
+        description = "Get estimated cashback amount for a Shopee product. Requires authentication. Cashback rate depends on user level."
     )
     public ResponseEntity<ApiResponse<EstimateCashbackResponse>> estimateCashback(
-        @Valid @RequestBody EstimateCashbackRequest request) {
+        @Valid @RequestBody EstimateCashbackRequest request,
+        @AuthenticationPrincipal Jwt jwt) {
 
-        log.info("API: Estimating cashback for URL: {}", request.getShopeeUrl());
+        // Get current user from JWT token
+        User currentUser = securityUtils.getCurrentUser(jwt);
 
-        EstimateCashbackResponse response = estimateCashbackUseCase.execute(request);
+        log.info("API: Estimating cashback for user {} (level: {}) with URL: {}",
+            currentUser.getUsername(), currentUser.getUserLevel(), request.getShopeeUrl());
+
+        // Pass userLevel to UseCase for cashback calculation
+        EstimateCashbackResponse response = estimateCashbackUseCase.execute(
+            request, currentUser.getUserLevel());
 
         return ResponseEntity.ok(
             ApiResponse.success(response, "Cashback estimated successfully")
