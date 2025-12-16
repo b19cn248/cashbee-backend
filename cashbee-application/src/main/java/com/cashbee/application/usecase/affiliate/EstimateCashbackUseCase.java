@@ -23,14 +23,19 @@ import java.util.Optional;
  * 1. Validates and parses the Shopee URL
  * 2. Calls external API (via ProductCommissionService port) to get commission data
  * 3. Calculates CashBee's cashback amount using formula:
- *    cashback = externalCommission * 2 * 0.96 (100% hoàn - 4% phí)
+ *    cashback = externalCommission * (80/60) = externalCommission * 4/3
  * 4. Returns estimated cashback with product details
  *
- * Why multiply by 2?
- * - External service shares ~52% of Shopee's commission with users
- * - To get full Shopee commission: externalCommission / 0.52 ≈ externalCommission * 2
- * - CashBee wants to give 100% of commission to users in early stage
- * - Minus 4% for operational costs: * 0.96
+ * Why multiply by 4/3 (≈1.3333)?
+ * - Tui3Gang API returns 60% of full Shopee commission to users
+ * - CashBee wants to give 80% of full commission to users
+ * - Formula: (commission / 0.6) * 0.8 = commission * (0.8 / 0.6) = commission * 4/3
+ *
+ * Example:
+ * - Tui3Gang returns: 17,009đ (60% of full commission)
+ * - Full commission: 17,009 / 0.6 = 28,348đ
+ * - CashBee gives 80%: 28,348 * 0.8 = 22,679đ
+ * - Or simply: 17,009 * (4/3) = 22,679đ
  *
  * @author CashBee Team
  */
@@ -47,16 +52,14 @@ public class EstimateCashbackUseCase {
     private final ShopeeUrlParser shopeeUrlParser;
 
     /**
-     * Cashback multiplier: External service gives ~52%, we want to give ~100%.
-     * So we multiply by 2 to estimate full commission.
+     * Tui3Gang gives 60% of full commission to users.
      */
-    private static final BigDecimal COMMISSION_MULTIPLIER = new BigDecimal("2");
+    private static final BigDecimal TUI3GANG_SHARE_RATE = new BigDecimal("0.6");
 
     /**
-     * Fee percentage to subtract (4% = 0.04).
-     * Final cashback = commission * 2 * (1 - 0.04) = commission * 2 * 0.96
+     * CashBee wants to give 80% of full commission to users.
      */
-    private static final BigDecimal FEE_MULTIPLIER = new BigDecimal("0.96");
+    private static final BigDecimal CASHBEE_SHARE_RATE = new BigDecimal("0.8");
 
     /**
      * Number formatter for Vietnamese currency.
@@ -100,11 +103,11 @@ public class EstimateCashbackUseCase {
         BigDecimal externalCommission = productInfo.commission();
         BigDecimal price = productInfo.price();
 
-        // Formula: cashback = externalCommission * 2 * 0.96
+        // Formula: cashback = externalCommission * (80/60) = externalCommission * CASHBEE_SHARE_RATE / TUI3GANG_SHARE_RATE
+        // Example: 17,009 * 0.8 / 0.6 = 22,679đ
         BigDecimal estimatedCashback = externalCommission
-            .multiply(COMMISSION_MULTIPLIER)
-            .multiply(FEE_MULTIPLIER)
-            .setScale(0, RoundingMode.HALF_UP);  // Round to whole number (VND)
+            .multiply(CASHBEE_SHARE_RATE)
+            .divide(TUI3GANG_SHARE_RATE, 0, RoundingMode.HALF_UP);  // Round to whole number (VND)
 
         // Calculate cashback rate as percentage
         BigDecimal cashbackRate = BigDecimal.ZERO;
@@ -115,7 +118,7 @@ public class EstimateCashbackUseCase {
                 .setScale(2, RoundingMode.HALF_UP);
         }
 
-        log.info("EstimateCashbackUseCase: Calculated cashback - External: {}, CashBee: {}, Rate: {}%",
+        log.info("EstimateCashbackUseCase: Calculated cashback - Tui3Gang (60%): {}, CashBee (80%): {}, Rate: {}%",
             externalCommission, estimatedCashback, cashbackRate);
 
         // Step 4: Build response

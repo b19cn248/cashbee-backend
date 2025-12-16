@@ -74,7 +74,16 @@
       "WebFetch(domain:stackoverflow.com)",
       "WebFetch(domain:www.permit.io)",
       "WebFetch(domain:dev.to)",
-      "WebFetch(domain:chietkhau.pro)"
+      "WebFetch(domain:chietkhau.pro)",
+      "WebFetch(domain:buichung.vn)",
+      "WebFetch(domain:api.buichung.vn)",
+      "WebFetch(domain:data.polyxgo.com)",
+      "WebFetch(domain:developers.accesstrade.vn)",
+      "Bash(git checkout:*)",
+      "WebFetch(domain:partner.tiktokshop.com)",
+      "WebFetch(domain:developers.tiktok.com)",
+      "WebFetch(domain:seller-vn.tiktok.com)",
+      "WebFetch(domain:api.tui3gang.com)"
     ],
     "deny": [],
     "ask": []
