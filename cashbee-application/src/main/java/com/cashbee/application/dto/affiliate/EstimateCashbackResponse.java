@@ -13,11 +13,10 @@ import java.math.BigDecimal;
  * Returns product details and estimated cashback amount that user
  * will receive when purchasing through CashBee.
  *
- * Cashback Calculation (based on user level):
- * - Formula: cashback = commission / 60 * userPercentage
- * - NORMAL: 80% of full commission
- * - VIP: 83% of full commission
- * - SUPER: 85% of full commission
+ * Cashback Calculation:
+ * - commissionRate = sellerCommissionRate + shopeeCommissionRate
+ * - estimatedCashback = commissionRate * price
+ * - cashbackRate = commissionRate * 100 (%)
  *
  * @author CashBee Team
  */
@@ -65,27 +64,15 @@ public class EstimateCashbackResponse {
 
     /**
      * Estimated cashback amount user will receive from CashBee (in VND).
-     * Formula: commission / 60 * userPercentage
+     * Formula: commissionRate * price
      */
     private BigDecimal estimatedCashback;
 
     /**
      * Cashback rate as percentage of product price.
-     * Example: 6.99 means 6.99% cashback.
+     * Example: 15.0 means 15% cashback.
      */
     private BigDecimal cashbackRate;
-
-    /**
-     * User level of the current user.
-     * Values: NORMAL, VIP, SUPER
-     */
-    private String userLevel;
-
-    /**
-     * Cashback rate percentage applied based on user level.
-     * NORMAL=80, VIP=83, SUPER=85
-     */
-    private Integer appliedCashbackRate;
 
     /**
      * Whether the commission is capped by Shopee.

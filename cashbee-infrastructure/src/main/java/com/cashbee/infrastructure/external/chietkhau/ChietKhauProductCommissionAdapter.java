@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Optional;
 
 /**
@@ -40,20 +41,30 @@ public class ChietKhauProductCommissionAdapter implements ProductCommissionServi
         // Convert to domain DTO
         ChietKhauProductInfo info = productInfoOpt.get();
 
+        BigDecimal price = new BigDecimal(info.getPrice());
+        BigDecimal commission = BigDecimal.valueOf(info.getCommission());
+
+        // Calculate commission rate: commission / price
+        BigDecimal commissionRate = BigDecimal.ZERO;
+        if (price.compareTo(BigDecimal.ZERO) > 0) {
+            commissionRate = commission.divide(price, 4, RoundingMode.HALF_UP);
+        }
+
         ProductCommissionInfo commissionInfo = new ProductCommissionInfo(
             info.getProductName(),
             info.getShopName(),
-            new BigDecimal(info.getPrice()),
+            price,
             info.getImageUrl(),
             info.getProductLink(),
-            BigDecimal.valueOf(info.getCommission()),
+            commission,
+            commissionRate,   // commission / price
             info.getSales(),  // Số lượt bán
             info.getIsLimitCap(),
             info.getCap() != null ? BigDecimal.valueOf(info.getCap()) : null
         );
 
-        log.info("ChietKhauAdapter: Converted commission info - Product: {}, Commission: {}, Sales: {}",
-            commissionInfo.productName(), commissionInfo.commission(), commissionInfo.sales());
+        log.info("ChietKhauAdapter: Product: {}, Price: {}, Rate: {}%, Commission: {}",
+            commissionInfo.productName(), price, commissionRate.multiply(BigDecimal.valueOf(100)), commission);
 
         return Optional.of(commissionInfo);
     }

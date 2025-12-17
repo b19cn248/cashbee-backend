@@ -17,8 +17,9 @@ import java.util.Optional;
  * - Uses Tui3GangService to call external API
  * - Converts external DTOs to domain DTOs
  *
- * IMPORTANT: Tui3Gang API returns commission as 60% of full commission.
- * This adapter passes that value directly - the UseCase will recalculate for 80%.
+ * Commission calculation:
+ * - commissionRate = sellerCommissionRate + shopeeCommissionRate
+ * - commission = commissionRate * price
  *
  * @Primary annotation makes this adapter the default choice when
  * ProductCommissionService is injected (replacing ChietKhauProductCommissionAdapter).
@@ -58,27 +59,51 @@ public class Tui3GangProductCommissionAdapter implements ProductCommissionServic
             }
         }
 
-        // Commission from Tui3Gang is 60% of full commission
-        // We pass it directly - UseCase will recalculate for 80%
-        BigDecimal commission = info.getCommission() != null
-            ? BigDecimal.valueOf(info.getCommission())
-            : BigDecimal.ZERO;
+        // Parse commission rates from API response
+        BigDecimal sellerRate = parseRate(info.getSellerCommissionRate());
+        BigDecimal shopeeRate = parseRate(info.getShopeeCommissionRate());
+
+        // Calculate total commission rate: sellerRate + shopeeRate
+        BigDecimal commissionRate = sellerRate.add(shopeeRate);
+
+        // Calculate commission amount: commissionRate * price
+        BigDecimal commission = commissionRate.multiply(price);
 
         ProductCommissionInfo commissionInfo = new ProductCommissionInfo(
             info.getProductName(),
-            null,  // shopName not available in Tui3Gang API
+            null,           // shopName not available in Tui3Gang API
             price,
             info.getImageUrl(),
             info.getProductLink(),
-            commission,  // 60% commission - UseCase will convert to 80%
-            null,        // sales not available in Tui3Gang API
-            false,       // isCapped - not provided by Tui3Gang
-            null         // maxCap - not provided by Tui3Gang
+            commission,     // commission = rate * price
+            commissionRate, // total rate (VD: 0.15 = 15%)
+            null,           // sales not available in Tui3Gang API
+            false,          // isCapped - not provided by Tui3Gang
+            null            // maxCap - not provided by Tui3Gang
         );
 
-        log.info("Tui3GangAdapter: Converted commission info - Product: {}, Price: {}, Commission (60%): {}",
-            commissionInfo.productName(), commissionInfo.price(), commissionInfo.commission());
+        log.info("Tui3GangAdapter: Product: {}, Price: {}, Rate: {}%, Commission: {}",
+            commissionInfo.productName(), price, commissionRate.multiply(BigDecimal.valueOf(100)), commission);
 
         return Optional.of(commissionInfo);
+    }
+
+    /**
+     * Parse commission rate from String to BigDecimal.
+     * Returns ZERO if input is null, empty, or invalid.
+     *
+     * @param rateString Rate as string (e.g., "0.1" for 10%)
+     * @return BigDecimal value or ZERO if parsing fails
+     */
+    private BigDecimal parseRate(String rateString) {
+        if (rateString == null || rateString.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            return new BigDecimal(rateString);
+        } catch (NumberFormatException e) {
+            log.warn("Tui3GangAdapter: Failed to parse rate: {}", rateString);
+            return BigDecimal.ZERO;
+        }
     }
 }
