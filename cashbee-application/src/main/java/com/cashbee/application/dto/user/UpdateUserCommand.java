@@ -61,6 +61,17 @@ public class UpdateUserCommand {
     private String bankCode;
 
     /**
+     * Mã giới thiệu của người đã giới thiệu user này (optional).
+     * Chỉ có thể nhập một lần duy nhất - nếu user đã có referredBy thì không thể thay đổi.
+     * Format: CB + 6 ký tự alphanumeric (ví dụ: CB4F7A9K)
+     */
+    @Pattern(
+        regexp = "^CB[A-Z0-9]{6}$",
+        message = "Mã giới thiệu phải có định dạng: CB + 6 ký tự chữ và số"
+    )
+    private String referredBy;
+
+    /**
      * Check if bank account info is being updated.
      *
      * @return true if both accountNumber and bankCode are provided
