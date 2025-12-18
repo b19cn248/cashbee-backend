@@ -112,7 +112,7 @@ class AdminControllerTest {
                     .thenReturn(pageResponse);
 
             // When
-            ResponseEntity<?> response = adminController.getUsers(null, null, 0, 20);
+            ResponseEntity<?> response = adminController.getUsers(null, null, null, null, 0, 20);
 
             // Then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -135,7 +135,7 @@ class AdminControllerTest {
                     .thenReturn(pageResponse);
 
             // When
-            adminController.getUsers(null, null, 0, 20);
+            adminController.getUsers(null, null, null, null, 0, 20);
 
             // Then
             ArgumentCaptor<GetUsersQuery> queryCaptor = ArgumentCaptor.forClass(GetUsersQuery.class);
@@ -168,7 +168,7 @@ class AdminControllerTest {
                     .thenReturn(pageResponse);
 
             // When
-            adminController.getUsers(UserStatus.ACTIVE, null, 0, 20);
+            adminController.getUsers(UserStatus.ACTIVE, null, null, null, 0, 20);
 
             // Then
             ArgumentCaptor<GetUsersQuery> queryCaptor = ArgumentCaptor.forClass(GetUsersQuery.class);
@@ -191,7 +191,7 @@ class AdminControllerTest {
                     .thenReturn(pageResponse);
 
             // When
-            ResponseEntity<?> response = adminController.getUsers(UserStatus.BANNED, null, 0, 20);
+            ResponseEntity<?> response = adminController.getUsers(UserStatus.BANNED, null, null, null, 0, 20);
 
             // Then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -226,7 +226,7 @@ class AdminControllerTest {
                     .thenReturn(pageResponse);
 
             // When
-            adminController.getUsers(null, searchKeyword, 0, 20);
+            adminController.getUsers(null, searchKeyword, null, null, 0, 20);
 
             // Then
             ArgumentCaptor<GetUsersQuery> queryCaptor = ArgumentCaptor.forClass(GetUsersQuery.class);
@@ -249,7 +249,7 @@ class AdminControllerTest {
                     .thenReturn(emptyResponse);
 
             // When
-            ResponseEntity<?> response = adminController.getUsers(null, "nonexistent", 0, 20);
+            ResponseEntity<?> response = adminController.getUsers(null, "nonexistent", null, null, 0, 20);
 
             // Then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -280,7 +280,7 @@ class AdminControllerTest {
                     .thenReturn(pageResponse);
 
             // When
-            adminController.getUsers(null, null, customPage, customSize);
+            adminController.getUsers(null, null, null, null, customPage, customSize);
 
             // Then
             ArgumentCaptor<GetUsersQuery> queryCaptor = ArgumentCaptor.forClass(GetUsersQuery.class);
@@ -308,7 +308,7 @@ class AdminControllerTest {
                     .thenThrow(new RuntimeException("Database error"));
 
             // When & Then
-            assertThatThrownBy(() -> adminController.getUsers(null, null, 0, 20))
+            assertThatThrownBy(() -> adminController.getUsers(null, null, null, null, 0, 20))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("Database error");
         }

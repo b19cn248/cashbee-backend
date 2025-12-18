@@ -3,6 +3,7 @@ package com.cashbee.application.usecase.order;
 import com.cashbee.application.dto.common.PageResponse;
 import com.cashbee.application.dto.order.GetUserOrdersQuery;
 import com.cashbee.application.dto.response.AffiliateOrderResponse;
+import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.AffiliateOrder;
 import com.cashbee.domain.model.AffiliateOrderItem;
@@ -190,7 +191,9 @@ class GetUserOrdersUseCaseTest {
             List<AffiliateOrder> orders = Collections.singletonList(order2);
             Page<AffiliateOrder> orderPage = new PageImpl<>(orders, PageRequest.of(0, 10), 1);
 
-            when(orderRepository.findByUserIdAndStatus(eq(100L), eq(OrderStatus.APPROVED), any(Pageable.class)))
+            // Note: OrderStatus.APPROVED maps to CashbackStatus.CONFIRMED in the use case
+            // So we need to mock findByUserIdAndCashbackStatus instead of findByUserIdAndStatus
+            when(orderRepository.findByUserIdAndCashbackStatus(eq(100L), eq(CashbackStatus.CONFIRMED), any(Pageable.class)))
                     .thenReturn(orderPage);
             when(orderItemRepository.findByOrderId(2L)).thenReturn(Collections.singletonList(item2));
 
@@ -205,8 +208,8 @@ class GetUserOrdersUseCaseTest {
             AffiliateOrderResponse order = result.getContent().get(0);
             assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.APPROVED);
 
-            // Verify correct repository method was called
-            verify(orderRepository).findByUserIdAndStatus(eq(100L), eq(OrderStatus.APPROVED), any(Pageable.class));
+            // Verify correct repository method was called (with CashbackStatus)
+            verify(orderRepository).findByUserIdAndCashbackStatus(eq(100L), eq(CashbackStatus.CONFIRMED), any(Pageable.class));
             verify(orderRepository, never()).findByUserId(anyLong(), any(Pageable.class));
         }
     }
