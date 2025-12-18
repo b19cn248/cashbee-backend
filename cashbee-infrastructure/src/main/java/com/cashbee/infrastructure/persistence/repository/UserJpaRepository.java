@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -151,4 +152,36 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, Long> {
            "AND (LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
            "OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<UserJpaEntity> searchByEmailOrUsername(@Param("keyword") String keyword, Pageable pageable);
+
+    /**
+     * Find users who have orders within a date range.
+     *
+     * This query:
+     * - Joins User with AffiliateOrder via userId
+     * - Filters orders by orderTime within the date range
+     * - Returns DISTINCT users (each user appears once even with multiple orders)
+     * - Excludes deleted users
+     *
+     * The query uses dynamic conditions:
+     * - If fromDate is null, no lower bound check
+     * - If toDate is null, no upper bound check
+     *
+     * @param fromDate Start of date range (inclusive), null for no lower bound
+     * @param toDate End of date range (inclusive), null for no upper bound
+     * @param pageable Pagination parameters
+     * @return Paginated users with orders in the date range
+     */
+    @Query("""
+        SELECT DISTINCT u FROM UserJpaEntity u
+        INNER JOIN com.cashbee.infrastructure.entity.AffiliateOrderJpaEntity o ON o.userId = u.id
+        WHERE u.deletedAt IS NULL
+          AND o.deletedAt IS NULL
+          AND (:fromDate IS NULL OR o.orderTime >= :fromDate)
+          AND (:toDate IS NULL OR o.orderTime <= :toDate)
+        """)
+    Page<UserJpaEntity> findUsersWithOrdersInDateRange(
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate,
+            Pageable pageable
+    );
 }

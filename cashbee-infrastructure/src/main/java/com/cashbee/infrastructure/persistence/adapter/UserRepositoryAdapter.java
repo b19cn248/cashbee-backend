@@ -209,4 +209,20 @@ public class UserRepositoryAdapter implements UserRepository {
         log.debug("Counting users by status: {}", status);
         return jpaRepository.countByStatus(status);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<User> findUsersWithOrdersInDateRange(
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            Pageable pageable) {
+        log.debug("Finding users with orders in date range: fromDate={}, toDate={}, page={}, size={}",
+                fromDate, toDate, pageable.getPageNumber(), pageable.getPageSize());
+
+        Page<UserJpaEntity> entityPage = jpaRepository.findUsersWithOrdersInDateRange(
+                fromDate, toDate, pageable);
+
+        log.debug("Found {} users with orders in date range", entityPage.getTotalElements());
+        return entityPage.map(mapper::toDomain);
+    }
 }

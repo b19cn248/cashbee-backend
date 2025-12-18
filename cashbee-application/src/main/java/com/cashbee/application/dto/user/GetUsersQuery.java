@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 /**
  * Query DTO for getting users list with filtering and pagination.
  *
@@ -44,6 +46,20 @@ public class GetUsersQuery {
      */
     @Builder.Default
     private int size = 20;
+
+    /**
+     * Filter users who have orders FROM this date.
+     * Format: YYYY-MM-DD (e.g., 2025-12-18)
+     * If null, no lower bound on order date.
+     */
+    private LocalDate orderFromDate;
+
+    /**
+     * Filter users who have orders TO this date (inclusive).
+     * Format: YYYY-MM-DD (e.g., 2025-12-18)
+     * If null, no upper bound on order date.
+     */
+    private LocalDate orderToDate;
 
     /**
      * Validate and normalize query parameters.
@@ -88,5 +104,15 @@ public class GetUsersQuery {
      */
     public boolean hasStatusFilter() {
         return status != null;
+    }
+
+    /**
+     * Check if order date filter is active.
+     * Returns true if either fromDate or toDate is provided.
+     *
+     * @return true if any order date filter is provided
+     */
+    public boolean hasOrderDateFilter() {
+        return orderFromDate != null || orderToDate != null;
     }
 }

@@ -14,6 +14,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,8 +48,9 @@ public class GetUsersUseCase {
         // Validate and normalize query parameters
         query.validate();
 
-        log.info("Getting users list (page: {}, size: {}, status: {}, search: {})",
-                query.getPage(), query.getSize(), query.getStatus(), query.getSearch());
+        log.info("Getting users list (page: {}, size: {}, status: {}, search: {}, orderFromDate: {}, orderToDate: {})",
+                query.getPage(), query.getSize(), query.getStatus(), query.getSearch(),
+                query.getOrderFromDate(), query.getOrderToDate());
 
         // Create pageable with sorting by createdAt DESC (newest first)
         Pageable pageable = PageRequest.of(
@@ -57,25 +60,7 @@ public class GetUsersUseCase {
         );
 
         // Fetch users based on filters
-        Page<User> userPage;
-
-        if (query.hasSearchFilter()) {
-            // Search by email or username
-            userPage = userRepository.searchByEmailOrUsername(query.getSearch(), pageable);
-            log.debug("Search found {} users matching '{}'",
-                    userPage.getTotalElements(), query.getSearch());
-
-        } else if (query.hasStatusFilter()) {
-            // Filter by status
-            userPage = userRepository.findByStatus(query.getStatus(), pageable);
-            log.debug("Found {} users with status {}",
-                    userPage.getTotalElements(), query.getStatus());
-
-        } else {
-            // Get all users
-            userPage = userRepository.findAll(pageable);
-            log.debug("Found {} total users", userPage.getTotalElements());
-        }
+        Page<User> userPage = fetchUsers(query, pageable);
 
         // Map to response DTOs
         List<UserResponse> userResponses = userPage.getContent().stream()
@@ -92,6 +77,80 @@ public class GetUsersUseCase {
                 query.getSize(),
                 userPage.getTotalElements()
         );
+    }
+
+    /**
+     * Fetch users based on query filters.
+     * Priority order:
+     * 1. Order date filter (users with orders in date range)
+     * 2. Search filter (search by email or username)
+     * 3. Status filter (filter by user status)
+     * 4. No filter (get all users)
+     *
+     * @param query Query parameters
+     * @param pageable Pagination parameters
+     * @return Page of users matching the filters
+     */
+    private Page<User> fetchUsers(GetUsersQuery query, Pageable pageable) {
+        // Priority 1: Order date filter
+        if (query.hasOrderDateFilter()) {
+            LocalDateTime fromDateTime = convertToStartOfDay(query.getOrderFromDate());
+            LocalDateTime toDateTime = convertToEndOfDay(query.getOrderToDate());
+
+            log.debug("Filtering users by order date range: {} to {}", fromDateTime, toDateTime);
+
+            Page<User> userPage = userRepository.findUsersWithOrdersInDateRange(
+                    fromDateTime, toDateTime, pageable);
+            log.debug("Found {} users with orders in date range", userPage.getTotalElements());
+            return userPage;
+        }
+
+        // Priority 2: Search filter
+        if (query.hasSearchFilter()) {
+            Page<User> userPage = userRepository.searchByEmailOrUsername(query.getSearch(), pageable);
+            log.debug("Search found {} users matching '{}'",
+                    userPage.getTotalElements(), query.getSearch());
+            return userPage;
+        }
+
+        // Priority 3: Status filter
+        if (query.hasStatusFilter()) {
+            Page<User> userPage = userRepository.findByStatus(query.getStatus(), pageable);
+            log.debug("Found {} users with status {}",
+                    userPage.getTotalElements(), query.getStatus());
+            return userPage;
+        }
+
+        // Priority 4: No filter - get all users
+        Page<User> userPage = userRepository.findAll(pageable);
+        log.debug("Found {} total users", userPage.getTotalElements());
+        return userPage;
+    }
+
+    /**
+     * Convert LocalDate to LocalDateTime at start of day (00:00:00).
+     *
+     * @param date LocalDate to convert, can be null
+     * @return LocalDateTime at 00:00:00, or null if input is null
+     */
+    private LocalDateTime convertToStartOfDay(java.time.LocalDate date) {
+        if (date == null) {
+            return null;
+        }
+        return date.atStartOfDay();
+    }
+
+    /**
+     * Convert LocalDate to LocalDateTime at end of day (23:59:59.999999999).
+     *
+     * @param date LocalDate to convert, can be null
+     * @return LocalDateTime at 23:59:59.999999999, or null if input is null
+     */
+    private LocalDateTime convertToEndOfDay(java.time.LocalDate date) {
+        if (date == null) {
+            return null;
+        }
+        return date.atTime(LocalTime.MAX);
     }
 
     /**

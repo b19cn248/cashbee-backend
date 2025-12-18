@@ -5,6 +5,7 @@ import com.cashbee.domain.model.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -174,4 +175,26 @@ public interface UserRepository {
      * @return Number of users with given status
      */
     long countByStatus(String status);
+
+    /**
+     * Find users who have orders within a date range.
+     *
+     * This method queries users that have at least one order
+     * with orderTime between fromDate and toDate.
+     *
+     * Use cases:
+     * - Find users with orders today
+     * - Find users with orders in the last 7 days
+     * - Find users with orders in a specific date range
+     *
+     * @param fromDate Start of date range (inclusive), null for no lower bound
+     * @param toDate End of date range (inclusive), null for no upper bound
+     * @param pageable Pagination parameters
+     * @return Paginated users with orders in the date range
+     */
+    Page<User> findUsersWithOrdersInDateRange(
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            Pageable pageable
+    );
 }

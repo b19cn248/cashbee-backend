@@ -1,7 +1,7 @@
 # Admin Users API Documentation
 
-> Version: 1.1.0
-> Last Updated: 2025-11-25
+> Version: 1.2.0
+> Last Updated: 2025-12-18
 > Base URL: `https://api.cashbee.vn` (Production) | `http://localhost:8080` (Development)
 
 ## Table of Contents
@@ -24,6 +24,7 @@ API cho phep Admin quan ly users trong he thong CashBee, bao gom:
 - Lay danh sach tat ca users voi phan trang
 - Loc users theo trang thai (ACTIVE, SUSPENDED, BANNED)
 - Tim kiem users theo email hoac username
+- **[NEW v1.2.0]** Loc users theo khoang thoi gian phat sinh don hang
 - Xem thong tin chi tiet cua tung user
 - Xem danh sach orders cua bat ky user nao
 
@@ -31,6 +32,9 @@ API cho phep Admin quan ly users trong he thong CashBee, bao gom:
 - Admin xem danh sach tat ca nguoi dung
 - Admin tim kiem user theo email de ho tro
 - Admin loc users theo trang thai de quan ly
+- **[NEW v1.2.0]** Admin loc users co don hang trong ngay hom nay
+- **[NEW v1.2.0]** Admin loc users co don hang trong 3 ngay gan day
+- **[NEW v1.2.0]** Admin loc users co don hang trong khoang thoi gian bat ky
 - Customer Support tra cuu thong tin khach hang
 - Admin xem orders cua mot user cu the de ho tro hoac kiem tra
 
@@ -117,8 +121,21 @@ Authorization: Bearer <admin_access_token>
 |-----------|------|----------|---------|-------------|
 | `status` | String | No | null | Loc theo trang thai: `ACTIVE`, `SUSPENDED`, `BANNED` |
 | `search` | String | No | null | Tim kiem theo email hoac username |
+| `orderFromDate` | String | No | null | **[NEW v1.2.0]** Loc users co don hang TU ngay nay (format: `YYYY-MM-DD`) |
+| `orderToDate` | String | No | null | **[NEW v1.2.0]** Loc users co don hang DEN ngay nay (format: `YYYY-MM-DD`) |
 | `page` | Integer | No | 0 | So trang (bat dau tu 0) |
 | `size` | Integer | No | 20 | So users moi trang (toi da 100) |
+
+#### Filter Priority
+
+Khi su dung nhieu filter cung luc, he thong ap dung theo thu tu uu tien sau:
+
+1. **Order Date Filter** (cao nhat) - Neu co `orderFromDate` hoac `orderToDate`
+2. **Search Filter** - Neu co `search`
+3. **Status Filter** - Neu co `status`
+4. **No Filter** - Lay tat ca users
+
+> **Luu y:** Hien tai cac filter hoat dong doc lap. Neu can ket hop (vi du: users ACTIVE co don hang hom nay), hay lien he Backend team de ho tro.
 
 #### Example Requests
 
@@ -146,7 +163,37 @@ curl -X GET "http://localhost:8080/api/admin/users?page=1&size=50" \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
-**Ket hop nhieu filter:**
+**[NEW v1.2.0] Lay users co don hang hom nay (18/12/2025):**
+```bash
+curl -X GET "http://localhost:8080/api/admin/users?orderFromDate=2025-12-18&orderToDate=2025-12-18" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**[NEW v1.2.0] Lay users co don hang trong 3 ngay gan day:**
+```bash
+curl -X GET "http://localhost:8080/api/admin/users?orderFromDate=2025-12-15&orderToDate=2025-12-18" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**[NEW v1.2.0] Lay users co don hang tu ngay 1/12 den nay:**
+```bash
+curl -X GET "http://localhost:8080/api/admin/users?orderFromDate=2025-12-01" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**[NEW v1.2.0] Lay users co don hang truoc ngay 15/12:**
+```bash
+curl -X GET "http://localhost:8080/api/admin/users?orderToDate=2025-12-15" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**[NEW v1.2.0] Lay users co don hang thang 11/2025:**
+```bash
+curl -X GET "http://localhost:8080/api/admin/users?orderFromDate=2025-11-01&orderToDate=2025-11-30" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Ket hop nhieu filter (luu y filter priority):**
 ```bash
 curl -X GET "http://localhost:8080/api/admin/users?status=ACTIVE&search=nguyen&page=0&size=20" \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -693,16 +740,23 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 export interface GetUsersParams {
   status?: string | null;
   search?: string | null;
+  orderFromDate?: string | null;  // [NEW v1.2.0] Format: YYYY-MM-DD
+  orderToDate?: string | null;    // [NEW v1.2.0] Format: YYYY-MM-DD
   page?: number;
   size?: number;
 }
 
 /**
  * [ADMIN] Get all users with pagination and filtering.
+ *
+ * [NEW v1.2.0] Supports orderFromDate and orderToDate to filter
+ * users who have orders in the specified date range.
  */
 export async function getUsers({
   status = null,
   search = null,
+  orderFromDate = null,
+  orderToDate = null,
   page = 0,
   size = 20
 }: GetUsersParams = {}) {
@@ -717,6 +771,15 @@ export async function getUsers({
 
   if (search) {
     params.append('search', search);
+  }
+
+  // [NEW v1.2.0] Order date range filter
+  if (orderFromDate) {
+    params.append('orderFromDate', orderFromDate);
+  }
+
+  if (orderToDate) {
+    params.append('orderToDate', orderToDate);
   }
 
   const response = await fetch(
@@ -796,6 +859,12 @@ interface UseAdminUsersOptions {
   pageSize?: number;
 }
 
+// [NEW v1.2.0] Date range filter interface
+interface DateRangeFilter {
+  fromDate: string | null;  // Format: YYYY-MM-DD
+  toDate: string | null;    // Format: YYYY-MM-DD
+}
+
 export function useAdminUsers({ initialStatus = null, pageSize = 20 }: UseAdminUsersOptions = {}) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
@@ -806,6 +875,12 @@ export function useAdminUsers({ initialStatus = null, pageSize = 20 }: UseAdminU
   const [statusFilter, setStatusFilter] = useState<UserStatus | null>(initialStatus);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
+  // [NEW v1.2.0] Order date range filter
+  const [orderDateFilter, setOrderDateFilter] = useState<DateRangeFilter>({
+    fromDate: null,
+    toDate: null
+  });
+
   const fetchUsers = useCallback(async (pageNum: number) => {
     setLoading(true);
     setError(null);
@@ -814,6 +889,8 @@ export function useAdminUsers({ initialStatus = null, pageSize = 20 }: UseAdminU
       const response: ApiResponse<PageResponse<User>> = await getUsers({
         status: statusFilter,
         search: searchTerm || null,
+        orderFromDate: orderDateFilter.fromDate,  // [NEW v1.2.0]
+        orderToDate: orderDateFilter.toDate,      // [NEW v1.2.0]
         page: pageNum,
         size: pageSize
       });
@@ -831,11 +908,11 @@ export function useAdminUsers({ initialStatus = null, pageSize = 20 }: UseAdminU
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchTerm, pageSize]);
+  }, [statusFilter, searchTerm, orderDateFilter, pageSize]);
 
   useEffect(() => {
     fetchUsers(0);
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, searchTerm, orderDateFilter]);
 
   const goToPage = useCallback((pageNum: number) => {
     if (pageNum >= 0 && pageNum < totalPages) {
@@ -855,6 +932,34 @@ export function useAdminUsers({ initialStatus = null, pageSize = 20 }: UseAdminU
     setSearchTerm(term);
   }, []);
 
+  // [NEW v1.2.0] Change order date filter
+  const changeOrderDateFilter = useCallback((filter: DateRangeFilter) => {
+    setOrderDateFilter(filter);
+  }, []);
+
+  // [NEW v1.2.0] Helper: Filter users with orders today
+  const filterUsersWithOrdersToday = useCallback(() => {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    setOrderDateFilter({ fromDate: today, toDate: today });
+  }, []);
+
+  // [NEW v1.2.0] Helper: Filter users with orders in last N days
+  const filterUsersWithOrdersInLastDays = useCallback((days: number) => {
+    const today = new Date();
+    const fromDate = new Date(today);
+    fromDate.setDate(today.getDate() - days + 1);
+
+    setOrderDateFilter({
+      fromDate: fromDate.toISOString().split('T')[0],
+      toDate: today.toISOString().split('T')[0]
+    });
+  }, []);
+
+  // [NEW v1.2.0] Clear order date filter
+  const clearOrderDateFilter = useCallback(() => {
+    setOrderDateFilter({ fromDate: null, toDate: null });
+  }, []);
+
   return {
     users,
     loading,
@@ -864,10 +969,15 @@ export function useAdminUsers({ initialStatus = null, pageSize = 20 }: UseAdminU
     totalElements,
     statusFilter,
     searchTerm,
+    orderDateFilter,  // [NEW v1.2.0]
     goToPage,
     refresh,
     changeStatusFilter,
-    changeSearchTerm
+    changeSearchTerm,
+    changeOrderDateFilter,           // [NEW v1.2.0]
+    filterUsersWithOrdersToday,      // [NEW v1.2.0]
+    filterUsersWithOrdersInLastDays, // [NEW v1.2.0]
+    clearOrderDateFilter             // [NEW v1.2.0]
   };
 }
 ```
@@ -894,17 +1004,41 @@ export function AdminUserList() {
     totalElements,
     statusFilter,
     searchTerm,
+    orderDateFilter,  // [NEW v1.2.0]
     goToPage,
     refresh,
     changeStatusFilter,
-    changeSearchTerm
+    changeSearchTerm,
+    changeOrderDateFilter,           // [NEW v1.2.0]
+    filterUsersWithOrdersToday,      // [NEW v1.2.0]
+    filterUsersWithOrdersInLastDays, // [NEW v1.2.0]
+    clearOrderDateFilter             // [NEW v1.2.0]
   } = useAdminUsers({ pageSize: 20 });
 
   const [searchInput, setSearchInput] = useState('');
 
+  // [NEW v1.2.0] Date input states
+  const [fromDateInput, setFromDateInput] = useState('');
+  const [toDateInput, setToDateInput] = useState('');
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     changeSearchTerm(searchInput);
+  };
+
+  // [NEW v1.2.0] Handle custom date range filter
+  const handleDateFilter = () => {
+    changeOrderDateFilter({
+      fromDate: fromDateInput || null,
+      toDate: toDateInput || null
+    });
+  };
+
+  // [NEW v1.2.0] Clear all date filters
+  const handleClearDateFilter = () => {
+    setFromDateInput('');
+    setToDateInput('');
+    clearOrderDateFilter();
   };
 
   return (
@@ -946,6 +1080,91 @@ export function AdminUserList() {
               Tim
             </button>
           </form>
+        </div>
+
+        {/* [NEW v1.2.0] Order Date Filter */}
+        <div className="mt-4 pt-4 border-t">
+          <div className="flex flex-wrap gap-4 items-center">
+            <span className="text-sm font-medium text-gray-700">Loc theo don hang:</span>
+
+            {/* Quick Filters */}
+            <div className="flex gap-2">
+              <button
+                className={`px-3 py-1 rounded text-sm ${
+                  !orderDateFilter.fromDate && !orderDateFilter.toDate
+                    ? 'bg-gray-200'
+                    : 'bg-gray-100'
+                }`}
+                onClick={handleClearDateFilter}
+              >
+                Tat ca
+              </button>
+              <button
+                className="px-3 py-1 rounded text-sm bg-green-100 hover:bg-green-200"
+                onClick={filterUsersWithOrdersToday}
+              >
+                Hom nay
+              </button>
+              <button
+                className="px-3 py-1 rounded text-sm bg-blue-100 hover:bg-blue-200"
+                onClick={() => filterUsersWithOrdersInLastDays(3)}
+              >
+                3 ngay
+              </button>
+              <button
+                className="px-3 py-1 rounded text-sm bg-purple-100 hover:bg-purple-200"
+                onClick={() => filterUsersWithOrdersInLastDays(7)}
+              >
+                7 ngay
+              </button>
+              <button
+                className="px-3 py-1 rounded text-sm bg-orange-100 hover:bg-orange-200"
+                onClick={() => filterUsersWithOrdersInLastDays(30)}
+              >
+                30 ngay
+              </button>
+            </div>
+
+            {/* Custom Date Range */}
+            <div className="flex gap-2 items-center">
+              <input
+                type="date"
+                value={fromDateInput}
+                onChange={(e) => setFromDateInput(e.target.value)}
+                className="px-2 py-1 border rounded text-sm"
+                placeholder="Tu ngay"
+              />
+              <span className="text-gray-500">-</span>
+              <input
+                type="date"
+                value={toDateInput}
+                onChange={(e) => setToDateInput(e.target.value)}
+                className="px-2 py-1 border rounded text-sm"
+                placeholder="Den ngay"
+              />
+              <button
+                onClick={handleDateFilter}
+                className="px-3 py-1 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600"
+              >
+                Loc
+              </button>
+            </div>
+
+            {/* Active Filter Indicator */}
+            {(orderDateFilter.fromDate || orderDateFilter.toDate) && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-indigo-100 rounded text-sm">
+                <span>
+                  Dang loc: {orderDateFilter.fromDate || '...'} → {orderDateFilter.toDate || '...'}
+                </span>
+                <button
+                  onClick={handleClearDateFilter}
+                  className="text-red-500 hover:text-red-700 font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1583,6 +1802,7 @@ const [selectedUser, setSelectedUser] = useState<{ id: number; name: string } | 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.0 | 2025-12-18 | Added `orderFromDate` and `orderToDate` parameters to filter users by order date range |
 | 1.1.0 | 2025-11-25 | Added `GET /api/users/{userId}/orders` endpoint for admin to view user's orders |
 | 1.0.0 | 2025-11-25 | Initial release with `GET /api/admin/users` endpoint |
 

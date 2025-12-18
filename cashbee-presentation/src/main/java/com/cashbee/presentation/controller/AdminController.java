@@ -21,8 +21,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 /**
  * REST Controller for Admin Dashboard.
@@ -104,15 +107,20 @@ public class AdminController {
      * - View all users in the system with pagination
      * - Filter users by status (ACTIVE, SUSPENDED, BANNED)
      * - Search users by email or username
+     * - Filter users who have orders in a specific date range
      *
      * Example requests:
-     * - GET /api/admin/users                       → All users, page 0, size 20
-     * - GET /api/admin/users?page=1&size=50        → Page 1 with 50 items
-     * - GET /api/admin/users?status=ACTIVE         → Only active users
-     * - GET /api/admin/users?search=john@          → Search by email/username
+     * - GET /api/admin/users                                    → All users, page 0, size 20
+     * - GET /api/admin/users?page=1&size=50                     → Page 1 with 50 items
+     * - GET /api/admin/users?status=ACTIVE                      → Only active users
+     * - GET /api/admin/users?search=john@                       → Search by email/username
+     * - GET /api/admin/users?orderFromDate=2025-12-18&orderToDate=2025-12-18  → Users with orders today
+     * - GET /api/admin/users?orderFromDate=2025-12-15           → Users with orders from Dec 15
      *
      * @param status Filter by user status (optional)
      * @param search Search keyword for email or username (optional)
+     * @param orderFromDate Filter users with orders FROM this date (optional, format: YYYY-MM-DD)
+     * @param orderToDate Filter users with orders TO this date (optional, format: YYYY-MM-DD)
      * @param page Page number (0-indexed, default: 0)
      * @param size Page size (default: 20, max: 100)
      * @return Paginated list of users
@@ -120,7 +128,7 @@ public class AdminController {
     @GetMapping("/users")
     @Operation(
             summary = "[ADMIN] Get all users",
-            description = "Retrieve paginated list of users with optional status filter and search"
+            description = "Retrieve paginated list of users with optional filters: status, search, and order date range"
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -137,19 +145,29 @@ public class AdminController {
             @Parameter(description = "Search by email or username")
             @RequestParam(required = false) String search,
 
+            @Parameter(description = "Filter users with orders FROM this date (format: YYYY-MM-DD)")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderFromDate,
+
+            @Parameter(description = "Filter users with orders TO this date (format: YYYY-MM-DD)")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderToDate,
+
             @Parameter(description = "Page number (0-indexed)")
             @RequestParam(defaultValue = "0") int page,
 
             @Parameter(description = "Page size (max 100)")
             @RequestParam(defaultValue = "20") int size
     ) {
-        log.info("API: [ADMIN] Getting users list (status={}, search={}, page={}, size={})",
-                status, search, page, size);
+        log.info("API: [ADMIN] Getting users list (status={}, search={}, orderFromDate={}, orderToDate={}, page={}, size={})",
+                status, search, orderFromDate, orderToDate, page, size);
 
         // Build query from request parameters
         GetUsersQuery query = GetUsersQuery.builder()
                 .status(status)
                 .search(search)
+                .orderFromDate(orderFromDate)
+                .orderToDate(orderToDate)
                 .page(page)
                 .size(size)
                 .build();
