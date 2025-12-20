@@ -14,9 +14,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Utility class to parse Shopee product URLs and extract shop_id, item_id.
+ * Utility class to parse Shopee and ShopeeFood product URLs.
  *
- * Shopee URL formats supported:
+ * Shopee Mall URL formats supported:
  * 1. Standard format: https://shopee.vn/product/{shop_id}/{item_id}
  * 2. Shop name format: https://shopee.vn/{shop_name}/{shop_id}/{item_id}
  * 3. Short format: https://shopee.vn/-i.{shop_id}.{item_id}
@@ -25,11 +25,17 @@ import java.util.regex.Pattern;
  * 6. Full URL from homepage: https://shopee.vn/{url-encoded-name}-i.{shop_id}.{item_id}?extraParams={json}
  * 7. Shortened link: https://s.shopee.vn/{short_code} (auto-expanded to format 2)
  *
+ * ShopeeFood URL formats supported:
+ * 8. Shortened link: https://shopeefood.shopee.vn/u/{short_code}
+ * 9. Detail URL: https://shopeefood.vn/now-food/cheap-meal/detail?itemId={id}&restaurantId={id}
+ * 10. Restaurant URL: https://shopeefood.vn/{city}/{restaurant-slug}
+ *
  * Version History:
  * - v1.0: Initial version with standard, short, universal link formats
  * - v1.1: Added logging and URL encoding validation for full URLs from homepage
  * - v1.2: Added support for shortened links (s.shopee.vn) with auto-expansion
  * - v1.3: Added shop name format (/{shop_name}/{shop_id}/{item_id}) for expanded shortened links
+ * - v1.4: Added ShopeeFood support (shopeefood.vn, shopeefood.shopee.vn)
  *
  * @author CashBee Team
  */
@@ -87,6 +93,32 @@ public class ShopeeUrlParser {
     // Example: https://shopee.vn/universal-link/1635050758?param=value
     private static final Pattern UNIVERSAL_LINK_PATTERN = Pattern.compile(
         "https?://shopee\\.vn/universal-link/(\\d+)(?:\\?.*)?$"
+    );
+
+    // ============== SHOPEEFOOD PATTERNS ==============
+
+    // Pattern 6: ShopeeFood detail URL with itemId and restaurantId
+    // https://shopeefood.vn/now-food/cheap-meal/detail?itemId=278729114&restaurantId=1158256
+    // Note: Parameters can be in any order
+    private static final Pattern SHOPEEFOOD_DETAIL_PATTERN = Pattern.compile(
+        "https?://shopeefood\\.vn/.*\\?.*(?:itemId=(\\d+))"
+    );
+
+    // Pattern to extract restaurantId from ShopeeFood URL
+    private static final Pattern SHOPEEFOOD_RESTAURANT_ID_PATTERN = Pattern.compile(
+        "restaurantId=(\\d+)"
+    );
+
+    // Pattern 7: ShopeeFood restaurant page URL
+    // https://shopeefood.vn/{city}/{restaurant-slug}
+    // Example: https://shopeefood.vn/ha-noi/link-food-trung-van
+    private static final Pattern SHOPEEFOOD_RESTAURANT_PATTERN = Pattern.compile(
+        "https?://shopeefood\\.vn/([a-z-]+)/([a-z0-9-]+)(?:\\?.*)?$"
+    );
+
+    // Pattern to detect ShopeeFood domains
+    private static final Pattern SHOPEEFOOD_DOMAIN_PATTERN = Pattern.compile(
+        "https?://(?:shopeefood\\.vn|shopeefood\\.shopee\\.vn)/.*"
     );
 
     /**
@@ -176,7 +208,12 @@ public class ShopeeUrlParser {
             throw new IllegalArgumentException("Invalid URL encoding format. URL contains malformed percent-encoding.");
         }
 
-        // Step 4: Try Pattern 1 - Standard format
+        // Step 4: Check if this is a ShopeeFood URL
+        if (isShopeeFoodUrl(urlToProcess)) {
+            return parseShopeeFoodUrl(url, urlToProcess, expandedUrl);
+        }
+
+        // Step 5: Try Pattern 1 - Standard format (Shopee Mall)
         Matcher matcher = STANDARD_PATTERN.matcher(urlToProcess);
         if (matcher.find()) {
             String shopId = matcher.group(1);
@@ -184,86 +221,154 @@ public class ShopeeUrlParser {
             log.info("Parsed as STANDARD format - Shop ID: {}, Item ID: {}", shopId, itemId);
 
             return ParsedShopeeUrl.builder()
-                .originalUrl(url)  // Keep original URL for tracking
-                .expandedUrl(expandedUrl)  // Set expanded URL if it was shortened
+                .originalUrl(url)
+                .expandedUrl(expandedUrl)
                 .shopId(shopId)
                 .itemId(itemId)
                 .format("standard")
+                .platform("shopee")
                 .build();
         }
 
-        // Step 5: Try Pattern 2 - Shop name format (from shortened links)
+        // Step 6: Try Pattern 2 - Shop name format (from shortened links)
         // Format: https://shopee.vn/{shop_name}/{shop_id}/{item_id}
         matcher = SHOP_NAME_PATTERN.matcher(urlToProcess);
         if (matcher.find()) {
-            String shopName = matcher.group(1);  // Shop slug (e.g., "opaanlp")
-            String shopId = matcher.group(2);     // Shop ID (e.g., "281960897")
-            String itemId = matcher.group(3);     // Item ID (e.g., "29266558866")
+            String shopName = matcher.group(1);
+            String shopId = matcher.group(2);
+            String itemId = matcher.group(3);
 
             log.info("Parsed as SHOP_NAME format - Shop Name: '{}', Shop ID: {}, Item ID: {}",
                 shopName, shopId, itemId);
 
-            // Check if URL has query parameters
-            if (urlToProcess.contains("?")) {
-                String queryPart = urlToProcess.substring(urlToProcess.indexOf("?") + 1);
-                log.debug("Query parameters detected: {}", queryPart);
-            }
-
             return ParsedShopeeUrl.builder()
-                .originalUrl(url)  // Keep original URL for tracking
-                .expandedUrl(expandedUrl)  // Set expanded URL if it was shortened
+                .originalUrl(url)
+                .expandedUrl(expandedUrl)
                 .shopId(shopId)
                 .itemId(itemId)
                 .format("shop_name")
+                .platform("shopee")
                 .build();
         }
 
-        // Step 6: Try Pattern 3, 4, 5 - Short format, product name, or full URL from homepage
+        // Step 7: Try Pattern 3, 4, 5 - Short format, product name, or full URL from homepage
         matcher = SHORT_PATTERN.matcher(urlToProcess);
         if (matcher.find()) {
             String shopId = matcher.group(1);
             String itemId = matcher.group(2);
 
-            // Extract product name part for logging (if URL encoded, decode it)
             String productNamePart = extractProductNamePart(urlToProcess);
             String decodedName = decodeForLogging(productNamePart);
 
             log.info("Parsed as SHORT/PRODUCT format - Shop ID: {}, Item ID: {}, Product: '{}'",
                 shopId, itemId, decodedName);
 
-            // Check if URL has query parameters
-            if (urlToProcess.contains("?")) {
-                String queryPart = urlToProcess.substring(urlToProcess.indexOf("?") + 1);
-                log.debug("Query parameters detected: {}", queryPart);
-            }
-
             return ParsedShopeeUrl.builder()
-                .originalUrl(url)  // Keep original URL for tracking
-                .expandedUrl(expandedUrl)  // Set expanded URL if it was shortened
+                .originalUrl(url)
+                .expandedUrl(expandedUrl)
                 .shopId(shopId)
                 .itemId(itemId)
                 .format("short")
+                .platform("shopee")
                 .build();
         }
 
-        // Step 7: Try Pattern 6 - Universal link (no shop_id available)
+        // Step 8: Try Pattern 6 - Universal link (no shop_id available)
         matcher = UNIVERSAL_LINK_PATTERN.matcher(urlToProcess);
         if (matcher.find()) {
             String itemId = matcher.group(1);
             log.info("Parsed as UNIVERSAL LINK format - Item ID: {} (no shop_id)", itemId);
 
             return ParsedShopeeUrl.builder()
-                .originalUrl(url)  // Keep original URL for tracking
-                .expandedUrl(expandedUrl)  // Set expanded URL if it was shortened
-                .shopId(null)  // Universal links don't have shop_id
+                .originalUrl(url)
+                .expandedUrl(expandedUrl)
+                .shopId(null)
                 .itemId(itemId)
                 .format("universal")
+                .platform("shopee")
                 .build();
         }
 
-        // Step 8: No pattern matched - invalid URL
+        // Step 9: No pattern matched - invalid URL
         log.error("Failed to parse URL - no pattern matched: {}", urlToProcess);
         throw new IllegalArgumentException("Invalid Shopee URL format: " + urlToProcess);
+    }
+
+    /**
+     * Check if URL belongs to ShopeeFood domain.
+     *
+     * Supported domains:
+     * - shopeefood.vn
+     * - shopeefood.shopee.vn
+     *
+     * @param url URL to check
+     * @return true if ShopeeFood URL
+     */
+    public boolean isShopeeFoodUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        return SHOPEEFOOD_DOMAIN_PATTERN.matcher(url).matches();
+    }
+
+    /**
+     * Parse ShopeeFood URL and extract restaurant/item information.
+     *
+     * @param originalUrl Original URL from user
+     * @param urlToProcess URL to parse (may be expanded)
+     * @param expandedUrl Expanded URL if was shortened, null otherwise
+     * @return ParsedShopeeUrl with ShopeeFood data
+     */
+    private ParsedShopeeUrl parseShopeeFoodUrl(String originalUrl, String urlToProcess, String expandedUrl) {
+        log.debug("Parsing ShopeeFood URL: {}", urlToProcess);
+
+        // Try Pattern 1: Detail URL with itemId
+        Matcher matcher = SHOPEEFOOD_DETAIL_PATTERN.matcher(urlToProcess);
+        if (matcher.find()) {
+            String itemId = matcher.group(1);
+
+            // Extract restaurantId if present
+            String restaurantId = null;
+            Matcher restaurantMatcher = SHOPEEFOOD_RESTAURANT_ID_PATTERN.matcher(urlToProcess);
+            if (restaurantMatcher.find()) {
+                restaurantId = restaurantMatcher.group(1);
+            }
+
+            log.info("Parsed as SHOPEEFOOD_DETAIL format - Item ID: {}, Restaurant ID: {}",
+                itemId, restaurantId);
+
+            return ParsedShopeeUrl.builder()
+                .originalUrl(originalUrl)
+                .expandedUrl(expandedUrl)
+                .itemId(itemId)
+                .restaurantId(restaurantId)
+                .format("shopeefood_detail")
+                .platform("shopeefood")
+                .build();
+        }
+
+        // Try Pattern 2: Restaurant page URL
+        matcher = SHOPEEFOOD_RESTAURANT_PATTERN.matcher(urlToProcess);
+        if (matcher.find()) {
+            String city = matcher.group(1);
+            String restaurantSlug = matcher.group(2);
+
+            log.info("Parsed as SHOPEEFOOD_RESTAURANT format - City: {}, Restaurant: {}",
+                city, restaurantSlug);
+
+            return ParsedShopeeUrl.builder()
+                .originalUrl(originalUrl)
+                .expandedUrl(expandedUrl)
+                .city(city)
+                .restaurantSlug(restaurantSlug)
+                .format("shopeefood_restaurant")
+                .platform("shopeefood")
+                .build();
+        }
+
+        // ShopeeFood URL but no pattern matched
+        log.error("Failed to parse ShopeeFood URL - no pattern matched: {}", urlToProcess);
+        throw new IllegalArgumentException("Invalid ShopeeFood URL format: " + urlToProcess);
     }
 
     /**
@@ -322,7 +427,7 @@ public class ShopeeUrlParser {
     }
 
     /**
-     * DTO to hold parsed Shopee URL data.
+     * DTO to hold parsed Shopee/ShopeeFood URL data.
      */
     @Data
     @Builder
@@ -336,19 +441,17 @@ public class ShopeeUrlParser {
 
         /**
          * Expanded URL (if original URL was a shortened link).
-         *
-         * - If originalUrl is a shortened link (s.shopee.vn), this contains the expanded URL
-         * - If originalUrl is already a full URL, this is null
-         *
-         * Example:
-         * - originalUrl: https://s.shopee.vn/12Y5L6SJB
-         * - expandedUrl: https://shopee.vn/opaanlp/281960897/29266558866
          */
         private String expandedUrl;
 
         /**
-         * Shop ID extracted from URL.
-         * May be null for universal links.
+         * Platform: "shopee" for Shopee Mall, "shopeefood" for ShopeeFood.
+         */
+        private String platform;
+
+        /**
+         * Shop ID extracted from URL (Shopee Mall only).
+         * May be null for universal links or ShopeeFood.
          */
         private String shopId;
 
@@ -358,23 +461,45 @@ public class ShopeeUrlParser {
         private String itemId;
 
         /**
-         * URL format detected: "standard", "shop_name", "short", or "universal".
+         * Restaurant ID (ShopeeFood only).
+         */
+        private String restaurantId;
+
+        /**
+         * City slug (ShopeeFood restaurant URL only).
+         * Example: "ha-noi", "ho-chi-minh"
+         */
+        private String city;
+
+        /**
+         * Restaurant slug (ShopeeFood restaurant URL only).
+         * Example: "link-food-trung-van"
+         */
+        private String restaurantSlug;
+
+        /**
+         * URL format detected.
+         * Shopee: "standard", "shop_name", "short", "universal"
+         * ShopeeFood: "shopeefood_detail", "shopeefood_restaurant"
          */
         private String format;
 
         /**
          * Check if this URL has shop_id.
-         *
-         * @return true if shop_id is present
          */
         public boolean hasShopId() {
             return shopId != null && !shopId.isBlank();
         }
 
         /**
+         * Check if this is a ShopeeFood URL.
+         */
+        public boolean isShopeeFood() {
+            return "shopeefood".equals(platform);
+        }
+
+        /**
          * Check if original URL was a shortened link that was expanded.
-         *
-         * @return true if URL was expanded from shortened link
          */
         public boolean wasExpanded() {
             return expandedUrl != null && !expandedUrl.isBlank();

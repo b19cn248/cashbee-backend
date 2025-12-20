@@ -63,6 +63,9 @@ public class GenerateBatchTransferFileUseCase {
     /**
      * Generate Excel file by batch code with specified bank template.
      *
+     * FIX: Giờ đây lấy data từ batch_transfer_item table (snapshot data)
+     * thay vì query lại tất cả users với balance >= minBalance.
+     *
      * @param batchCode Batch code
      * @param bankTemplate Bank template type (VPBANK or VIETINBANK)
      * @return Excel file as byte array
@@ -72,13 +75,34 @@ public class GenerateBatchTransferFileUseCase {
         log.info("GenerateBatchTransferFileUseCase: Generating file for batch code: {}, template: {}",
                 batchCode, bankTemplate);
 
-        // Load batch metadata
+        // 1. Load batch metadata
         BatchTransferExport batchExport = batchTransferExportRepository.findByBatchCode(batchCode)
                 .orElseThrow(() -> new BusinessException("BATCH_NOT_FOUND",
                         "Batch transfer export not found: " + batchCode));
 
-        // Generate file with stored minBalance and remark template
-        return generateFile(batchExport.getMinBalance(), batchExport.getRemarkTemplate(), bankTemplate);
+        // 2. Query batch items (snapshot data từ khi tạo batch)
+        List<BatchTransferRow> rows = queryBatchItemsWithBankInfo(
+                batchExport.getId(),
+                batchExport.getRemarkTemplate()
+        );
+
+        if (rows.isEmpty()) {
+            throw new BusinessException("NO_BATCH_ITEMS",
+                    "No items found for batch: " + batchCode);
+        }
+
+        log.info("GenerateBatchTransferFileUseCase: Found {} items in batch {}", rows.size(), batchCode);
+
+        // 3. Get appropriate generator from factory
+        BatchTransferExcelGenerator generator = excelGeneratorFactory.getGenerator(bankTemplate);
+
+        // 4. Generate Excel file
+        byte[] excelBytes = generator.generate(rows);
+
+        log.info("GenerateBatchTransferFileUseCase: Generated {} file ({} bytes) for batch {}",
+                bankTemplate.getFileExtension(), excelBytes.length, batchCode);
+
+        return excelBytes;
     }
 
     /**
@@ -165,6 +189,39 @@ public class GenerateBatchTransferFileUseCase {
     }
 
     /**
+     * Query batch items với bank info từ batch_transfer_item table.
+     *
+     * Đây là data đã được snapshot khi tạo batch, đảm bảo:
+     * - Chỉ lấy đúng những users thuộc batch này
+     * - Amount là giá trị tại thời điểm tạo batch (không phải balance hiện tại)
+     *
+     * @param batchId Batch ID
+     * @param remarkTemplate Remark template
+     * @return List of BatchTransferRow
+     */
+    private List<BatchTransferRow> queryBatchItemsWithBankInfo(Long batchId, String remarkTemplate) {
+        String sql = """
+                SELECT
+                    bti.id,
+                    bti.user_id,
+                    bti.amount,
+                    bti.account_number,
+                    bti.account_name,
+                    bti.bank_name,
+                    uba.bank_code,
+                    b.vietinbank_code,
+                    COALESCE(b.vpbank_id, b.id) as vpbank_id
+                FROM batch_transfer_item bti
+                LEFT JOIN user_bank_account uba ON bti.user_id = uba.user_id AND uba.is_default = 1
+                LEFT JOIN bank b ON uba.bank_code = b.bank_code
+                WHERE bti.batch_id = ?
+                ORDER BY bti.id ASC
+                """;
+
+        return jdbcTemplate.query(sql, new BatchItemRowMapper(remarkTemplate), batchId);
+    }
+
+    /**
      * Generate default remark template.
      */
     private String generateDefaultRemark() {
@@ -174,7 +231,7 @@ public class GenerateBatchTransferFileUseCase {
     }
 
     /**
-     * Row mapper for BatchTransferRow.
+     * Row mapper for BatchTransferRow (used for fresh query with minBalance).
      * Maps database result to DTO including vietinbank_code.
      */
     private static class BatchTransferRowMapper implements RowMapper<BatchTransferRow> {
@@ -194,6 +251,36 @@ public class GenerateBatchTransferFileUseCase {
                     .accountNumber(rs.getString("account_number"))
                     .accountName(rs.getString("account_name"))
                     .amount(rs.getBigDecimal("balance"))
+                    .bankName(rs.getString("bank_name"))
+                    .bankCode(rs.getString("bank_code"))
+                    .vietinbankCode(rs.getString("vietinbank_code"))
+                    .vpbankId(rs.getInt("vpbank_id"))
+                    .remark(remarkTemplate)
+                    .build();
+        }
+    }
+
+    /**
+     * Row mapper for batch items (used for query from batch_transfer_item table).
+     * Maps snapshot data from batch_transfer_item with bank info.
+     */
+    private static class BatchItemRowMapper implements RowMapper<BatchTransferRow> {
+
+        private final String remarkTemplate;
+        private int stt = 1;
+
+        public BatchItemRowMapper(String remarkTemplate) {
+            this.remarkTemplate = remarkTemplate;
+        }
+
+        @Override
+        public BatchTransferRow mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return BatchTransferRow.builder()
+                    .stt(stt++)
+                    .userId(rs.getLong("user_id"))
+                    .accountNumber(rs.getString("account_number"))
+                    .accountName(rs.getString("account_name"))
+                    .amount(rs.getBigDecimal("amount"))  // từ batch_transfer_item, không phải balance
                     .bankName(rs.getString("bank_name"))
                     .bankCode(rs.getString("bank_code"))
                     .vietinbankCode(rs.getString("vietinbank_code"))

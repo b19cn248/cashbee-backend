@@ -1,11 +1,10 @@
 package com.cashbee.application.usecase.user;
 
+import com.cashbee.application.dto.referral.ReferralValidationResult;
 import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.port.UserDtoMapper;
-import com.cashbee.common.exception.InvalidReferralCodeException;
-import com.cashbee.common.exception.ReferralCodeAlreadySetException;
-import com.cashbee.common.exception.SelfReferralException;
+import com.cashbee.application.service.ReferralCodeValidator;
 import com.cashbee.domain.model.Bank;
 import com.cashbee.domain.model.User;
 import com.cashbee.domain.model.UserBankAccount;
@@ -44,6 +43,7 @@ public class UpdateUserUseCase {
     private final BankRepository bankRepository;
     private final IdentityProviderPort identityProviderPort;
     private final UserDtoMapper userDtoMapper;
+    private final ReferralCodeValidator referralCodeValidator;
 
     /**
      * Execute use case to update user.
@@ -160,52 +160,25 @@ public class UpdateUserUseCase {
      *
      * @param user User entity
      * @param referredByCode Mã giới thiệu cần set
-     * @throws ReferralCodeAlreadySetException nếu user đã có referredBy
-     * @throws InvalidReferralCodeException nếu mã không tồn tại hoặc không hợp lệ
-     * @throws SelfReferralException nếu user tự giới thiệu chính mình
      */
     private void updateReferredBy(User user, String referredByCode) {
         log.info("Updating referredBy for user: userId={}, referredByCode={}",
                 user.getId(), referredByCode);
 
-        // Bước 1: Kiểm tra user đã có referredBy chưa
-        if (user.getReferredBy() != null && !user.getReferredBy().isBlank()) {
-            log.warn("User {} already has referredBy set: {}", user.getId(), user.getReferredBy());
-            throw new ReferralCodeAlreadySetException(
-                    "Mã giới thiệu chỉ có thể nhập một lần duy nhất");
-        }
+        // 1. Check user đã có referredBy chưa
+        referralCodeValidator.checkNotAlreadyReferred(user);
 
-        // Bước 2: Chuẩn hóa mã (uppercase, trim)
-        String normalizedCode = referredByCode.toUpperCase().trim();
+        // 2. Validate referral code (throws exception if invalid)
+        ReferralValidationResult result = referralCodeValidator.validateOrThrow(
+                referredByCode,
+                user.getId()
+        );
 
-        // Bước 3: Tìm người giới thiệu (referrer) theo mã
-        User referrer = userRepository.findByReferralCode(normalizedCode)
-                .orElseThrow(() -> {
-                    log.warn("Referral code not found: {}", normalizedCode);
-                    return InvalidReferralCodeException.notFound(normalizedCode);
-                });
+        // 3. Set referredBy cho user
+        user.setReferredBy(result.getNormalizedCode());
 
-        log.debug("Found referrer: userId={}, username={}", referrer.getId(), referrer.getUsername());
-
-        // Bước 4: Kiểm tra self-referral (không được tự giới thiệu chính mình)
-        if (user.getId().equals(referrer.getId())) {
-            log.warn("Self-referral attempt by user: {}", user.getId());
-            throw SelfReferralException.forUser(user.getId());
-        }
-
-        // Bước 5: Kiểm tra referrer có active không
-        if (!referrer.isActive()) {
-            log.warn("Referrer {} is inactive (status={})", referrer.getId(), referrer.getStatus());
-            throw new InvalidReferralCodeException(
-                    "REFERRER_INACTIVE",
-                    "Mã giới thiệu không hợp lệ");
-        }
-
-        // Bước 6: Set referredBy cho user
-        user.setReferredBy(normalizedCode);
-
-        log.info("ReferredBy set successfully: userId={}, referredBy={}",
-                user.getId(), normalizedCode);
+        log.info("ReferredBy set successfully: userId={}, referredBy={}, referrerId={}",
+                user.getId(), result.getNormalizedCode(), result.getReferrerId());
     }
 
     /**

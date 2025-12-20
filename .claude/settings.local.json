@@ -83,7 +83,36 @@
       "WebFetch(domain:partner.tiktokshop.com)",
       "WebFetch(domain:developers.tiktok.com)",
       "WebFetch(domain:seller-vn.tiktok.com)",
-      "WebFetch(domain:api.tui3gang.com)"
+      "WebFetch(domain:api.tui3gang.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(dir:*)",
+      "Bash(cashbee-application/src/main/java/com/cashbee/application/dto/affiliate/EstimateCashbackResponse.java )",
+      "Bash(cashbee-application/src/main/java/com/cashbee/application/usecase/affiliate/EstimateCashbackUseCase.java )",
+      "Bash(cashbee-domain/src/main/java/com/cashbee/domain/service/ProductCommissionService.java )",
+      "Bash(cashbee-infrastructure/src/main/java/com/cashbee/infrastructure/external/chietkhau/ChietKhauProductCommissionAdapter.java )",
+      "Bash(cashbee-infrastructure/src/main/java/com/cashbee/infrastructure/external/tui3gang/Tui3GangProductCommissionAdapter.java )",
+      "Bash(cashbee-presentation/src/main/java/com/cashbee/presentation/controller/AffiliateTrackingController.java)",
+      "Bash(cashbee-application/src/main/java/com/cashbee/application/dto/user/GetUsersQuery.java )",
+      "Bash(cashbee-application/src/main/java/com/cashbee/application/usecase/user/GetUsersUseCase.java )",
+      "Bash(cashbee-domain/src/main/java/com/cashbee/domain/repository/UserRepository.java )",
+      "Bash(cashbee-infrastructure/src/main/java/com/cashbee/infrastructure/persistence/adapter/UserRepositoryAdapter.java )",
+      "Bash(cashbee-infrastructure/src/main/java/com/cashbee/infrastructure/persistence/repository/UserJpaRepository.java )",
+      "Bash(cashbee-presentation/src/main/java/com/cashbee/presentation/controller/AdminController.java )",
+      "Bash(docs/api/ADMIN_USERS_API.md )",
+      "Bash(docs/frontend/FE_UPDATE_ADMIN_USERS_ORDER_DATE_FILTER.md)",
+      "mcp__my_plane__get_user",
+      "mcp__my_plane__list_modules",
+      "mcp__my_plane__create_label",
+      "mcp__my_plane__create_module",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:adpia.vn)",
+      "WebFetch(domain:shopeefood.shopee.vn)",
+      "WebFetch(domain:s.shopee.vn)",
+      "WebFetch(domain:s.shopeefood.vn)",
+      "WebFetch(domain:shopeefood.vn)"
     ],
     "deny": [],
     "ask": []
@@ -94,5 +123,11 @@
     "team_plane",
     "my_plane",
     "cashbee_server_mysql"
-  ]
+  ],
+  "enabledPlugins": {
+    "figma@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "developer-kit@giuseppe.trisciuoglio": true
+  }
 }

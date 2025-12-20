@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * REST Controller for Referral operations.
- *
+ * <p>
  * Endpoints:
  * - POST /api/referral/set-code - Set referral code (become a referee)
  * - GET /api/referral/validate/{code} - Validate a referral code
@@ -40,16 +40,16 @@ public class ReferralController {
 
     /**
      * Set referral code for the current user (become a referee).
-     *
+     * <p>
      * This endpoint is called when:
      * - User registers with a referral code
      * - User adds bank account and enters referral code
-     *
+     * <p>
      * Business rules:
      * - User can only set referral code once
      * - Cannot use own referral code (self-referral)
      * - Referral code must belong to an active user
-     *
+     * <p>
      * Usage (Frontend):
      * <pre>
      * const response = await fetch('/api/referral/set-code', {
@@ -89,10 +89,10 @@ public class ReferralController {
 
     /**
      * Validate a referral code.
-     *
+     * <p>
      * This endpoint is used to check if a referral code is valid
      * before the user submits it. Provides immediate feedback.
-     *
+     * <p>
      * Usage (Frontend):
      * <pre>
      * const response = await fetch('/api/referral/validate/REFCODE1', {
@@ -124,13 +124,13 @@ public class ReferralController {
 
     /**
      * Get referral statistics for the current user.
-     *
+     * <p>
      * Returns comprehensive referral information including:
      * - User's own referral progress (as referee)
      * - User's referral earnings (as referrer)
      * - Milestone progress and achievements
      * - Commission summary
-     *
+     * <p>
      * Usage (Frontend):
      * <pre>
      * const response = await fetch('/api/referral/stats', {
@@ -166,7 +166,7 @@ public class ReferralController {
 
     /**
      * Get user's referral code (for sharing).
-     *
+     * <p>
      * Simplified endpoint to just get the user's referral code.
      *
      * @param jwt JWT token

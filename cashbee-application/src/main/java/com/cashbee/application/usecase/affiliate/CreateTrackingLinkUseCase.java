@@ -4,6 +4,7 @@ import com.cashbee.application.dto.affiliate.CreateTrackingLinkRequest;
 import com.cashbee.application.dto.affiliate.TrackingLinkResponse;
 import com.cashbee.application.util.affiliate.AffiliateLinkBuilder;
 import com.cashbee.application.util.affiliate.ShopeeAffiliateLinkBuilder;
+import com.cashbee.application.util.affiliate.ShopeeFoodAffiliateLinkBuilder;
 import com.cashbee.application.util.affiliate.ShopeeUrlParser;
 import com.cashbee.application.util.affiliate.TrackingCodeGenerator;
 import com.cashbee.common.exception.BusinessException;
@@ -23,12 +24,14 @@ import java.time.LocalDateTime;
 /**
  * Use case for creating an affiliate tracking link.
  *
+ * Supports both Shopee Mall and ShopeeFood URLs.
+ *
  * Flow:
- * 1. Parse Shopee URL to extract shop_id and item_id
- * 2. Get platform configuration (Shopee)
+ * 1. Parse URL to extract product/restaurant info and detect platform
+ * 2. Get platform configuration (shopee or shopeefood)
  * 3. Create AffiliateClick record (save to get ID)
  * 4. Generate unique tracking code
- * 5. Build affiliate tracking URL from template
+ * 5. Build affiliate tracking URL using appropriate builder
  * 6. Update AffiliateClick with tracking info
  * 7. Return tracking link to user
  *
@@ -45,6 +48,7 @@ public class CreateTrackingLinkUseCase {
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final AffiliateLinkBuilder linkBuilder;
     private final ShopeeAffiliateLinkBuilder shopeeAffiliateLinkBuilder;
+    private final ShopeeFoodAffiliateLinkBuilder shopeeFoodAffiliateLinkBuilder;
 
     /**
      * Execute use case to create tracking link.
@@ -65,21 +69,29 @@ public class CreateTrackingLinkUseCase {
         log.info("UseCase: Creating tracking link for authenticated user {} with URL: {}",
             userId, request.getShopeeUrl());
 
-        // Step 1: Parse Shopee URL
+        // Step 1: Parse URL (supports both Shopee Mall and ShopeeFood)
         ShopeeUrlParser.ParsedShopeeUrl parsedUrl;
         try {
             parsedUrl = urlParser.parse(request.getShopeeUrl());
-            log.info("UseCase: Parsed URL - Shop ID: {}, Item ID: {}",
-                parsedUrl.getShopId(), parsedUrl.getItemId());
+            log.info("UseCase: Parsed URL - Platform: {}, Item ID: {}, Shop ID: {}, Restaurant ID: {}",
+                parsedUrl.getPlatform(), parsedUrl.getItemId(),
+                parsedUrl.getShopId(), parsedUrl.getRestaurantId());
         } catch (IllegalArgumentException e) {
-            log.error("UseCase: Invalid Shopee URL: {}", request.getShopeeUrl(), e);
-            throw new BusinessException("Invalid Shopee URL format: " + e.getMessage());
+            log.error("UseCase: Invalid URL: {}", request.getShopeeUrl(), e);
+            throw new BusinessException("Invalid URL format: " + e.getMessage());
         }
 
-        // Step 2: Get platform (default to "shopee" if not specified)
-        String platformCode = request.getPlatformCode() != null
-            ? request.getPlatformCode()
-            : "shopee";
+        // Step 2: Determine platform code from parsed URL or request
+        // Priority: 1) Parsed URL platform, 2) Request platformCode, 3) Default "shopee"
+        String platformCode;
+        if (parsedUrl.getPlatform() != null) {
+            platformCode = parsedUrl.getPlatform();  // Auto-detected from URL
+        } else if (request.getPlatformCode() != null) {
+            platformCode = request.getPlatformCode();
+        } else {
+            platformCode = "shopee";
+        }
+        log.info("UseCase: Using platform: {}", platformCode);
 
         AffiliatePlatform platform = platformRepository.findByCode(platformCode)
             .orElseThrow(() -> {
@@ -103,9 +115,9 @@ public class CreateTrackingLinkUseCase {
             throw new BusinessException("Platform affiliate ID is not configured. Please contact admin.");
         }
 
-        // Note: For Shopee, link_template is not used (uses redirect service instead)
+        // Note: Shopee and ShopeeFood use redirect service, no link_template needed
         // For other platforms, link_template is still required
-        if (!"shopee".equalsIgnoreCase(platformCode)) {
+        if (!"shopee".equalsIgnoreCase(platformCode) && !"shopeefood".equalsIgnoreCase(platformCode)) {
             if (platform.getLinkTemplate() == null || platform.getLinkTemplate().isBlank()) {
                 log.error("UseCase: Platform link template is not configured: {}", platformCode);
                 throw new BusinessException("Platform link template is not configured. Please contact admin.");
@@ -119,31 +131,8 @@ public class CreateTrackingLinkUseCase {
         // Step 4: Build temporary tracking URL
         String tempTrackingUrl;
         try {
-            // Use Shopee-specific builder for Shopee platform
-            if ("shopee".equalsIgnoreCase(platformCode)) {
-                // IMPORTANT: Use expanded URL if available (for shortened links)
-                // parsedUrl.getUrlForAffiliateLink() returns:
-                // - expandedUrl if URL was a shortened link (s.shopee.vn)
-                // - originalUrl if URL was already a full Shopee URL
-                String urlForAffiliate = parsedUrl.getUrlForAffiliateLink();
-                log.debug("UseCase: Building affiliate link with URL: {}", urlForAffiliate);
-
-                tempTrackingUrl = shopeeAffiliateLinkBuilder.build(
-                    urlForAffiliate,  // Use expanded URL (if shortened) or original URL
-                    platform.getAffiliateId(),
-                    tempTrackingCode
-                );
-                log.info("UseCase: Built Shopee temporary tracking URL: {}", tempTrackingUrl);
-            } else {
-                // Use generic builder for other platforms
-                tempTrackingUrl = linkBuilder.build(
-                    platform,
-                    parsedUrl.getItemId(),
-                    parsedUrl.getShopId(),
-                    tempTrackingCode
-                );
-                log.info("UseCase: Built temporary tracking URL: {}", tempTrackingUrl);
-            }
+            tempTrackingUrl = buildTrackingUrl(parsedUrl, platform, platformCode, tempTrackingCode);
+            log.info("UseCase: Built temporary tracking URL: {}", tempTrackingUrl);
         } catch (IllegalArgumentException e) {
             log.error("UseCase: Failed to build tracking URL", e);
             throw new BusinessException("Failed to build tracking URL: " + e.getMessage());
@@ -176,28 +165,8 @@ public class CreateTrackingLinkUseCase {
         // Step 8: Build real affiliate tracking URL
         String trackingUrl;
         try {
-            // Use Shopee-specific builder for Shopee platform
-            if ("shopee".equalsIgnoreCase(platformCode)) {
-                // IMPORTANT: Use expanded URL if available (for shortened links)
-                String urlForAffiliate = parsedUrl.getUrlForAffiliateLink();
-                log.debug("UseCase: Building real affiliate link with URL: {}", urlForAffiliate);
-
-                trackingUrl = shopeeAffiliateLinkBuilder.build(
-                    urlForAffiliate,  // Use expanded URL (if shortened) or original URL
-                    platform.getAffiliateId(),
-                    trackingCode
-                );
-                log.info("UseCase: Built Shopee real tracking URL: {}", trackingUrl);
-            } else {
-                // Use generic builder for other platforms
-                trackingUrl = linkBuilder.build(
-                    platform,
-                    parsedUrl.getItemId(),
-                    parsedUrl.getShopId(),
-                    trackingCode
-                );
-                log.info("UseCase: Built real tracking URL: {}", trackingUrl);
-            }
+            trackingUrl = buildTrackingUrl(parsedUrl, platform, platformCode, trackingCode);
+            log.info("UseCase: Built real tracking URL: {}", trackingUrl);
         } catch (IllegalArgumentException e) {
             log.error("UseCase: Failed to build tracking URL", e);
             throw new BusinessException("Failed to build tracking URL: " + e.getMessage());
@@ -211,7 +180,7 @@ public class CreateTrackingLinkUseCase {
         log.info("UseCase: Successfully created tracking link for user {}, click ID {}",
             userId, savedClick.getId());
 
-        // Step 7: Build and return response
+        // Step 10: Build and return response
         return TrackingLinkResponse.builder()
             .clickId(savedClick.getId())
             .trackingUrl(trackingUrl)
@@ -226,5 +195,48 @@ public class CreateTrackingLinkUseCase {
             .createdAt(savedClick.getCreatedAt())
             .message("Click this link to shop on " + platform.getName() + " and earn cashback!")
             .build();
+    }
+
+    /**
+     * Build tracking URL using the appropriate builder based on platform.
+     *
+     * @param parsedUrl Parsed URL with product/restaurant info
+     * @param platform Platform configuration
+     * @param platformCode Platform code (shopee, shopeefood, etc.)
+     * @param trackingCode Unique tracking code
+     * @return Affiliate tracking URL
+     */
+    private String buildTrackingUrl(
+        ShopeeUrlParser.ParsedShopeeUrl parsedUrl,
+        AffiliatePlatform platform,
+        String platformCode,
+        String trackingCode
+    ) {
+        String urlForAffiliate = parsedUrl.getUrlForAffiliateLink();
+        log.debug("UseCase: Building affiliate link with URL: {}", urlForAffiliate);
+
+        if ("shopee".equalsIgnoreCase(platformCode)) {
+            // Use Shopee Mall builder
+            return shopeeAffiliateLinkBuilder.build(
+                urlForAffiliate,
+                platform.getAffiliateId(),
+                trackingCode
+            );
+        } else if ("shopeefood".equalsIgnoreCase(platformCode)) {
+            // Use ShopeeFood builder
+            return shopeeFoodAffiliateLinkBuilder.build(
+                urlForAffiliate,
+                platform.getAffiliateId(),
+                trackingCode
+            );
+        } else {
+            // Use generic builder for other platforms
+            return linkBuilder.build(
+                platform,
+                parsedUrl.getItemId(),
+                parsedUrl.getShopId(),
+                trackingCode
+            );
+        }
     }
 }

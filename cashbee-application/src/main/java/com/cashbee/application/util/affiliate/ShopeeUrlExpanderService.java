@@ -10,10 +10,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Service to expand Shopee shortened links (s.shopee.vn) to full product URLs.
+ * Service to expand Shopee/ShopeeFood shortened links to full URLs.
  *
- * Shopee shortened links format: https://s.shopee.vn/{short_code}
- * Example: https://s.shopee.vn/12Y5L6SJB
+ * Supported shortened link formats:
+ * - Shopee Mall: https://s.shopee.vn/{short_code}
+ * - Shopee Mall: https://{country}.shp.ee/{short_code}
+ * - Shopee Mall: https://shope.ee/{short_code}
+ * - ShopeeFood: https://shopeefood.shopee.vn/u/{short_code}
  *
  * This service follows HTTP redirects to get the final product URL,
  * which can then be parsed normally by ShopeeUrlParser.
@@ -160,12 +163,13 @@ public class ShopeeUrlExpanderService {
     }
 
     /**
-     * Check if a URL is a Shopee shortened link.
+     * Check if a URL is a Shopee/ShopeeFood shortened link.
      *
      * Supported shortened URL formats:
      * 1. s.shopee.{country} - e.g., https://s.shopee.vn/5Al0npFYE8
      * 2. {country}.shp.ee   - e.g., https://vn.shp.ee/S5hDghe (from Android app share)
      * 3. shope.ee           - e.g., https://shope.ee/3poh74Bvt2 (global affiliate link)
+     * 4. shopeefood.shopee.vn/u/ - e.g., https://shopeefood.shopee.vn/u/je8DiJT (ShopeeFood)
      *
      * @param url URL to check
      * @return true if this is a shortened link
@@ -182,16 +186,20 @@ public class ShopeeUrlExpanderService {
         }
 
         // Pattern 2: {country}.shp.ee (e.g., vn.shp.ee, id.shp.ee, ph.shp.ee, my.shp.ee)
-        // This format is used when sharing from Shopee Android app on some devices
         if (url.matches("https?://[a-z]{2}\\.shp\\.ee/.*")) {
             log.debug("Detected shortened URL format: {country}.shp.ee - {}", url);
             return true;
         }
 
         // Pattern 3: shope.ee (global affiliate short link)
-        // This format is used for Shopee affiliate links
         if (url.matches("https?://shope\\.ee/.*")) {
             log.debug("Detected shortened URL format: shope.ee (global) - {}", url);
+            return true;
+        }
+
+        // Pattern 4: shopeefood.shopee.vn/u/{code} (ShopeeFood shortened link)
+        if (url.matches("https?://shopeefood\\.shopee\\.vn/u/.*")) {
+            log.debug("Detected shortened URL format: shopeefood.shopee.vn/u/ - {}", url);
             return true;
         }
 

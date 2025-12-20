@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.*;
  * 4. System saves user to local database
  * 5. System auto-creates wallet with zero balance
  * 6. Returns user info + referral code
- * 7. User can immediately login using username/password
+ * 7. User can immediately log in using username/password
  *
  * @author CashBee Team
  */
@@ -176,7 +176,7 @@ public class AuthController {
     /**
      * Resend OTP verification email.
      * <p>
-     * If user didn't receive OTP or it expired, they can request a new one.
+     * If user didn't receive OTP, or it expired, they can request a new one.
      * Subject to cooldown period and daily limit.
      *
      * @param request Resend OTP request
