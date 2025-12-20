@@ -142,6 +142,29 @@ public interface CashbackRepository {
     int updateStatusByUserIdAndStatusWithBatchId(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId);
 
     /**
+     * Update status for unpaid cashbacks of a user that were CONFIRMED before batch creation.
+     *
+     * FIX: Only updates cashbacks where:
+     * 1. paidBatchId IS NULL (not yet paid)
+     * 2. confirmedAt <= batchCreatedAt (was CONFIRMED before batch was created)
+     *
+     * This prevents newly CONFIRMED cashbacks (after batch creation) from being marked as PAID.
+     *
+     * @param userId User ID
+     * @param oldStatus Current status to match (typically CONFIRMED)
+     * @param newStatus New status to set (typically PAID)
+     * @param batchId Batch ID that is paying these cashbacks
+     * @param batchCreatedAt Batch creation timestamp - only cashbacks confirmed before this are updated
+     * @return Number of records updated
+     */
+    int updateStatusByUserIdAndStatusWithBatchIdBeforeDate(
+            Long userId,
+            CashbackStatus oldStatus,
+            CashbackStatus newStatus,
+            Long batchId,
+            java.time.LocalDateTime batchCreatedAt);
+
+    /**
      * Find all cashbacks paid by a specific batch.
      * Used for traceability: batchCode → cashbacks → orders
      *

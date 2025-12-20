@@ -86,10 +86,10 @@ public class CompleteBatchTransferUseCase {
         int successCount = 0;
         int failCount = 0;
 
-        // 4. Process each item (pass batch.getId() for cashback tracking)
+        // 4. Process each item (pass batch.getId() and batch.getCreatedAt() for cashback tracking)
         for (BatchTransferItem item : items) {
             try {
-                processItem(item, batch.getId(), batchCode);
+                processItem(item, batch.getId(), batchCode, batch.getCreatedAt());
                 successCount++;
             } catch (Exception e) {
                 log.error("CompleteBatchTransferUseCase: Failed to process item {} for user {}: {}",
@@ -114,8 +114,9 @@ public class CompleteBatchTransferUseCase {
      * @param item Batch transfer item
      * @param batchId Batch ID for cashback tracking
      * @param batchCode Batch code for transaction description
+     * @param batchCreatedAt Batch creation timestamp - only cashbacks confirmed before this are updated
      */
-    private void processItem(BatchTransferItem item, Long batchId, String batchCode) {
+    private void processItem(BatchTransferItem item, Long batchId, String batchCode, LocalDateTime batchCreatedAt) {
         // 0. Validate: batch_transfer_item.amount should match sum of unpaid CONFIRMED cashbacks
         BigDecimal unpaidCashbackSum = cashbackRepository.sumUnpaidConfirmedCashbackByUserId(item.getUserId());
         if (unpaidCashbackSum.compareTo(item.getAmount()) != 0) {
@@ -174,16 +175,19 @@ public class CompleteBatchTransferUseCase {
         transactionRepository.save(transaction);
 
         // 5. Update cashback status: CONFIRMED → PAID (with batch tracking)
-        // Only updates cashbacks where paid_batch_id IS NULL (unpaid cashbacks)
+        // FIX: Only updates cashbacks where:
+        //   - paid_batch_id IS NULL (unpaid cashbacks)
+        //   - confirmedAt <= batchCreatedAt (was CONFIRMED before batch was created)
         // This ensures newly CONFIRMED cashbacks (after batch creation) are NOT updated
-        int updatedCashbacks = cashbackRepository.updateStatusByUserIdAndStatusWithBatchId(
+        int updatedCashbacks = cashbackRepository.updateStatusByUserIdAndStatusWithBatchIdBeforeDate(
                 item.getUserId(),
                 CashbackStatus.CONFIRMED,
                 CashbackStatus.PAID,
-                batchId  // Record which batch paid these cashbacks
+                batchId,
+                batchCreatedAt  // Only update cashbacks confirmed before batch creation
         );
-        log.debug("CompleteBatchTransferUseCase: Updated {} unpaid CONFIRMED cashbacks to PAID for user {} (batchId={})",
-                updatedCashbacks, item.getUserId(), batchId);
+        log.debug("CompleteBatchTransferUseCase: Updated {} CONFIRMED cashbacks (confirmedAt <= {}) to PAID for user {} (batchId={})",
+                updatedCashbacks, batchCreatedAt, item.getUserId(), batchId);
 
         // 6. Mark item as completed
         item.markAsCompleted();

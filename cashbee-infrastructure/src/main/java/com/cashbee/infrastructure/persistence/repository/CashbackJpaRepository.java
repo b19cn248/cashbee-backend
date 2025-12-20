@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -112,6 +113,24 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
      * Used for traceability: batchCode → cashbacks → orders
      */
     List<CashbackJpaEntity> findByPaidBatchId(Long paidBatchId);
+
+    /**
+     * Update status for unpaid cashbacks of a user that were CONFIRMED before batch creation.
+     *
+     * FIX: Only updates cashbacks where:
+     * 1. paidBatchId IS NULL (not yet paid)
+     * 2. confirmedAt <= batchCreatedAt (was CONFIRMED before batch was created)
+     *
+     * This prevents newly CONFIRMED cashbacks (after batch creation) from being marked as PAID.
+     */
+    @Modifying
+    @Query("UPDATE CashbackJpaEntity c SET c.status = :newStatus, c.paidAt = CURRENT_TIMESTAMP, c.updatedAt = CURRENT_TIMESTAMP, c.paidBatchId = :batchId WHERE c.userId = :userId AND c.status = :oldStatus AND c.paidBatchId IS NULL AND c.confirmedAt <= :batchCreatedAt")
+    int updateStatusByUserIdAndStatusWithBatchIdBeforeDate(
+            @Param("userId") Long userId,
+            @Param("oldStatus") CashbackStatus oldStatus,
+            @Param("newStatus") CashbackStatus newStatus,
+            @Param("batchId") Long batchId,
+            @Param("batchCreatedAt") LocalDateTime batchCreatedAt);
 
     /**
      * Sum cashback amount for unpaid CONFIRMED cashbacks of a user.

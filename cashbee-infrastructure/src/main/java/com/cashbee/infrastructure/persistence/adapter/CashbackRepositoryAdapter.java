@@ -110,6 +110,17 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     }
 
     @Override
+    public int updateStatusByUserIdAndStatusWithBatchIdBeforeDate(
+            Long userId,
+            CashbackStatus oldStatus,
+            CashbackStatus newStatus,
+            Long batchId,
+            java.time.LocalDateTime batchCreatedAt) {
+        return jpaRepository.updateStatusByUserIdAndStatusWithBatchIdBeforeDate(
+                userId, oldStatus, newStatus, batchId, batchCreatedAt);
+    }
+
+    @Override
     public List<Cashback> findByPaidBatchId(Long batchId) {
         return jpaRepository.findByPaidBatchId(batchId).stream()
             .map(mapper::toDomain)
