@@ -2,15 +2,19 @@ package com.cashbee.presentation.controller;
 
 import com.cashbee.application.dto.user.CheckEmailExistsResponse;
 import com.cashbee.application.dto.user.CheckPhoneExistsResponse;
+import com.cashbee.application.dto.user.CheckReferralCodeExistsResponse;
 import com.cashbee.application.dto.user.CheckReferredByExistsResponse;
+import com.cashbee.application.dto.user.UpdatePhoneAndReferralCommand;
 import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UpdateUserLevelCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.dto.user.UserSyncCommand;
 import com.cashbee.application.usecase.user.CheckUserExistsByEmailUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByPhoneUseCase;
+import com.cashbee.application.usecase.user.CheckUserExistsByReferralCodeUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByReferredByUseCase;
 import com.cashbee.application.usecase.user.GetUserByKeycloakIdUseCase;
+import com.cashbee.application.usecase.user.UpdatePhoneAndReferralUseCase;
 import com.cashbee.application.usecase.user.SyncUserFromKeycloakUseCase;
 import com.cashbee.application.usecase.user.UpdateUserLevelUseCase;
 import com.cashbee.application.usecase.user.UpdateUserUseCase;
@@ -57,8 +61,10 @@ public class UserController {
   private final GetUserByKeycloakIdUseCase getUserByKeycloakIdUseCase;
   private final UpdateUserUseCase updateUserUseCase;
   private final UpdateUserLevelUseCase updateUserLevelUseCase;
+  private final UpdatePhoneAndReferralUseCase updatePhoneAndReferralUseCase;
   private final CheckUserExistsByEmailUseCase checkUserExistsByEmailUseCase;
   private final CheckUserExistsByPhoneUseCase checkUserExistsByPhoneUseCase;
+  private final CheckUserExistsByReferralCodeUseCase checkUserExistsByReferralCodeUseCase;
   private final CheckUserExistsByReferredByUseCase checkUserExistsByReferredByUseCase;
   private final SecurityUtils securityUtils;
 
@@ -192,6 +198,59 @@ public class UserController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(ApiResponse.success(user, "User updated successfully"));
+  }
+
+  /**
+   * Update phone number and referral code for current user.
+   * <p>
+   * This is a simplified API that only updates 2 fields:
+   * - phone: Phone number
+   * - referredBy: Referral code of the person who referred this user
+   * <p>
+   * Both fields are optional - only provided fields will be updated.
+   * <p>
+   * Note: referredBy can only be set once. If user already has referredBy,
+   * it cannot be changed.
+   * <p>
+   * Usage (Frontend):
+   * <pre>
+   * const response = await fetch('/api/users/me/phone-referral', {
+   *   method: 'PUT',
+   *   headers: {
+   *     'Authorization': `Bearer ${token}`,
+   *     'Content-Type': 'application/json'
+   *   },
+   *   body: JSON.stringify({
+   *     phone: "0987654321",
+   *     referredBy: "CB4F7A9K"
+   *   })
+   * });
+   * </pre>
+   *
+   * @param jwt     JWT token (auto-injected by Spring Security)
+   * @param command Command containing phone and/or referredBy
+   * @return Updated user information
+   */
+  @PutMapping("/me/phone-referral")
+  @Operation(summary = "Update phone and referral code",
+      description = "Update current user's phone number and referral code")
+  public ResponseEntity<ApiResponse<UserResponse>> updatePhoneAndReferral(
+      @AuthenticationPrincipal Jwt jwt,
+      @Valid @RequestBody UpdatePhoneAndReferralCommand command) {
+
+    log.info("API: Updating phone and referral for current user");
+
+    // Extract keycloakId from JWT
+    String keycloakId = securityUtils.getKeycloakUserId(jwt);
+
+    // Execute update
+    UserResponse user = updatePhoneAndReferralUseCase.execute(keycloakId, command);
+
+    log.info("API: Phone and referral updated successfully: userId={}", user.getId());
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ApiResponse.success(user, "Phone and referral updated successfully"));
   }
 
   /**
@@ -347,6 +406,52 @@ public class UserController {
     CheckReferredByExistsResponse response = checkUserExistsByReferredByUseCase.execute(referredBy);
 
     log.info("API: ReferredBy {} exists: {}", referredBy, response.isExists());
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ApiResponse.success(response));
+  }
+
+  /**
+   * Check if referral code exists in the system.
+   * <p>
+   * This endpoint checks if the given referral code belongs to any user in the system.
+   * <p>
+   * Note the difference:
+   * - referralCode: The code OF a user (user creates to share with others)
+   * - referredBy: The code a user USED during registration (code of the person who referred them)
+   * <p>
+   * Use case:
+   * - Before user enters a referral code, validate if it's a valid code that belongs to someone
+   * <p>
+   * Usage:
+   * <pre>
+   * GET /api/users/check-referral-code?referralCode=CB4F7A9K
+   *
+   * Response:
+   * {
+   *   "status": "success",
+   *   "data": {
+   *     "referralCode": "CB4F7A9K",
+   *     "exists": true
+   *   }
+   * }
+   * </pre>
+   *
+   * @param referralCode Referral code to check
+   * @return Response containing referralCode and exists flag (true/false)
+   */
+  @GetMapping("/check-referral-code")
+  @Operation(summary = "Check if referral code exists",
+      description = "Check if a referral code belongs to any user in the system")
+  public ResponseEntity<ApiResponse<CheckReferralCodeExistsResponse>> checkReferralCodeExists(
+      @RequestParam String referralCode) {
+
+    log.info("API: Checking if referralCode exists: {}", referralCode);
+
+    CheckReferralCodeExistsResponse response = checkUserExistsByReferralCodeUseCase.execute(referralCode);
+
+    log.info("API: ReferralCode {} exists: {}", referralCode, response.isExists());
 
     return ResponseEntity
         .status(HttpStatus.OK)
