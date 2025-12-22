@@ -85,6 +85,9 @@ public class SecurityConfig {
                 "/api/v1/n8n/**",
                 "/api/v1/notifications",
                 "/api/v1/gemini/generate",
+                "/api/users/check-referred-by",
+                "/api/users/check-email",
+                "/api/users/check-phone",
                 // Affiliate tracking redirect endpoints - Public (no auth required)
                 // These are the actual tracking links that users click
                 "/api/affiliate/tracking/redirect/**",

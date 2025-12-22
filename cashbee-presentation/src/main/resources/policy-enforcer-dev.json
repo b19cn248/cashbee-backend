@@ -35,6 +35,18 @@
     {
       "path": "/api/auth/resend-otp/*",
       "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/users/check-referred-by",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/users/check-email",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/users/check-phone",
+      "enforcement-mode": "DISABLED"
     }
   ]
 }

@@ -112,6 +112,23 @@ public interface UserRepository {
     boolean existsByReferralCode(String referralCode);
 
     /**
+     * Check if user exists by phone number.
+     *
+     * @param phone Phone number
+     * @return true if phone number exists
+     */
+    boolean existsByPhone(String phone);
+
+    /**
+     * Check if user exists by referredBy code.
+     * This checks if someone has already used this referral code when registering.
+     *
+     * @param referredBy Referral code used during registration
+     * @return true if someone has already used this referral code
+     */
+    boolean existsByReferredBy(String referredBy);
+
+    /**
      * Find all users referred by a specific referral code.
      *
      * @param referralCode Referral code

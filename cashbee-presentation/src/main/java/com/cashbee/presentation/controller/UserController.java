@@ -1,11 +1,15 @@
 package com.cashbee.presentation.controller;
 
 import com.cashbee.application.dto.user.CheckEmailExistsResponse;
+import com.cashbee.application.dto.user.CheckPhoneExistsResponse;
+import com.cashbee.application.dto.user.CheckReferredByExistsResponse;
 import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UpdateUserLevelCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.dto.user.UserSyncCommand;
 import com.cashbee.application.usecase.user.CheckUserExistsByEmailUseCase;
+import com.cashbee.application.usecase.user.CheckUserExistsByPhoneUseCase;
+import com.cashbee.application.usecase.user.CheckUserExistsByReferredByUseCase;
 import com.cashbee.application.usecase.user.GetUserByKeycloakIdUseCase;
 import com.cashbee.application.usecase.user.SyncUserFromKeycloakUseCase;
 import com.cashbee.application.usecase.user.UpdateUserLevelUseCase;
@@ -54,6 +58,8 @@ public class UserController {
   private final UpdateUserUseCase updateUserUseCase;
   private final UpdateUserLevelUseCase updateUserLevelUseCase;
   private final CheckUserExistsByEmailUseCase checkUserExistsByEmailUseCase;
+  private final CheckUserExistsByPhoneUseCase checkUserExistsByPhoneUseCase;
+  private final CheckUserExistsByReferredByUseCase checkUserExistsByReferredByUseCase;
   private final SecurityUtils securityUtils;
 
   /**
@@ -255,6 +261,92 @@ public class UserController {
     CheckEmailExistsResponse response = checkUserExistsByEmailUseCase.execute(email);
 
     log.info("API: Email {} exists: {}", email, response.isExists());
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ApiResponse.success(response));
+  }
+
+  /**
+   * Check if phone number already exists in the system.
+   * <p>
+   * This endpoint is useful for:
+   * - Checking phone number before registration
+   * - Validating phone in forms
+   * - Preventing duplicate user creation
+   * <p>
+   * Usage:
+   * <pre>
+   * GET /api/users/check-phone?phone=0987654321
+   *
+   * Response:
+   * {
+   *   "status": "success",
+   *   "data": {
+   *     "phone": "0987654321",
+   *     "exists": true
+   *   }
+   * }
+   * </pre>
+   *
+   * @param phone Phone number to check
+   * @return Response containing phone and exists flag (true/false)
+   */
+  @GetMapping("/check-phone")
+  @Operation(summary = "Check if phone exists",
+      description = "Check if a phone number is already registered in the system")
+  public ResponseEntity<ApiResponse<CheckPhoneExistsResponse>> checkPhoneExists(
+      @RequestParam String phone) {
+
+    log.info("API: Checking if phone exists: {}", phone);
+
+    CheckPhoneExistsResponse response = checkUserExistsByPhoneUseCase.execute(phone);
+
+    log.info("API: Phone {} exists: {}", phone, response.isExists());
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ApiResponse.success(response));
+  }
+
+  /**
+   * Check if referral code has been used by someone during registration.
+   * <p>
+   * This endpoint checks if the given referral code (referredBy) has already been
+   * used by another user when they registered.
+   * <p>
+   * Note the difference:
+   * - referralCode: The code OF a user (user creates to share with others)
+   * - referredBy: The code a user USED during registration (code of the person who referred them)
+   * <p>
+   * Usage:
+   * <pre>
+   * GET /api/users/check-referred-by?referredBy=CB123456
+   *
+   * Response:
+   * {
+   *   "status": "success",
+   *   "data": {
+   *     "referredBy": "CB123456",
+   *     "exists": true
+   *   }
+   * }
+   * </pre>
+   *
+   * @param referredBy Referral code to check
+   * @return Response containing referredBy and exists flag (true/false)
+   */
+  @GetMapping("/check-referred-by")
+  @Operation(summary = "Check if referral code is used",
+      description = "Check if a referral code has already been used by someone during registration")
+  public ResponseEntity<ApiResponse<CheckReferredByExistsResponse>> checkReferredByExists(
+      @RequestParam String referredBy) {
+
+    log.info("API: Checking if referredBy exists: {}", referredBy);
+
+    CheckReferredByExistsResponse response = checkUserExistsByReferredByUseCase.execute(referredBy);
+
+    log.info("API: ReferredBy {} exists: {}", referredBy, response.isExists());
 
     return ResponseEntity
         .status(HttpStatus.OK)
