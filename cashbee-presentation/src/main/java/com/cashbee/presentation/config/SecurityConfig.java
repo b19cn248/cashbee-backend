@@ -86,6 +86,7 @@ public class SecurityConfig {
                 "/api/v1/notifications",
                 "/api/v1/gemini/generate",
                 "/api/users/check-referral-code",
+                "/api/users/check-has-referrer",
                 "/api/users/check-email",
                 "/api/users/check-phone",
                 // Affiliate tracking redirect endpoints - Public (no auth required)

@@ -47,6 +47,10 @@
     {
       "path": "/api/users/check-phone",
       "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/users/check-has-referrer",
+      "enforcement-mode": "DISABLED"
     }
   ]
 }

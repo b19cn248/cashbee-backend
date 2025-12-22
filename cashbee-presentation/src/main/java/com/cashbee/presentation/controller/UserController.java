@@ -4,6 +4,7 @@ import com.cashbee.application.dto.user.CheckEmailExistsResponse;
 import com.cashbee.application.dto.user.CheckPhoneExistsResponse;
 import com.cashbee.application.dto.user.CheckReferralCodeExistsResponse;
 import com.cashbee.application.dto.user.CheckReferredByExistsResponse;
+import com.cashbee.application.dto.user.CheckUserHasReferrerResponse;
 import com.cashbee.application.dto.user.UpdatePhoneAndReferralCommand;
 import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UpdateUserLevelCommand;
@@ -13,6 +14,7 @@ import com.cashbee.application.usecase.user.CheckUserExistsByEmailUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByPhoneUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByReferralCodeUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByReferredByUseCase;
+import com.cashbee.application.usecase.user.CheckUserHasReferrerByEmailUseCase;
 import com.cashbee.application.usecase.user.GetUserByKeycloakIdUseCase;
 import com.cashbee.application.usecase.user.UpdatePhoneAndReferralUseCase;
 import com.cashbee.application.usecase.user.SyncUserFromKeycloakUseCase;
@@ -66,6 +68,7 @@ public class UserController {
   private final CheckUserExistsByPhoneUseCase checkUserExistsByPhoneUseCase;
   private final CheckUserExistsByReferralCodeUseCase checkUserExistsByReferralCodeUseCase;
   private final CheckUserExistsByReferredByUseCase checkUserExistsByReferredByUseCase;
+  private final CheckUserHasReferrerByEmailUseCase checkUserHasReferrerByEmailUseCase;
   private final SecurityUtils securityUtils;
 
   /**
@@ -452,6 +455,51 @@ public class UserController {
     CheckReferralCodeExistsResponse response = checkUserExistsByReferralCodeUseCase.execute(referralCode);
 
     log.info("API: ReferralCode {} exists: {}", referralCode, response.isExists());
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ApiResponse.success(response));
+  }
+
+  /**
+   * Check if user has a referrer (referredBy) based on email.
+   * <p>
+   * This endpoint checks if the user with the given email has already
+   * entered a referral code (referredBy field is not null/empty).
+   * <p>
+   * Use case:
+   * - Frontend can show/hide the referral code input form based on this result
+   * - If hasReferrer is true, user has already entered a referral code
+   * - If hasReferrer is false, user can still enter a referral code
+   * <p>
+   * Usage:
+   * <pre>
+   * GET /api/users/check-has-referrer?email=test@gmail.com
+   *
+   * Response:
+   * {
+   *   "status": "success",
+   *   "data": {
+   *     "email": "test@gmail.com",
+   *     "hasReferrer": true
+   *   }
+   * }
+   * </pre>
+   *
+   * @param email Email of the user to check
+   * @return Response containing email and hasReferrer flag (true/false)
+   */
+  @GetMapping("/check-has-referrer")
+  @Operation(summary = "Check if user has referrer",
+      description = "Check if user with given email has already entered a referral code")
+  public ResponseEntity<ApiResponse<CheckUserHasReferrerResponse>> checkUserHasReferrer(
+      @RequestParam @Email(message = "Invalid email format") String email) {
+
+    log.info("API: Checking if user has referrer by email: {}", email);
+
+    CheckUserHasReferrerResponse response = checkUserHasReferrerByEmailUseCase.execute(email);
+
+    log.info("API: User with email {} has referrer: {}", email, response.isHasReferrer());
 
     return ResponseEntity
         .status(HttpStatus.OK)
