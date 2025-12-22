@@ -37,7 +37,7 @@
       "enforcement-mode": "DISABLED"
     },
     {
-      "path": "/api/users/check-referred-by",
+      "path": "/api/users/check-referral-code",
       "enforcement-mode": "DISABLED"
     },
     {
