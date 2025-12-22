@@ -1,9 +1,11 @@
 package com.cashbee.presentation.controller;
 
+import com.cashbee.application.dto.user.CheckEmailExistsResponse;
 import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UpdateUserLevelCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.dto.user.UserSyncCommand;
+import com.cashbee.application.usecase.user.CheckUserExistsByEmailUseCase;
 import com.cashbee.application.usecase.user.GetUserByKeycloakIdUseCase;
 import com.cashbee.application.usecase.user.SyncUserFromKeycloakUseCase;
 import com.cashbee.application.usecase.user.UpdateUserLevelUseCase;
@@ -13,6 +15,7 @@ import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -49,6 +53,7 @@ public class UserController {
   private final GetUserByKeycloakIdUseCase getUserByKeycloakIdUseCase;
   private final UpdateUserUseCase updateUserUseCase;
   private final UpdateUserLevelUseCase updateUserLevelUseCase;
+  private final CheckUserExistsByEmailUseCase checkUserExistsByEmailUseCase;
   private final SecurityUtils securityUtils;
 
   /**
@@ -212,5 +217,47 @@ public class UserController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(ApiResponse.success(user, "User level updated successfully"));
+  }
+
+  /**
+   * Check if email already exists in the system.
+   * <p>
+   * This endpoint is useful for:
+   * - Checking email before registration
+   * - Validating email in forms
+   * - Preventing duplicate user creation
+   * <p>
+   * Usage:
+   * <pre>
+   * GET /api/users/check-email?email=test@gmail.com
+   *
+   * Response:
+   * {
+   *   "status": "success",
+   *   "data": {
+   *     "email": "test@gmail.com",
+   *     "exists": true
+   *   }
+   * }
+   * </pre>
+   *
+   * @param email Email to check
+   * @return Response containing email and exists flag (true/false)
+   */
+  @GetMapping("/check-email")
+  @Operation(summary = "Check if email exists",
+      description = "Check if an email address is already registered in the system")
+  public ResponseEntity<ApiResponse<CheckEmailExistsResponse>> checkEmailExists(
+      @RequestParam @Email(message = "Invalid email format") String email) {
+
+    log.info("API: Checking if email exists: {}", email);
+
+    CheckEmailExistsResponse response = checkUserExistsByEmailUseCase.execute(email);
+
+    log.info("API: Email {} exists: {}", email, response.isExists());
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ApiResponse.success(response));
   }
 }
