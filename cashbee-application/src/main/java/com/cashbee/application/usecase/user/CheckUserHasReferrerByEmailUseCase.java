@@ -24,11 +24,12 @@ import java.time.LocalDateTime;
 public class CheckUserHasReferrerByEmailUseCase {
 
     /**
-     * Ngày cutoff: chỉ user tạo SAU thời điểm này mới được nhập mã giới thiệu.
-     * User tạo trước hoặc bằng thời điểm này sẽ bị coi như đã có referrer.
+     * Ngày cutoff: phân biệt user cũ và user mới.
+     * - User cũ (tạo TRƯỚC thời điểm này) → hasReferrer = false luôn
+     * - User mới (tạo TỪ thời điểm này trở đi) → kiểm tra referredBy
      */
     private static final LocalDateTime REFERRAL_CUTOFF_DATE =
-            LocalDateTime.of(2025, 12, 22, 21, 31, 31);
+            LocalDateTime.of(2025, 12, 21, 21, 26, 0);
 
     private final UserRepository userRepository;
 
@@ -48,12 +49,13 @@ public class CheckUserHasReferrerByEmailUseCase {
                 .orElseThrow(() -> NotFoundException.ofField("User", "email", email));
 
         // 2. Kiểm tra điều kiện:
-        //    - User cũ (tạo trước/bằng cutoff) → hasReferrer = true (không cho nhập mã)
-        //    - User mới (tạo sau cutoff) → kiểm tra referredBy có giá trị chưa
+        //    - User cũ (tạo TRƯỚC cutoff) → hasReferrer = false luôn
+        //    - User mới (tạo TỪ cutoff trở đi) → kiểm tra referredBy có giá trị chưa
         boolean isOldUser = user.getCreatedAt() == null
-                || !user.getCreatedAt().isAfter(REFERRAL_CUTOFF_DATE);
+                || user.getCreatedAt().isBefore(REFERRAL_CUTOFF_DATE);
 
-        boolean hasReferrer = isOldUser || user.hasReferrer();
+        // User cũ → false luôn, User mới → check referrer
+        boolean hasReferrer = !isOldUser && user.hasReferrer();
 
         log.debug("User with email {}: createdAt={}, isOldUser={}, hasReferrer={}",
                 email, user.getCreatedAt(), isOldUser, hasReferrer);
