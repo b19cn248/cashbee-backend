@@ -49,13 +49,13 @@ public class CheckUserHasReferrerByEmailUseCase {
                 .orElseThrow(() -> NotFoundException.ofField("User", "email", email));
 
         // 2. Kiểm tra điều kiện:
-        //    - User cũ (tạo TRƯỚC cutoff) → hasReferrer = false luôn
+        //    - User cũ (tạo TRƯỚC cutoff) → hasReferrer = true luôn (ẩn form nhập mã)
         //    - User mới (tạo TỪ cutoff trở đi) → kiểm tra referredBy có giá trị chưa
         boolean isOldUser = user.getCreatedAt() == null
                 || user.getCreatedAt().isBefore(REFERRAL_CUTOFF_DATE);
 
-        // User cũ → false luôn, User mới → check referrer
-        boolean hasReferrer = !isOldUser && user.hasReferrer();
+        // User cũ → true luôn (ẩn form), User mới → check referrer
+        boolean hasReferrer = isOldUser || user.hasReferrer();
 
         log.debug("User with email {}: createdAt={}, isOldUser={}, hasReferrer={}",
                 email, user.getCreatedAt(), isOldUser, hasReferrer);
