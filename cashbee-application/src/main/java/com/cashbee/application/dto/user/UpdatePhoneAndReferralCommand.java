@@ -26,9 +26,9 @@ public class UpdatePhoneAndReferralCommand {
 
     /**
      * Số điện thoại (định dạng Việt Nam: 0XXXXXXXXX).
-     * Optional - chỉ update nếu được cung cấp.
+     * Optional - có thể null hoặc rỗng. Nếu có giá trị thì phải đúng định dạng.
      */
-    @Pattern(regexp = "^0\\d{9}$", message = "Phone must be 10 digits starting with 0")
+    @Pattern(regexp = "^(0\\d{9})?$", message = "Phone must be 10 digits starting with 0")
     private String phone;
 
     /**
