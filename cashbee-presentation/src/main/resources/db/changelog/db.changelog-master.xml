@@ -84,4 +84,10 @@
     <!-- Batch Cashback Snapshot for accurate batch completion -->
     <include file="db/changelog/039-create-batch-cashback-snapshot-table.xml"/>
 
+    <!-- VPBank batch transfer format - add vpbank_code (9 digits) -->
+    <include file="db/changelog/041-add-vpbank-code-to-bank.xml"/>
+
+    <!-- Fix vpbank_code values after migration update -->
+    <include file="db/changelog/042-fix-vpbank-code-checksum.xml"/>
+
 </databaseChangeLog>

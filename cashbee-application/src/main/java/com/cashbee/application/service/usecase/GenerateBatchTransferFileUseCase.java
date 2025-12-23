@@ -162,7 +162,7 @@ public class GenerateBatchTransferFileUseCase {
      * Query eligible users with bank account details.
      *
      * Returns realtime data from database.
-     * Includes vietinbank_code from bank table for VietinBank template support.
+     * Includes vpbank_code (9-digit) and vietinbank_code from bank table.
      */
     private List<BatchTransferRow> queryEligibleUsersWithBankAccounts(BigDecimal minBalance, String remarkTemplate) {
         String sql = """
@@ -173,6 +173,7 @@ public class GenerateBatchTransferFileUseCase {
                     uba.account_name,
                     uba.bank_name,
                     uba.bank_code,
+                    b.vpbank_code,
                     b.vietinbank_code,
                     COALESCE(b.vpbank_id, b.id) as vpbank_id
                 FROM user u
@@ -209,6 +210,7 @@ public class GenerateBatchTransferFileUseCase {
                     bti.account_name,
                     bti.bank_name,
                     uba.bank_code,
+                    b.vpbank_code,
                     b.vietinbank_code,
                     COALESCE(b.vpbank_id, b.id) as vpbank_id
                 FROM batch_transfer_item bti
@@ -232,7 +234,7 @@ public class GenerateBatchTransferFileUseCase {
 
     /**
      * Row mapper for BatchTransferRow (used for fresh query with minBalance).
-     * Maps database result to DTO including vietinbank_code.
+     * Maps database result to DTO including vpbank_code and vietinbank_code.
      */
     private static class BatchTransferRowMapper implements RowMapper<BatchTransferRow> {
 
@@ -251,11 +253,14 @@ public class GenerateBatchTransferFileUseCase {
                     .accountNumber(rs.getString("account_number"))
                     .accountName(rs.getString("account_name"))
                     .amount(rs.getBigDecimal("balance"))
+                    .currency("VND")  // Default currency for CashBee
                     .bankName(rs.getString("bank_name"))
                     .bankCode(rs.getString("bank_code"))
+                    .vpbankCode(rs.getString("vpbank_code"))
                     .vietinbankCode(rs.getString("vietinbank_code"))
                     .vpbankId(rs.getInt("vpbank_id"))
                     .remark(remarkTemplate)
+                    .charges("OUR")  // Default: sender pays fees
                     .build();
         }
     }
@@ -281,11 +286,14 @@ public class GenerateBatchTransferFileUseCase {
                     .accountNumber(rs.getString("account_number"))
                     .accountName(rs.getString("account_name"))
                     .amount(rs.getBigDecimal("amount"))  // từ batch_transfer_item, không phải balance
+                    .currency("VND")  // Default currency for CashBee
                     .bankName(rs.getString("bank_name"))
                     .bankCode(rs.getString("bank_code"))
+                    .vpbankCode(rs.getString("vpbank_code"))
                     .vietinbankCode(rs.getString("vietinbank_code"))
                     .vpbankId(rs.getInt("vpbank_id"))
                     .remark(remarkTemplate)
+                    .charges("OUR")  // Default: sender pays fees
                     .build();
         }
     }

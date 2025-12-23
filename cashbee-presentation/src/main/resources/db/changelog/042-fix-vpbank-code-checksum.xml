@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 042: Fix vpbank_code values after migration update
+        Author: CashBee Team
+        Date: 2025-12-23
+        Description: Re-apply correct vpbank_code values since changeset 041 was modified
+                     This is safe because UPDATE statements are idempotent
+    -->
+
+    <changeSet id="042-fix-vpbank-code-values" author="cashbee">
+        <comment>Re-apply vpbank_code values with correct bank_code mappings</comment>
+
+        <!-- Big 4 Banks -->
+        <update tableName="bank">
+            <column name="vpbank_code" value="101204001"/>
+            <where>bank_code = 'AGRIBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101201001"/>
+            <where>bank_code = 'VIETINBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101202021"/>
+            <where>bank_code = 'BIDV'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101203001"/>
+            <where>bank_code = 'VIETCOMBANK'</where>
+        </update>
+
+        <!-- Other Major Banks - using ACTUAL bank_code from 022-seed-banks.xml -->
+        <update tableName="bank">
+            <column name="vpbank_code" value="101310001"/>
+            <where>bank_code = 'TCB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101311001"/>
+            <where>bank_code = 'MB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101307001"/>
+            <where>bank_code = 'ACB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101348002"/>
+            <where>bank_code = 'SHB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101358001"/>
+            <where>bank_code = 'TPB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101321001"/>
+            <where>bank_code = 'HDBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101323001"/>
+            <where>bank_code = 'ABBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101305001"/>
+            <where>bank_code = 'EIB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101317001"/>
+            <where>bank_code = 'SEABANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101302001"/>
+            <where>bank_code = 'MSB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101306001"/>
+            <where>bank_code = 'NAMABANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="140313001"/>
+            <where>bank_code = 'BAB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101357001"/>
+            <where>bank_code = 'LPBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101359001"/>
+            <where>bank_code = 'BVB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101360002"/>
+            <where>bank_code = 'PVCOMBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101355001"/>
+            <where>bank_code = 'VAB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="179356001"/>
+            <where>bank_code = 'VIETBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="191353001"/>
+            <where>bank_code = 'KIENLONGBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101319001"/>
+            <where>bank_code = 'OJB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101320001"/>
+            <where>bank_code = 'GPBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101341001"/>
+            <where>bank_code = 'PGBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101303001"/>
+            <where>bank_code = 'SACOMBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101334001"/>
+            <where>bank_code = 'SCB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101314001"/>
+            <where>bank_code = 'VIB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101333001"/>
+            <where>bank_code = 'OCB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101352001"/>
+            <where>bank_code = 'NCB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101308001"/>
+            <where>bank_code = 'SAIGONBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101304001"/>
+            <where>bank_code = 'DAB'</where>
+        </update>
+
+        <!-- Foreign Banks -->
+        <update tableName="bank">
+            <column name="vpbank_code" value="101604001"/>
+            <where>bank_code = 'STANDARDCHARTERED'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101617001"/>
+            <where>bank_code = 'HSBC'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101616001"/>
+            <where>bank_code = 'SHINHAN'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101663001"/>
+            <where>bank_code = 'WRB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101665001"/>
+            <where>bank_code = 'UOB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101661001"/>
+            <where>bank_code = 'CIMB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101901001"/>
+            <where>bank_code = 'COOPBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="vpbank_code" value="101207001"/>
+            <where>bank_code = 'VBSP'</where>
+        </update>
+
+    </changeSet>
+
+</databaseChangeLog>

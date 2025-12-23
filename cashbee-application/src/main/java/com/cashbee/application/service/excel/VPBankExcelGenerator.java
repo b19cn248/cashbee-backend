@@ -5,13 +5,14 @@ import com.cashbee.common.exception.BusinessException;
 import com.cashbee.domain.enums.BankTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.hssf.usermodel.*;
+import org.apache.poi.hssf.usermodel.HSSFCellStyle;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.util.List;
@@ -19,15 +20,30 @@ import java.util.regex.Pattern;
 
 /**
  * Service to generate VPBank batch transfer Excel file (.xls format).
- * <p>
- * VPBank template structure (7 columns):
- * - Col 0: # (STT)
- * - Col 1: Số Tài Khoản (Account Number)
- * - Col 2: Tên Tài Khoản (Account Name) - UPPERCASE, no accents
- * - Col 3: Số Tiền (Amount) - integer, no formatting
- * - Col 4: Ngân Hàng Hưởng (Bank) - bank code like TCB, VCB
- * - Col 5: BANKID - VPBank internal bank ID (integer)
- * - Col 6: Nội Dung (Remark) - no accents
+ *
+ * <p>Generates file matching VPBank TTTN (Thanh Toan Trong Nuoc) template with 11 columns:
+ * <ol>
+ *   <li>STT - Row number</li>
+ *   <li>Account - Bank account number</li>
+ *   <li>Currency - Currency code (VND)</li>
+ *   <li>Ben_Name - Beneficiary name (uppercase, no Vietnamese)</li>
+ *   <li>Bank_Code - VPBank 9-digit code (empty for internal VPBank)</li>
+ *   <li>Bank_Name - Bank short name</li>
+ *   <li>Branch_Name - Branch (empty for internal VPBank)</li>
+ *   <li>City_Name - City (empty for internal VPBank)</li>
+ *   <li>Amount - Transfer amount (integer for VND)</li>
+ *   <li>Details - Payment description (no Vietnamese)</li>
+ *   <li>Charges - Fee type: OUR or BEN</li>
+ * </ol>
+ *
+ * <p>Rules from VPBank TTTN_HUONG DAN:
+ * <ul>
+ *   <li>No Vietnamese characters allowed</li>
+ *   <li>No special characters (only: SPACE A-Za-z0-9.+-)(,)</li>
+ *   <li>No empty rows</li>
+ *   <li>VND amounts must be integers (no decimal point)</li>
+ *   <li>For internal VPBank transfers: Bank_Code, Branch_Name, City_Name are empty</li>
+ * </ul>
  *
  * @author CashBee Team
  */
@@ -36,8 +52,30 @@ import java.util.regex.Pattern;
 @Slf4j
 public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
 
-    private static final String TEMPLATE_PATH = "templates/vpbank_template.xls";
-    private static final String DEFAULT_REMARK = "CASHBEE HOAN TIEN";
+    /**
+     * Allowed characters for VPBank fields (from TTTN_HUONG DAN).
+     */
+    private static final String ALLOWED_CHARS_REGEX = "[^A-Za-z0-9 .+\\-)(,]";
+    private static final Pattern ALLOWED_CHARS_PATTERN = Pattern.compile(ALLOWED_CHARS_REGEX);
+
+    /**
+     * Header names matching VPBank TTTN template exactly.
+     */
+    private static final String[] HEADERS = {
+            "STT",
+            "Account",
+            "Currency",
+            "Ben_Name",
+            "Bank_Code",
+            "Bank_Name",
+            "Branch_Name",
+            "City_Name",
+            "Amount",
+            "Details",
+            "Charges"
+    };
+
+    private static final int COLUMN_COUNT = 11;
 
     @Override
     public BankTemplate getTemplate() {
@@ -55,93 +93,43 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
     public byte[] generate(List<BatchTransferRow> rows) {
         log.info("VPBankExcelGenerator: Generating Excel file with {} rows", rows.size());
 
-        try {
-            // Load template file
-            HSSFWorkbook workbook = loadTemplate();
+        try (HSSFWorkbook workbook = new HSSFWorkbook()) {
+            // Create sheet named "TTTN" matching VPBank template
+            HSSFSheet sheet = workbook.createSheet("TTTN");
 
-            // Get or create sheet
-            HSSFSheet sheet = workbook.getSheetAt(0);
-            if (sheet == null) {
-                sheet = workbook.createSheet("Batch");
-            }
+            // Create header row
+            createHeaderRow(sheet, workbook);
 
-            // Clear existing data (keep header)
-            clearExistingData(sheet);
+            // Create data rows
+            createDataRows(sheet, workbook, rows);
 
-            // Create header if not exists
-            if (sheet.getPhysicalNumberOfRows() == 0) {
-                createHeader(sheet, workbook);
-            }
-
-            // Add data rows
-            addDataRows(sheet, rows, workbook);
-
-            // Auto-size columns
+            // Auto-size columns for better readability
             autoSizeColumns(sheet);
 
             // Convert to byte array
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             workbook.write(outputStream);
-            workbook.close();
 
             byte[] excelBytes = outputStream.toByteArray();
-            log.info("VPBankExcelGenerator: Generated Excel file ({} bytes)", excelBytes.length);
+            log.info("VPBankExcelGenerator: Generated Excel file ({} bytes, {} rows)",
+                    excelBytes.length, rows.size());
 
             return excelBytes;
 
         } catch (Exception e) {
             log.error("VPBankExcelGenerator: Failed to generate Excel file", e);
             throw new BusinessException("EXCEL_GENERATION_FAILED",
-                    "Failed to generate Excel file: " + e.getMessage());
+                    "Failed to generate VPBank Excel file: " + e.getMessage());
         }
     }
 
     /**
-     * Load template file from resources.
+     * Create header row with VPBank TTTN column names.
      */
-    private HSSFWorkbook loadTemplate() {
-        log.debug("VPBankExcelGenerator: Loading template from {}", TEMPLATE_PATH);
-
-        try {
-            ClassPathResource resource = new ClassPathResource(TEMPLATE_PATH);
-            if (!resource.exists()) {
-                log.warn("VPBankExcelGenerator: Template not found, creating new workbook");
-                return new HSSFWorkbook();
-            }
-
-            try (InputStream inputStream = resource.getInputStream()) {
-                return new HSSFWorkbook(inputStream);
-            }
-        } catch (Exception e) {
-            log.warn("VPBankExcelGenerator: Failed to load template, creating new workbook: {}", e.getMessage());
-            return new HSSFWorkbook();
-        }
-    }
-
-    /**
-     * Clear existing data rows (keep header).
-     */
-    private void clearExistingData(HSSFSheet sheet) {
-        int lastRowNum = sheet.getLastRowNum();
-        if (lastRowNum > 0) {
-            for (int i = lastRowNum; i > 0; i--) {
-                Row row = sheet.getRow(i);
-                if (row != null) {
-                    sheet.removeRow(row);
-                }
-            }
-        }
-    }
-
-    /**
-     * Create header row (7 columns matching VPBank template).
-     */
-    private void createHeader(HSSFSheet sheet, HSSFWorkbook workbook) {
-        log.debug("VPBankExcelGenerator: Creating header row");
-
+    private void createHeaderRow(HSSFSheet sheet, HSSFWorkbook workbook) {
         Row headerRow = sheet.createRow(0);
 
-        // Create header cell style (bold)
+        // Create header style (bold, centered)
         CellStyle headerStyle = workbook.createCellStyle();
         Font headerFont = workbook.createFont();
         headerFont.setBold(true);
@@ -149,31 +137,19 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
         headerStyle.setAlignment(HorizontalAlignment.CENTER);
         headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
 
-        // 7 columns matching VPBank template
-        String[] headers = {
-                "#",
-                "Số Tài Khoản (Account Number)",
-                "Tên Tài Khoản (Account Name)",
-                "Số Tiền (Amount)",
-                "Ngân Hàng Hưởng (Bank)",
-                "BANKID",
-                "Nội Dung (Remark)"
-        };
-
-        for (int i = 0; i < headers.length; i++) {
+        for (int i = 0; i < HEADERS.length; i++) {
             Cell cell = headerRow.createCell(i);
-            cell.setCellValue(headers[i]);
+            cell.setCellValue(HEADERS[i]);
             cell.setCellStyle(headerStyle);
         }
+
+        log.debug("VPBankExcelGenerator: Created header row with {} columns", HEADERS.length);
     }
 
     /**
-     * Add data rows to sheet (7 columns).
-     * Account number is stored as TEXT to preserve leading zeros.
+     * Create data rows from BatchTransferRow list.
      */
-    private void addDataRows(HSSFSheet sheet, List<BatchTransferRow> rows, HSSFWorkbook workbook) {
-        log.debug("VPBankExcelGenerator: Adding {} data rows", rows.size());
-
+    private void createDataRows(HSSFSheet sheet, HSSFWorkbook workbook, List<BatchTransferRow> rows) {
         // Create text style for account number (preserves leading zeros)
         HSSFCellStyle textStyle = createTextStyle(workbook);
 
@@ -181,61 +157,171 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
 
         for (BatchTransferRow data : rows) {
             Row row = sheet.createRow(rowNum++);
-
-            // Col 0: # (STT) - NUMBER
-            Cell sttCell = row.createCell(0);
-            sttCell.setCellValue(data.getStt());
-
-            // Col 1: Số Tài Khoản - TEXT (to preserve leading zeros like "0123456789")
-            Cell accountNumberCell = row.createCell(1);
-            accountNumberCell.setCellValue(data.getAccountNumber());
-            accountNumberCell.setCellStyle(textStyle);
-
-            // Col 2: Tên Tài Khoản - TEXT (UPPERCASE, no accents)
-            Cell accountNameCell = row.createCell(2);
-            String processedName = processAccountName(data.getAccountName());
-            accountNameCell.setCellValue(processedName);
-
-            // Col 3: Số Tiền - NUMBER (integer, no formatting)
-            Cell amountCell = row.createCell(3);
-            long amountValue = data.getAmount().setScale(0, RoundingMode.FLOOR).longValue();
-            amountCell.setCellValue(amountValue);
-
-            // Col 4: Ngân Hàng Hưởng - TEXT (bank code like TCB, VCB)
-            Cell bankCell = row.createCell(4);
-            bankCell.setCellValue(data.getBankCode());
-
-            // Col 5: BANKID - NUMBER (VPBank internal bank ID)
-            Cell bankIdCell = row.createCell(5);
-            bankIdCell.setCellValue(data.getVpbankId());
-
-            // Col 6: Nội Dung - TEXT (no accents, fixed content)
-            Cell remarkCell = row.createCell(6);
-            remarkCell.setCellValue(DEFAULT_REMARK);
+            populateDataRow(row, data, textStyle);
         }
+
+        log.debug("VPBankExcelGenerator: Created {} data rows", rows.size());
     }
 
     /**
-     * Process account name for VPBank requirements:
+     * Populate a single data row with values from BatchTransferRow.
+     *
+     * <p>Column mapping:
+     * <pre>
+     * 0: STT          - Row number
+     * 1: Account      - Bank account number (text format)
+     * 2: Currency     - VND
+     * 3: Ben_Name     - Beneficiary name (processed)
+     * 4: Bank_Code    - VPBank 9-digit code (empty for internal VPBank only)
+     * 5: Bank_Name    - Bank short name
+     * 6: Branch_Name  - "ALL" for external banks, empty for internal VPBank
+     * 7: City_Name    - "ALL" for external banks, empty for internal VPBank
+     * 8: Amount       - Integer for VND
+     * 9: Details      - Payment description (processed)
+     * 10: Charges     - OUR or BEN
+     * </pre>
+     *
+     * <p>Important: According to VPBank TTTN guide:
+     * - Branch_Name and City_Name can only be empty for internal VPBank transfers
+     * - For external banks, use "ALL" when specific branch/city is unknown
+     * - Bank_Code must be provided for external banks (9-digit code)
+     */
+    private void populateDataRow(Row row, BatchTransferRow data, CellStyle textStyle) {
+        boolean isInternalVPBank = isInternalVPBankTransfer(data);
+
+        // Column 0: STT (Number)
+        row.createCell(0).setCellValue(data.getStt());
+
+        // Column 1: Account (Text - preserves leading zeros)
+        Cell accountCell = row.createCell(1);
+        accountCell.setCellValue(sanitizeAccountNumber(data.getAccountNumber()));
+        accountCell.setCellStyle(textStyle);
+
+        // Column 2: Currency (Text)
+        String currency = data.getCurrency() != null ? data.getCurrency() : "VND";
+        row.createCell(2).setCellValue(currency);
+
+        // Column 3: Ben_Name (Text - processed: uppercase, no Vietnamese)
+        row.createCell(3).setCellValue(processName(data.getAccountName()));
+
+        // Column 4: Bank_Code (Text - empty ONLY for internal VPBank)
+        String bankCode = isInternalVPBank ? "" : nullToEmpty(data.getVpbankCode());
+        row.createCell(4).setCellValue(bankCode);
+
+        // Column 5: Bank_Name (Text - use short name, processed)
+        String bankName = isInternalVPBank ? "VPBANK" : extractBankShortName(data.getBankName(), data.getBankCode());
+        row.createCell(5).setCellValue(bankName);
+
+        // Column 6: Branch_Name (Text - "ALL" for external banks, empty for internal VPBank)
+        // VPBank requires Branch_Name for external transfers; "ALL" means all branches
+        String branchName = isInternalVPBank ? "" : "ALL";
+        row.createCell(6).setCellValue(branchName);
+
+        // Column 7: City_Name (Text - "ALL" for external banks, empty for internal VPBank)
+        // VPBank requires City_Name for external transfers; "ALL" means all cities
+        String cityName = isInternalVPBank ? "" : "ALL";
+        row.createCell(7).setCellValue(cityName);
+
+        // Column 8: Amount (Number - integer for VND)
+        Cell amountCell = row.createCell(8);
+        BigDecimal amount = data.getAmount() != null ? data.getAmount() : BigDecimal.ZERO;
+        if ("VND".equals(currency) || "JPY".equals(currency)) {
+            // VND and JPY: integer only (no decimal)
+            amountCell.setCellValue(amount.setScale(0, RoundingMode.FLOOR).longValue());
+        } else {
+            // Other currencies: max 2 decimal places
+            amountCell.setCellValue(amount.setScale(2, RoundingMode.HALF_UP).doubleValue());
+        }
+
+        // Column 9: Details (Text - processed: no Vietnamese)
+        row.createCell(9).setCellValue(processDetails(data.getRemark()));
+
+        // Column 10: Charges (Text - OUR or BEN)
+        String charges = data.getCharges() != null ? data.getCharges() : "OUR";
+        row.createCell(10).setCellValue(charges);
+    }
+
+    /**
+     * Check if this is an internal VPBank transfer.
+     * Internal transfers are when the beneficiary bank is VPBank itself.
+     *
+     * @param data Transfer row data
+     * @return true if transferring to a VPBank account
+     */
+    private boolean isInternalVPBankTransfer(BatchTransferRow data) {
+        // Check by bank code first (most reliable)
+        String bankCode = data.getBankCode();
+        if (bankCode != null && bankCode.toUpperCase().contains("VPBANK")) {
+            return true;
+        }
+
+        // Also check bank name as fallback
+        String bankName = data.getBankName();
+        if (bankName != null && bankName.toUpperCase().contains("VPBANK")) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Extract short bank name for Bank_Name column.
+     * VPBank template expects short names like "VIETCOMBANK", "TECHCOMBANK", not full names.
+     *
+     * @param fullBankName Full bank name from database
+     * @param bankCode Bank code as fallback
+     * @return Short bank name for VPBank template
+     */
+    private String extractBankShortName(String fullBankName, String bankCode) {
+        if (fullBankName == null || fullBankName.isEmpty()) {
+            return bankCode != null ? bankCode.toUpperCase() : "";
+        }
+
+        // Try to extract short name from parentheses: "... (VIETCOMBANK)" -> "VIETCOMBANK"
+        int startParen = fullBankName.lastIndexOf('(');
+        int endParen = fullBankName.lastIndexOf(')');
+        if (startParen >= 0 && endParen > startParen) {
+            String shortName = fullBankName.substring(startParen + 1, endParen).trim();
+            return processName(shortName);
+        }
+
+        // If no parentheses, use the full name processed
+        return processName(fullBankName);
+    }
+
+    /**
+     * Sanitize account number: remove special characters, keep only alphanumeric.
+     */
+    private String sanitizeAccountNumber(String accountNumber) {
+        if (accountNumber == null || accountNumber.isEmpty()) {
+            return "";
+        }
+        // Remove any non-alphanumeric characters
+        return accountNumber.replaceAll("[^A-Za-z0-9]", "");
+    }
+
+    /**
+     * Process name/text field for VPBank requirements:
      * 1. Remove Vietnamese accents
      * 2. Convert to UPPERCASE
-     * 3. Remove special characters like "&"
-     * <p>
-     * Example: "Nguyễn Văn A" -> "NGUYEN VAN A"
+     * 3. Remove disallowed special characters
+     * 4. Clean up extra whitespace
+     *
+     * <p>Example: "Nguyễn Văn A" → "NGUYEN VAN A"
      */
-    private String processAccountName(String accountName) {
-        if (accountName == null || accountName.isEmpty()) {
+    private String processName(String text) {
+        if (text == null || text.isEmpty()) {
             return "";
         }
 
         // Step 1: Remove Vietnamese accents
-        String processed = removeVietnameseAccents(accountName);
+        String processed = removeVietnameseAccents(text);
 
         // Step 2: Convert to uppercase
         processed = processed.toUpperCase();
 
-        // Step 3: Remove special characters
-        processed = processed.replace("&", " ");
+        // Step 3: Remove disallowed characters
+        processed = ALLOWED_CHARS_PATTERN.matcher(processed).replaceAll("");
 
         // Step 4: Clean up extra whitespace
         processed = processed.replaceAll("\\s+", " ").trim();
@@ -244,9 +330,33 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
     }
 
     /**
+     * Process payment details for VPBank requirements.
+     * Similar to processName but keeps original case.
+     */
+    private String processDetails(String text) {
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+
+        // Step 1: Remove Vietnamese accents
+        String processed = removeVietnameseAccents(text);
+
+        // Step 2: Remove disallowed characters
+        processed = ALLOWED_CHARS_PATTERN.matcher(processed).replaceAll("");
+
+        // Step 3: Clean up extra whitespace
+        processed = processed.replaceAll("\\s+", " ").trim();
+
+        return processed;
+    }
+
+    /**
      * Remove Vietnamese accents from string.
-     * <p>
-     * Example: "Nguyễn Văn" -> "Nguyen Van"
+     *
+     * <p>Uses Unicode NFD normalization to separate base characters from
+     * combining diacritical marks, then removes the marks.
+     *
+     * <p>Example: "Nguyễn Văn" → "Nguyen Van"
      */
     private String removeVietnameseAccents(String str) {
         if (str == null || str.isEmpty()) {
@@ -272,24 +382,31 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
      */
     private HSSFCellStyle createTextStyle(HSSFWorkbook workbook) {
         HSSFCellStyle style = workbook.createCellStyle();
-        // Format "@" = Text format, preserves leading zeros
         DataFormat format = workbook.createDataFormat();
         style.setDataFormat(format.getFormat("@"));
         return style;
     }
 
     /**
-     * Auto-size all 7 columns.
+     * Auto-size all columns for better readability.
      */
     private void autoSizeColumns(HSSFSheet sheet) {
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < COLUMN_COUNT; i++) {
             try {
                 sheet.autoSizeColumn(i);
+                // Add extra width for padding
                 int currentWidth = sheet.getColumnWidth(i);
-                sheet.setColumnWidth(i, currentWidth + 1000);
+                sheet.setColumnWidth(i, Math.min(currentWidth + 1000, 255 * 256)); // Max Excel width
             } catch (Exception e) {
-                log.warn("VPBankExcelGenerator: Failed to auto-size column {}", i);
+                log.warn("VPBankExcelGenerator: Failed to auto-size column {}: {}", i, e.getMessage());
             }
         }
+    }
+
+    /**
+     * Convert null to empty string.
+     */
+    private String nullToEmpty(String value) {
+        return value != null ? value : "";
     }
 }

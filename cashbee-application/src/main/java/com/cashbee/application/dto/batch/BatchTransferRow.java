@@ -10,16 +10,22 @@ import java.math.BigDecimal;
 /**
  * DTO representing one row in the Excel batch transfer file.
  *
- * Maps to columns in VPBank template:
- * - STT (Row Number)
- * - Số Tài Khoản (Account Number)
- * - Tên Tài Khoản (Account Name)
- * - Số Tiền (Amount)
- * - Ngân Hàng Hưởng (Bank)
- * - Nội Dung (Remark)
+ * <p>Maps to columns in VPBank TTTN (Thanh Toan Trong Nuoc) template:
+ * <ul>
+ *   <li>STT - Row number</li>
+ *   <li>Account - Bank account number</li>
+ *   <li>Currency - Currency code (VND, USD, EUR...)</li>
+ *   <li>Ben_Name - Beneficiary name (no Vietnamese, no special chars)</li>
+ *   <li>Bank_Code - VPBank bank code (9 digits, empty for internal VPBank)</li>
+ *   <li>Bank_Name - Bank short name (e.g., VIETCOMBANK, VPBANK)</li>
+ *   <li>Branch_Name - Branch name (empty for internal VPBank)</li>
+ *   <li>City_Name - City name (empty for internal VPBank)</li>
+ *   <li>Amount - Transfer amount</li>
+ *   <li>Details - Payment details (no Vietnamese)</li>
+ *   <li>Charges - Fee type: OUR or BEN</li>
+ * </ul>
  *
- * For VietinBank template, additional field vietinbankCode is used
- * instead of bankName for the bank column.
+ * <p>For VietinBank template, uses vietinbankCode instead of vpbankCode.
  *
  * @author CashBee Team
  */
@@ -30,65 +36,115 @@ import java.math.BigDecimal;
 public class BatchTransferRow {
 
     /**
-     * STT (Row number).
-     * Auto-incremented: 1, 2, 3, ...
+     * STT - Row number (auto-incremented: 1, 2, 3...).
      */
     private Integer stt;
 
     /**
-     * Số tài khoản ngân hàng.
+     * Account - Bank account number.
+     * Only alphanumeric characters allowed.
      */
     private String accountNumber;
 
     /**
-     * Tên chủ tài khoản.
+     * Ben_Name - Beneficiary account name.
+     * Will be converted to uppercase, no Vietnamese accents.
      */
     private String accountName;
 
     /**
-     * Số tiền cần chuyển (balance của user).
+     * Amount - Transfer amount.
+     * For VND: integer only (no decimal point).
+     * For other currencies: max 2 decimal places.
      */
     private BigDecimal amount;
 
     /**
-     * Ngân hàng hưởng (tên đầy đủ).
-     * Example: "Ngân hàng TMCP Việt Nam Thịnh Vượng"
+     * Currency - Currency code.
+     * Supported: VND, USD, EUR, GBP, CAD, AUD, JPY, CHF, SGD.
+     * Default: VND.
+     */
+    @Builder.Default
+    private String currency = "VND";
+
+    /**
+     * Bank_Name - Bank short name (e.g., VIETCOMBANK, TECHCOMBANK).
+     * For internal VPBank transfer, must contain "VPBank".
      */
     private String bankName;
 
     /**
-     * Mã ngân hàng (viết tắt).
-     * Example: "VPBANK", "VCB", "ACB"
-     * Used for VPBank template.
+     * Bank_Code - Internal bank code used in system (e.g., VPBANK, ACB).
+     * This is NOT the VPBank 9-digit code.
      */
     private String bankCode;
 
     /**
-     * Nội dung chuyển khoản.
-     * Example: "Hoan tien CashBee 11/2025"
+     * VPBank Bank_Code - 9-digit bank code for VPBank format.
+     * Example: "101203001" (Vietcombank), "101310001" (Techcombank).
+     * Empty/null for internal VPBank transfers.
+     */
+    private String vpbankCode;
+
+    /**
+     * Branch_Name - Bank branch name.
+     * Not required for internal VPBank transfers.
+     * No Vietnamese, no special characters.
+     */
+    @Builder.Default
+    private String branchName = "";
+
+    /**
+     * City_Name - City/Province name.
+     * Not required for internal VPBank transfers.
+     * No Vietnamese (e.g., "Ha Noi" not "Hà Nội").
+     */
+    @Builder.Default
+    private String cityName = "";
+
+    /**
+     * Details - Payment description/remark.
+     * No Vietnamese, no special characters.
+     * Allowed: SPACE A-Za-z0-9.+-)(,
      */
     private String remark;
 
     /**
-     * User ID (metadata, không xuất ra Excel).
+     * Charges - Fee type.
+     * OUR: Sender pays all fees.
+     * BEN: Beneficiary pays fees.
+     * For internal VPBank transfers, always treated as OUR.
+     */
+    @Builder.Default
+    private String charges = "OUR";
+
+    /**
+     * User ID - Internal reference (not exported to Excel).
      * Used for logging/debugging only.
      */
     private Long userId;
 
     /**
-     * Mã ngân hàng theo chuẩn VietinBank (8 chữ số).
-     * Example: "01309001" (VPBank), "01202001" (BIDV)
-     * Special: "VietinBank" for internal VietinBank transfer
-     *
+     * VietinBank code - 8-digit bank code for VietinBank format.
+     * Example: "01309001" (VPBank), "01202001" (BIDV).
+     * Special: "VietinBank" for internal VietinBank transfer.
      * Used only for VietinBank template.
      */
     private String vietinbankCode;
 
     /**
-     * Mã ngân hàng theo chuẩn VPBank (số nguyên).
-     * Example: 28 (Techcombank), 1 (VPBank)
-     *
-     * Used only for VPBank template (column BANKID).
+     * VPBank ID - Internal VPBank bank ID (integer).
+     * Legacy field, may be deprecated.
      */
     private Integer vpbankId;
+
+    /**
+     * Check if this is an internal VPBank transfer.
+     * Internal transfers have empty Bank_Code, Branch_Name, City_Name.
+     *
+     * @return true if transferring to VPBank account
+     */
+    public boolean isInternalVPBankTransfer() {
+        return bankCode != null && bankCode.equalsIgnoreCase("VPBANK");
+    }
 }
