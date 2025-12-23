@@ -4,6 +4,7 @@ import com.cashbee.application.dto.affiliate.FallbackMatchResult;
 import com.cashbee.application.dto.affiliate.ImportOrdersRequest;
 import com.cashbee.application.dto.affiliate.ImportOrdersResponse;
 import com.cashbee.application.usecase.cashback.CalculateCashbackUseCase;
+import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
 import com.cashbee.application.util.affiliate.ShopeeCSVParser;
 import com.cashbee.application.util.affiliate.TrackingCodeGenerator;
 import com.cashbee.common.exception.BusinessException;
@@ -73,6 +74,7 @@ public class ImportShopeeOrdersUseCase {
     private final ShopeeCSVParser csvParser;
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final CalculateCashbackUseCase calculateCashbackUseCase;
+    private final RecalculateWalletUseCase recalculateWalletUseCase;
     private final EntityManager entityManager;
 
     /**
@@ -192,9 +194,20 @@ public class ImportShopeeOrdersUseCase {
             throw new BusinessException("IMPORT_FAILED", errorMessage);
         }
 
-        // Step 5: Build response
-        // NOTE: Wallet is now updated directly in CalculateCashbackUseCase
-        // when cashback is created or status changes. No need to recalculate here.
+        // Step 5: Recalculate wallets for all affected users
+        // CRITICAL FIX: Always recalculate wallet from cashback (source of truth)
+        // This ensures wallet stays in sync even when:
+        // - Re-importing same file (status unchanged, but wallet may have been reset)
+        // - Partial imports with mixed status changes
+        // - Any edge cases where direct wallet updates may have failed
+        if (!affectedUserIds.isEmpty()) {
+            log.info("UseCase: Recalculating wallets for {} affected users: {}",
+                affectedUserIds.size(), affectedUserIds);
+            recalculateWalletUseCase.executeForUsers(affectedUserIds);
+            log.info("UseCase: Wallet recalculation completed for {} users", affectedUserIds.size());
+        }
+
+        // Step 6: Build response
         long durationSeconds = Duration.between(startTime, endTime).getSeconds();
 
         return ImportOrdersResponse.builder()

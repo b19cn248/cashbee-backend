@@ -3,12 +3,17 @@ package com.cashbee.application.service.usecase;
 import com.cashbee.application.dto.batch.ExportBatchTransferRequest;
 import com.cashbee.application.dto.batch.ExportBatchTransferResponse;
 import com.cashbee.common.exception.BusinessException;
+import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.domain.enums.ExportStatus;
 import com.cashbee.domain.enums.ExportType;
+import com.cashbee.domain.model.BatchCashbackSnapshot;
 import com.cashbee.domain.model.BatchTransferExport;
 import com.cashbee.domain.model.BatchTransferItem;
+import com.cashbee.domain.model.Cashback;
+import com.cashbee.domain.repository.BatchCashbackSnapshotRepository;
 import com.cashbee.domain.repository.BatchTransferExportRepository;
 import com.cashbee.domain.repository.BatchTransferItemRepository;
+import com.cashbee.domain.repository.CashbackRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,6 +27,7 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -47,6 +53,8 @@ public class ExportBatchTransferUseCase {
 
     private final BatchTransferExportRepository batchTransferExportRepository;
     private final BatchTransferItemRepository batchTransferItemRepository;
+    private final BatchCashbackSnapshotRepository batchCashbackSnapshotRepository;
+    private final CashbackRepository cashbackRepository;
     private final JdbcTemplate jdbcTemplate;
 
     /**
@@ -105,11 +113,16 @@ public class ExportBatchTransferUseCase {
         log.info("ExportBatchTransferUseCase: Saved batch export with code: {}", saved.getBatchCode());
 
         // 7. Save batch items (snapshot of each user's balance and bank info)
-        saveBatchItems(saved.getId(), request.getMinBalance());
+        List<BatchTransferItem> savedItems = saveBatchItems(saved.getId(), request.getMinBalance());
 
-        log.info("ExportBatchTransferUseCase: Saved {} batch items", saved.getTotalUsers());
+        log.info("ExportBatchTransferUseCase: Saved {} batch items", savedItems.size());
 
-        // 8. Build response
+        // 8. Save cashback snapshots for each user (Approach B)
+        int totalCashbackSnapshots = saveCashbackSnapshots(saved.getId(), savedItems);
+
+        log.info("ExportBatchTransferUseCase: Saved {} cashback snapshots", totalCashbackSnapshots);
+
+        // 9. Build response
         return ExportBatchTransferResponse.builder()
                 .batchCode(saved.getBatchCode())
                 .fileName(saved.getFileName())
@@ -186,8 +199,9 @@ public class ExportBatchTransferUseCase {
      *
      * @param batchId Batch ID
      * @param minBalance Minimum balance
+     * @return List of saved batch items
      */
-    private void saveBatchItems(Long batchId, BigDecimal minBalance) {
+    private List<BatchTransferItem> saveBatchItems(Long batchId, BigDecimal minBalance) {
         String sql = """
                 SELECT
                     u.id as user_id,
@@ -208,8 +222,49 @@ public class ExportBatchTransferUseCase {
         List<BatchTransferItem> items = jdbcTemplate.query(sql, new BatchTransferItemRowMapper(batchId), minBalance);
 
         if (!items.isEmpty()) {
-            batchTransferItemRepository.saveAll(items);
+            return batchTransferItemRepository.saveAll(items);
         }
+        return items;
+    }
+
+    /**
+     * Save cashback snapshots for each user in the batch.
+     * This is Approach B: snapshot which cashbacks are included at batch creation time.
+     *
+     * @param batchId Batch ID
+     * @param batchItems List of batch items (users in the batch)
+     * @return Total number of cashback snapshots saved
+     */
+    private int saveCashbackSnapshots(Long batchId, List<BatchTransferItem> batchItems) {
+        List<BatchCashbackSnapshot> allSnapshots = new ArrayList<>();
+
+        for (BatchTransferItem item : batchItems) {
+            // Get all unpaid CONFIRMED cashbacks for this user
+            List<Cashback> confirmedCashbacks = cashbackRepository
+                    .findByUserIdAndStatus(item.getUserId(), CashbackStatus.CONFIRMED);
+
+            // Filter to only unpaid cashbacks (paidBatchId is null)
+            for (Cashback cashback : confirmedCashbacks) {
+                if (cashback.getPaidBatchId() == null) {
+                    BatchCashbackSnapshot snapshot = BatchCashbackSnapshot.builder()
+                            .batchId(batchId)
+                            .cashbackId(cashback.getId())
+                            .userId(cashback.getUserId())
+                            .amount(cashback.getCashbackAmount())
+                            .createdAt(LocalDateTime.now())
+                            .build();
+                    allSnapshots.add(snapshot);
+                }
+            }
+        }
+
+        if (!allSnapshots.isEmpty()) {
+            batchCashbackSnapshotRepository.saveAll(allSnapshots);
+            log.debug("ExportBatchTransferUseCase: Saved {} cashback snapshots for batch {}",
+                    allSnapshots.size(), batchId);
+        }
+
+        return allSnapshots.size();
     }
 
     /**

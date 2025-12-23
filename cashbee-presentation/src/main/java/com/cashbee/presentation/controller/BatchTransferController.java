@@ -9,6 +9,7 @@ import com.cashbee.application.service.usecase.ExportBatchTransferUseCase;
 import com.cashbee.application.service.usecase.GenerateBatchTransferFileUseCase;
 import com.cashbee.application.service.usecase.GetBatchCashbacksUseCase;
 import com.cashbee.application.service.usecase.GetBatchExportHistoryUseCase;
+import com.cashbee.application.util.SecurityUtils;
 import com.cashbee.domain.enums.BankTemplate;
 import com.cashbee.domain.model.BatchTransferExport;
 import com.cashbee.presentation.dto.ApiResponse;
@@ -24,6 +25,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -53,6 +56,7 @@ public class BatchTransferController {
     private final CompleteBatchTransferUseCase completeBatchTransferUseCase;
     private final GetBatchCashbacksUseCase getBatchCashbacksUseCase;
     private final BatchTransferEmailService emailService;
+    private final SecurityUtils securityUtils;
 
     /**
      * Create batch export metadata.
@@ -290,7 +294,8 @@ public class BatchTransferController {
      * What this does:
      * - Deducts balance from all users in the batch
      * - Creates transaction records for each user
-     * - Marks batch as COMPLETED
+     * - Marks batch as COMPLETED/PARTIAL_FAILED/FAILED
+     * - Records admin ID and completion timestamp for audit trail
      *
      * Response:
      * {
@@ -298,23 +303,41 @@ public class BatchTransferController {
      *   "data": {
      *     "batchCode": "BATCH_20251119_001",
      *     "status": "COMPLETED",
-     *     "message": "Batch completed. 25 users processed."
+     *     "successCount": 25,
+     *     "failedCount": 0,
+     *     "message": "Batch completed. 25 success, 0 failed."
      *   }
      * }
      */
     @PostMapping("/{batchCode}/complete")
-    @Operation(summary = "Complete batch transfer", description = "Mark batch as completed and deduct balance from all users")
+    @Operation(summary = "Complete batch transfer",
+            description = "Mark batch as completed and deduct balance from all users. " +
+                    "Records admin ID for audit trail. Returns COMPLETED/PARTIAL_FAILED/FAILED status.")
     public ResponseEntity<ApiResponse<CompleteBatchResponse>> completeBatchTransfer(
-            @PathVariable String batchCode) {
+            @PathVariable String batchCode,
+            @AuthenticationPrincipal Jwt jwt) {
 
-        log.info("BatchTransferController: POST /{}/complete", batchCode);
+        // Get admin user ID from JWT for audit trail
+        Long adminId = null;
+        try {
+            adminId = securityUtils.getCurrentUserId(jwt);
+            log.info("BatchTransferController: POST /{}/complete by admin {}", batchCode, adminId);
+        } catch (Exception e) {
+            log.warn("BatchTransferController: Could not extract admin ID from JWT: {}", e.getMessage());
+            log.info("BatchTransferController: POST /{}/complete (no admin ID)", batchCode);
+        }
 
-        BatchTransferExport completedBatch = completeBatchTransferUseCase.execute(batchCode);
+        BatchTransferExport completedBatch = completeBatchTransferUseCase.execute(batchCode, adminId);
 
         CompleteBatchResponse response = new CompleteBatchResponse(
                 completedBatch.getBatchCode(),
                 completedBatch.getStatus().name(),
-                String.format("Batch completed. %d users processed.", completedBatch.getTotalUsers())
+                completedBatch.getSuccessCount(),
+                completedBatch.getFailedCount(),
+                String.format("Batch %s. %d success, %d failed.",
+                        completedBatch.getStatus().name().toLowerCase().replace("_", " "),
+                        completedBatch.getSuccessCount(),
+                        completedBatch.getFailedCount())
         );
 
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -365,7 +388,13 @@ public class BatchTransferController {
     /**
      * Response DTO for complete batch endpoint.
      */
-    public record CompleteBatchResponse(String batchCode, String status, String message) {}
+    public record CompleteBatchResponse(
+            String batchCode,
+            String status,
+            Integer successCount,
+            Integer failedCount,
+            String message
+    ) {}
 
     /**
      * Request DTO for send email endpoint.

@@ -9,6 +9,7 @@ import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.usecase.admin.GetSystemStatisticsUseCase;
 import com.cashbee.application.usecase.affiliate.GetAffiliateClicksUseCase;
 import com.cashbee.application.usecase.user.GetUsersUseCase;
+import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
 import com.cashbee.domain.enums.ClickStatus;
 import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.presentation.dto.ApiResponse;
@@ -49,6 +50,7 @@ public class AdminController {
     private final GetSystemStatisticsUseCase getSystemStatisticsUseCase;
     private final GetUsersUseCase getUsersUseCase;
     private final GetAffiliateClicksUseCase getAffiliateClicksUseCase;
+    private final RecalculateWalletUseCase recalculateWalletUseCase;
 
     // ============================================================
     // SYSTEM STATISTICS
@@ -266,5 +268,56 @@ public class AdminController {
                 result.getContent().size(), result.getPage(), result.getTotalPages());
 
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    // ============================================================
+    // WALLET MANAGEMENT
+    // ============================================================
+
+    /**
+     * Recalculate wallet balances for a specific user.
+     *
+     * This endpoint recalculates wallet balances from cashback data (source of truth):
+     * - pending_balance = SUM(cashback_amount) WHERE status = PENDING
+     * - balance = SUM(cashback_amount) WHERE status = CONFIRMED
+     * - total_earned = SUM(cashback_amount) WHERE status IN (CONFIRMED, PAID)
+     *
+     * Use this to fix wallet inconsistencies after import issues or data corruption.
+     *
+     * Example: POST /api/admin/wallets/recalculate?userId=20
+     *
+     * @param userId User ID to recalculate wallet for
+     * @return Success message
+     */
+    @PostMapping("/wallets/recalculate")
+    @Operation(
+            summary = "[ADMIN] Recalculate wallet balance for a user",
+            description = "Recalculate wallet balances from cashback data. Use this to fix wallet inconsistencies."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Wallet recalculated successfully"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid user ID"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Admin access required"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<ApiResponse<String>> recalculateWallet(
+            @Parameter(description = "User ID to recalculate wallet for", required = true)
+            @RequestParam Long userId
+    ) {
+        log.info("API: [ADMIN] Recalculating wallet for user {}", userId);
+
+        if (userId == null || userId <= 0) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("INVALID_USER_ID", "Invalid user ID"));
+        }
+
+        recalculateWalletUseCase.execute(userId);
+
+        log.info("API: [ADMIN] Wallet recalculated successfully for user {}", userId);
+
+        return ResponseEntity.ok(ApiResponse.success("Wallet recalculated successfully for user " + userId));
     }
 }

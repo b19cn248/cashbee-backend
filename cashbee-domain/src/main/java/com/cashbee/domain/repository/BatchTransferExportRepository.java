@@ -26,6 +26,15 @@ public interface BatchTransferExportRepository {
     Optional<BatchTransferExport> findByBatchCode(String batchCode);
 
     /**
+     * Find batch export by batch code with pessimistic write lock.
+     * Use this when updating batch status to prevent race conditions.
+     *
+     * @param batchCode Batch code
+     * @return Batch export if found (locked for update)
+     */
+    Optional<BatchTransferExport> findByBatchCodeForUpdate(String batchCode);
+
+    /**
      * Save batch export.
      *
      * @param batchExport Batch export to save

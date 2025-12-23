@@ -2,9 +2,13 @@ package com.cashbee.infrastructure.persistence.repository;
 
 import com.cashbee.domain.enums.ExportType;
 import com.cashbee.infrastructure.persistence.entity.BatchTransferExportJpaEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -27,6 +31,17 @@ public interface BatchTransferExportJpaRepository extends JpaRepository<BatchTra
      * @return Batch export if found
      */
     Optional<BatchTransferExportJpaEntity> findByBatchCode(String batchCode);
+
+    /**
+     * Find batch export by batch code with pessimistic write lock.
+     * Use this when updating batch status to prevent race conditions.
+     *
+     * @param batchCode Batch code
+     * @return Batch export if found (locked for update)
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM BatchTransferExportJpaEntity b WHERE b.batchCode = :batchCode")
+    Optional<BatchTransferExportJpaEntity> findByBatchCodeForUpdate(@Param("batchCode") String batchCode);
 
     /**
      * Count batches created between two timestamps.

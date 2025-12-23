@@ -108,4 +108,31 @@ public class BatchTransferExportJpaEntity {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /**
+     * Admin user ID who completed the batch.
+     * Null if batch is not yet completed.
+     */
+    @Column(name = "completed_by")
+    private Long completedBy;
+
+    /**
+     * Timestamp when batch was completed.
+     */
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    /**
+     * Number of items processed successfully.
+     */
+    @Column(name = "success_count")
+    @Builder.Default
+    private Integer successCount = 0;
+
+    /**
+     * Number of items that failed processing.
+     */
+    @Column(name = "failed_count")
+    @Builder.Default
+    private Integer failedCount = 0;
 }

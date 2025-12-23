@@ -3,19 +3,28 @@ package com.cashbee.domain.enums;
 /**
  * Trạng thái của từng item trong batch transfer.
  *
- * PENDING: Chờ thanh toán (mới tạo batch)
- * COMPLETED: Đã thanh toán (admin đã confirm)
- *
  * @author CashBee Team
  */
 public enum BatchItemStatus {
     /**
-     * Chờ thanh toán.
+     * Chờ thanh toán (mới tạo batch, chưa process).
      */
     PENDING,
 
     /**
-     * Đã thanh toán.
+     * Đang xử lý (đang trừ tiền user này).
+     * Trạng thái tạm thời trong quá trình processing.
      */
-    COMPLETED
+    PROCESSING,
+
+    /**
+     * Đã thanh toán thành công (đã trừ tiền, tạo transaction).
+     */
+    COMPLETED,
+
+    /**
+     * Xử lý thất bại (có lỗi khi trừ tiền hoặc tạo transaction).
+     * Cần admin review và retry.
+     */
+    FAILED
 }

@@ -32,6 +32,8 @@ public class BatchTransferItemMapper {
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
                 .completedAt(entity.getCompletedAt())
+                .errorMessage(entity.getErrorMessage())
+                .actualAmountDeducted(entity.getActualAmountDeducted())
                 .build();
     }
 
@@ -55,6 +57,8 @@ public class BatchTransferItemMapper {
                 .status(domain.getStatus())
                 .createdAt(domain.getCreatedAt())
                 .completedAt(domain.getCompletedAt())
+                .errorMessage(domain.getErrorMessage())
+                .actualAmountDeducted(domain.getActualAmountDeducted())
                 .build();
     }
 }

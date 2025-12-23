@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 039: Create batch_cashback_snapshot table
+        Author: CashBee Team
+        Date: 2025-12-23
+
+        Purpose:
+        - Snapshot which cashbacks are included in each batch at creation time
+        - When completing batch, only mark these specific cashbacks as PAID
+        - Prevents newly CONFIRMED cashbacks (after batch creation) from being marked as PAID
+
+        Approach B Implementation:
+        - ExportBatchTransferUseCase: When creating batch, also save cashback IDs to snapshot
+        - CompleteBatchTransferUseCase: Only update cashbacks that exist in snapshot
+
+        This provides accurate tracking and prevents race conditions where:
+        1. Admin creates batch (based on wallet balance)
+        2. New orders get CONFIRMED (adding to wallet balance)
+        3. Admin completes batch
+        4. Without snapshot: ALL CONFIRMED cashbacks get PAID (wrong!)
+        5. With snapshot: Only original cashbacks get PAID (correct!)
+    -->
+
+    <!-- Step 1: Create batch_cashback_snapshot table -->
+    <changeSet id="039-01-create-batch-cashback-snapshot-table" author="cashbee">
+        <comment>
+            Create snapshot table to track which cashbacks are included in each batch.
+            This is a many-to-many relationship between batch_transfer_export and cashback.
+        </comment>
+
+        <createTable tableName="batch_cashback_snapshot">
+            <!-- Primary key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Foreign key to batch_transfer_export -->
+            <column name="batch_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Foreign key to cashback -->
+            <column name="cashback_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- User ID for easier querying (denormalized) -->
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Amount at snapshot time (for audit trail) -->
+            <column name="amount" type="DECIMAL(19,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamp -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- Step 2: Add foreign key to batch_transfer_export -->
+    <changeSet id="039-02-add-batch-id-fk" author="cashbee">
+        <comment>Add foreign key from batch_cashback_snapshot.batch_id to batch_transfer_export.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="batch_cashback_snapshot"
+                baseColumnNames="batch_id"
+                constraintName="fk_batch_cashback_snapshot_batch"
+                referencedTableName="batch_transfer_export"
+                referencedColumnNames="id"
+                onDelete="CASCADE"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+    <!-- Step 3: Add foreign key to cashback -->
+    <changeSet id="039-03-add-cashback-id-fk" author="cashbee">
+        <comment>Add foreign key from batch_cashback_snapshot.cashback_id to cashback.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="batch_cashback_snapshot"
+                baseColumnNames="cashback_id"
+                constraintName="fk_batch_cashback_snapshot_cashback"
+                referencedTableName="cashback"
+                referencedColumnNames="id"
+                onDelete="CASCADE"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+    <!-- Step 4: Add unique constraint (batch_id, cashback_id) -->
+    <changeSet id="039-04-add-unique-constraint" author="cashbee">
+        <comment>Ensure each cashback can only be in a batch once</comment>
+
+        <addUniqueConstraint
+                tableName="batch_cashback_snapshot"
+                columnNames="batch_id, cashback_id"
+                constraintName="uk_batch_cashback_snapshot"/>
+    </changeSet>
+
+    <!-- Step 5: Add indexes for query performance -->
+    <changeSet id="039-05-add-indexes" author="cashbee">
+        <comment>Add indexes for efficient queries</comment>
+
+        <!-- Index on batch_id for finding all cashbacks in a batch -->
+        <createIndex tableName="batch_cashback_snapshot" indexName="idx_batch_cashback_snapshot_batch">
+            <column name="batch_id"/>
+        </createIndex>
+
+        <!-- Index on user_id for finding all snapshots for a user -->
+        <createIndex tableName="batch_cashback_snapshot" indexName="idx_batch_cashback_snapshot_user">
+            <column name="user_id"/>
+        </createIndex>
+
+        <!-- Composite index for query: WHERE batch_id = ? AND user_id = ? -->
+        <createIndex tableName="batch_cashback_snapshot" indexName="idx_batch_cashback_snapshot_batch_user">
+            <column name="batch_id"/>
+            <column name="user_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

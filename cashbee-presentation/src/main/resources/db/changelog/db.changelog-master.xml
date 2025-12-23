@@ -75,4 +75,13 @@
     <include file="db/changelog/035-create-referral-reward-table.xml"/>
     <include file="db/changelog/036-create-referrer-commission-table.xml"/>
 
+    <!-- Batch Transfer Improvements: audit trail, error tracking -->
+    <include file="db/changelog/037-add-batch-transfer-improvements.xml"/>
+
+    <!-- Fix: Add updated_count column to import_batch -->
+    <include file="db/changelog/038-add-updated-count-to-import-batch.xml"/>
+
+    <!-- Batch Cashback Snapshot for accurate batch completion -->
+    <include file="db/changelog/039-create-batch-cashback-snapshot-table.xml"/>
+
 </databaseChangeLog>

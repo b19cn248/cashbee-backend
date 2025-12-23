@@ -38,6 +38,13 @@ public class BatchTransferExportRepositoryAdapter implements BatchTransferExport
     }
 
     @Override
+    public Optional<BatchTransferExport> findByBatchCodeForUpdate(String batchCode) {
+        log.debug("Repository: Finding batch export by code with lock: {}", batchCode);
+        return jpaRepository.findByBatchCodeForUpdate(batchCode)
+                .map(BatchTransferExportMapper::toDomain);
+    }
+
+    @Override
     @Transactional
     public BatchTransferExport save(BatchTransferExport batchExport) {
         log.debug("Repository: Saving batch export: {}", batchExport.getBatchCode());

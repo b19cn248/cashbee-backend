@@ -99,6 +99,29 @@ public class BatchTransferExport {
      */
     private LocalDateTime createdAt;
 
+    /**
+     * Admin user ID who completed the batch.
+     * Null if batch is not yet completed.
+     */
+    private Long completedBy;
+
+    /**
+     * Timestamp when batch was completed.
+     */
+    private LocalDateTime completedAt;
+
+    /**
+     * Number of items processed successfully.
+     */
+    @Builder.Default
+    private Integer successCount = 0;
+
+    /**
+     * Number of items that failed processing.
+     */
+    @Builder.Default
+    private Integer failedCount = 0;
+
     // ===== Business Logic Methods =====
 
     /**
@@ -145,17 +168,71 @@ public class BatchTransferExport {
     }
 
     /**
-     * Mark export as completed.
+     * Mark export as processing (prevent double-processing).
      */
-    public void markAsCompleted() {
-        this.status = ExportStatus.COMPLETED;
+    public void markAsProcessing() {
+        this.status = ExportStatus.PROCESSING;
     }
 
     /**
-     * Mark export as failed.
+     * Mark export as completed with statistics.
+     *
+     * @param adminId ID of admin who completed the batch
+     * @param successCount Number of items processed successfully
+     * @param failedCount Number of items that failed
+     */
+    public void markAsCompleted(Long adminId, int successCount, int failedCount) {
+        this.completedBy = adminId;
+        this.completedAt = LocalDateTime.now();
+        this.successCount = successCount;
+        this.failedCount = failedCount;
+
+        if (failedCount == 0) {
+            this.status = ExportStatus.COMPLETED;
+        } else if (successCount == 0) {
+            this.status = ExportStatus.FAILED;
+        } else {
+            this.status = ExportStatus.PARTIAL_FAILED;
+        }
+    }
+
+    /**
+     * Mark export as completed (all success).
+     * @deprecated Use {@link #markAsCompleted(Long, int, int)} instead
+     */
+    @Deprecated
+    public void markAsCompleted() {
+        this.status = ExportStatus.COMPLETED;
+        this.completedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Mark export as failed (all failed).
      */
     public void markAsFailed() {
         this.status = ExportStatus.FAILED;
+        this.completedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Check if batch is currently processing.
+     */
+    public boolean isProcessing() {
+        return ExportStatus.PROCESSING.equals(this.status);
+    }
+
+    /**
+     * Check if batch can be processed (only PENDING batches).
+     */
+    public boolean canBeProcessed() {
+        return ExportStatus.PENDING.equals(this.status);
+    }
+
+    /**
+     * Check if batch has any failed items.
+     */
+    public boolean hasFailedItems() {
+        return this.failedCount != null && this.failedCount > 0;
     }
 
     /**

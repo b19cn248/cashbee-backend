@@ -181,4 +181,17 @@ public interface CashbackRepository {
      * @return Sum of unpaid CONFIRMED cashback amounts
      */
     java.math.BigDecimal sumUnpaidConfirmedCashbackByUserId(Long userId);
+
+    /**
+     * Update status for specific cashbacks by their IDs (Approach B).
+     * Only updates cashbacks that are in the provided list AND match the old status.
+     * This ensures only cashbacks that were snapshot at batch creation are marked as PAID.
+     *
+     * @param cashbackIds List of cashback IDs to update (from batch_cashback_snapshot)
+     * @param oldStatus Current status to match (typically CONFIRMED)
+     * @param newStatus New status to set (typically PAID)
+     * @param batchId Batch ID that is paying these cashbacks
+     * @return Number of records updated
+     */
+    int updateStatusByCashbackIdsWithBatchId(List<Long> cashbackIds, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId);
 }

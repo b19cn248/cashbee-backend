@@ -131,4 +131,12 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     public BigDecimal sumUnpaidConfirmedCashbackByUserId(Long userId) {
         return jpaRepository.sumUnpaidConfirmedCashbackByUserId(userId);
     }
+
+    @Override
+    public int updateStatusByCashbackIdsWithBatchId(List<Long> cashbackIds, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId) {
+        if (cashbackIds == null || cashbackIds.isEmpty()) {
+            return 0;
+        }
+        return jpaRepository.updateStatusByCashbackIdsWithBatchId(cashbackIds, oldStatus, newStatus, batchId);
+    }
 }

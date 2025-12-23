@@ -86,6 +86,17 @@ public class BatchTransferItem {
      */
     private LocalDateTime completedAt;
 
+    /**
+     * Error message if processing failed.
+     * Null if successful or not yet processed.
+     */
+    private String errorMessage;
+
+    /**
+     * Actual amount deducted (may differ from snapshot if balance changed).
+     */
+    private BigDecimal actualAmountDeducted;
+
     // ===== Business Logic Methods =====
 
     /**
@@ -122,11 +133,43 @@ public class BatchTransferItem {
     }
 
     /**
-     * Mark item as completed (đã thanh toán).
+     * Mark item as processing (prevent double-processing).
      */
+    public void markAsProcessing() {
+        this.status = BatchItemStatus.PROCESSING;
+    }
+
+    /**
+     * Mark item as completed (đã thanh toán).
+     *
+     * @param actualAmount Actual amount deducted from wallet
+     */
+    public void markAsCompleted(BigDecimal actualAmount) {
+        this.status = BatchItemStatus.COMPLETED;
+        this.completedAt = LocalDateTime.now();
+        this.actualAmountDeducted = actualAmount;
+        this.errorMessage = null;
+    }
+
+    /**
+     * Mark item as completed (đã thanh toán).
+     * @deprecated Use {@link #markAsCompleted(BigDecimal)} instead
+     */
+    @Deprecated
     public void markAsCompleted() {
         this.status = BatchItemStatus.COMPLETED;
         this.completedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Mark item as failed with error message.
+     *
+     * @param error Error message describing why processing failed
+     */
+    public void markAsFailed(String error) {
+        this.status = BatchItemStatus.FAILED;
+        this.completedAt = LocalDateTime.now();
+        this.errorMessage = error;
     }
 
     /**
@@ -137,9 +180,30 @@ public class BatchTransferItem {
     }
 
     /**
+     * Check if item is processing.
+     */
+    public boolean isProcessing() {
+        return BatchItemStatus.PROCESSING.equals(this.status);
+    }
+
+    /**
      * Check if item is completed.
      */
     public boolean isCompleted() {
         return BatchItemStatus.COMPLETED.equals(this.status);
+    }
+
+    /**
+     * Check if item is failed.
+     */
+    public boolean isFailed() {
+        return BatchItemStatus.FAILED.equals(this.status);
+    }
+
+    /**
+     * Check if item can be retried (only FAILED items can be retried).
+     */
+    public boolean canRetry() {
+        return BatchItemStatus.FAILED.equals(this.status);
     }
 }

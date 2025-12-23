@@ -355,6 +355,14 @@ public class CalculateCashbackUseCase {
             Cashback cashback = existingCashback.get();
             CashbackStatus currentStatus = cashback.getStatus();
 
+            // FIX: Don't downgrade PAID status - it's already finalized
+            // PAID cashbacks can only be changed to CANCELLED (refund scenario)
+            if (currentStatus == CashbackStatus.PAID && !isCancelled) {
+                log.info("UseCase: Cashback {} already PAID, skipping status update (import cannot downgrade PAID status)",
+                    cashback.getId());
+                return cashback;
+            }
+
             // Determine new status based on flags
             CashbackStatus newStatus;
             if (isCancelled) {

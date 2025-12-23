@@ -138,4 +138,13 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
      */
     @Query("SELECT COALESCE(SUM(c.cashbackAmount), 0) FROM CashbackJpaEntity c WHERE c.userId = :userId AND c.status = 'CONFIRMED' AND c.paidBatchId IS NULL")
     BigDecimal sumUnpaidConfirmedCashbackByUserId(@Param("userId") Long userId);
+
+    /**
+     * Update status for specific cashbacks by their IDs (Approach B).
+     * Only updates cashbacks that are in the provided list AND match the old status.
+     * This ensures only cashbacks that were snapshot at batch creation are marked as PAID.
+     */
+    @Modifying
+    @Query("UPDATE CashbackJpaEntity c SET c.status = :newStatus, c.paidAt = CURRENT_TIMESTAMP, c.updatedAt = CURRENT_TIMESTAMP, c.paidBatchId = :batchId WHERE c.id IN :cashbackIds AND c.status = :oldStatus")
+    int updateStatusByCashbackIdsWithBatchId(@Param("cashbackIds") List<Long> cashbackIds, @Param("oldStatus") CashbackStatus oldStatus, @Param("newStatus") CashbackStatus newStatus, @Param("batchId") Long batchId);
 }

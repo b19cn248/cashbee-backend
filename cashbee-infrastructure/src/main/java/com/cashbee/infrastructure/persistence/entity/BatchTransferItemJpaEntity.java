@@ -97,4 +97,17 @@ public class BatchTransferItemJpaEntity {
      */
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    /**
+     * Error message if processing failed.
+     * Null if successful or not yet processed.
+     */
+    @Column(name = "error_message", length = 1000)
+    private String errorMessage;
+
+    /**
+     * Actual amount deducted (may differ from snapshot if balance changed).
+     */
+    @Column(name = "actual_amount_deducted", precision = 15, scale = 2)
+    private BigDecimal actualAmountDeducted;
 }

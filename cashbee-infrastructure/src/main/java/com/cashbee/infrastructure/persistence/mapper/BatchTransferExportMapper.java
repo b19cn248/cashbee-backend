@@ -36,6 +36,10 @@ public class BatchTransferExportMapper {
                 .remarkTemplate(entity.getRemarkTemplate())
                 .minBalance(entity.getMinBalance())
                 .createdAt(entity.getCreatedAt())
+                .completedBy(entity.getCompletedBy())
+                .completedAt(entity.getCompletedAt())
+                .successCount(entity.getSuccessCount())
+                .failedCount(entity.getFailedCount())
                 .build();
     }
 
@@ -62,6 +66,10 @@ public class BatchTransferExportMapper {
                 .remarkTemplate(domain.getRemarkTemplate())
                 .minBalance(domain.getMinBalance())
                 .createdAt(domain.getCreatedAt())
+                .completedBy(domain.getCompletedBy())
+                .completedAt(domain.getCompletedAt())
+                .successCount(domain.getSuccessCount())
+                .failedCount(domain.getFailedCount())
                 .build();
     }
 
