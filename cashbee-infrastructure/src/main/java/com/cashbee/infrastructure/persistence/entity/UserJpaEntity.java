@@ -76,6 +76,9 @@ public class UserJpaEntity {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @Column(name = "has_ever_logged_in", nullable = false, columnDefinition = "TINYINT(1)")
+    private Boolean hasEverLoggedIn;
+
     @Column(name = "last_sync_at")
     private LocalDateTime lastSyncAt;
 
@@ -97,6 +100,9 @@ public class UserJpaEntity {
         }
         if (this.totalCompletedOrders == null) {
             this.totalCompletedOrders = 0;
+        }
+        if (this.hasEverLoggedIn == null) {
+            this.hasEverLoggedIn = false;
         }
     }
 

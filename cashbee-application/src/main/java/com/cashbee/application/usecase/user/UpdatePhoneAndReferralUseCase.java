@@ -54,30 +54,26 @@ public class UpdatePhoneAndReferralUseCase {
 
         log.debug("Found user: id={}, username={}", user.getId(), user.getUsername());
 
-        boolean userUpdated = false;
-
         // 2. Update phone nếu được cung cấp
         if (command.getPhone() != null && !command.getPhone().isBlank()) {
             log.debug("Updating phone: {} -> {}", user.getPhone(), command.getPhone());
             user.setPhone(command.getPhone());
-            userUpdated = true;
         }
 
         // 3. Update referredBy nếu được cung cấp
         if (command.getReferredBy() != null && !command.getReferredBy().isBlank()) {
             updateReferredBy(user, command.getReferredBy());
-            userUpdated = true;
         }
 
-        // 4. Save user nếu có thay đổi
-        if (userUpdated) {
-            user = userRepository.save(user);
-            log.info("User updated successfully: userId={}", user.getId());
-        } else {
-            log.info("No changes to update for user: userId={}", user.getId());
-        }
+        // 4. Đánh dấu user đã login (không còn là first login)
+        // Khi user cập nhật phone/referral = họ đã tương tác với hệ thống
+        user.markAsLoggedIn();
 
-        // 5. Build và trả về response
+        // 5. Save user
+        user = userRepository.save(user);
+        log.info("User updated successfully: userId={}", user.getId());
+
+        // 6. Build và trả về response
         return buildUserResponse(user);
     }
 

@@ -217,9 +217,10 @@ public class VPBankExcelGenerator implements BatchTransferExcelGenerator {
         String branchName = isInternalVPBank ? "" : "ALL";
         row.createCell(6).setCellValue(branchName);
 
-        // Column 7: City_Name (Text - "ALL" for external banks, empty for internal VPBank)
-        // VPBank requires City_Name for external transfers; "ALL" means all cities
-        String cityName = isInternalVPBank ? "" : "ALL";
+        // Column 7: City_Name (Text - valid city name for external banks, empty for internal VPBank)
+        // VPBank requires City_Name from valid city list (64 provinces/cities in Vietnam)
+        // Using "Ho Chi Minh" as default since it's the largest city with most bank branches
+        String cityName = isInternalVPBank ? "" : "Ho Chi Minh";
         row.createCell(7).setCellValue(cityName);
 
         // Column 8: Amount (Number - integer for VND)

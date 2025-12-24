@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Add has_ever_logged_in column to user table.
+
+        Purpose:
+        - Track whether a user has ever logged into the system
+        - Used to detect first-time login for onboarding flow
+
+        Logic:
+        - New users start with FALSE (never logged in)
+        - After first login, set to TRUE
+        - Existing users are set to TRUE (already logged in before)
+    -->
+    <changeSet id="043-add-has-ever-logged-in-column" author="cashbee">
+        <addColumn tableName="user">
+            <column name="has_ever_logged_in" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <comment>Add has_ever_logged_in column to track first-time login</comment>
+    </changeSet>
+
+    <!--
+        Set all existing users to TRUE.
+        Since they already exist in the system, they have logged in before.
+    -->
+    <changeSet id="043-update-existing-users-as-logged-in" author="cashbee">
+        <update tableName="user">
+            <column name="has_ever_logged_in" valueBoolean="true"/>
+        </update>
+        <comment>Mark all existing users as having logged in before</comment>
+    </changeSet>
+
+</databaseChangeLog>

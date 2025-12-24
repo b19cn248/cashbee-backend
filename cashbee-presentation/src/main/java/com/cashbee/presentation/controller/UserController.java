@@ -1,20 +1,20 @@
 package com.cashbee.presentation.controller;
 
 import com.cashbee.application.dto.user.CheckEmailExistsResponse;
+import com.cashbee.application.dto.user.CheckFirstLoginResponse;
 import com.cashbee.application.dto.user.CheckPhoneExistsResponse;
 import com.cashbee.application.dto.user.CheckReferralCodeExistsResponse;
 import com.cashbee.application.dto.user.CheckReferredByExistsResponse;
-import com.cashbee.application.dto.user.CheckUserHasReferrerResponse;
 import com.cashbee.application.dto.user.UpdatePhoneAndReferralCommand;
 import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UpdateUserLevelCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.dto.user.UserSyncCommand;
+import com.cashbee.application.usecase.user.CheckFirstLoginUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByEmailUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByPhoneUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByReferralCodeUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByReferredByUseCase;
-import com.cashbee.application.usecase.user.CheckUserHasReferrerByEmailUseCase;
 import com.cashbee.application.usecase.user.GetUserByKeycloakIdUseCase;
 import com.cashbee.application.usecase.user.UpdatePhoneAndReferralUseCase;
 import com.cashbee.application.usecase.user.SyncUserFromKeycloakUseCase;
@@ -68,7 +68,7 @@ public class UserController {
   private final CheckUserExistsByPhoneUseCase checkUserExistsByPhoneUseCase;
   private final CheckUserExistsByReferralCodeUseCase checkUserExistsByReferralCodeUseCase;
   private final CheckUserExistsByReferredByUseCase checkUserExistsByReferredByUseCase;
-  private final CheckUserHasReferrerByEmailUseCase checkUserHasReferrerByEmailUseCase;
+  private final CheckFirstLoginUseCase checkFirstLoginUseCase;
   private final SecurityUtils securityUtils;
 
   /**
@@ -462,44 +462,48 @@ public class UserController {
   }
 
   /**
-   * Check if user has a referrer (referredBy) based on email.
+   * Check if this is the user's first login.
    * <p>
-   * This endpoint checks if the user with the given email has already
-   * entered a referral code (referredBy field is not null/empty).
+   * This endpoint checks whether the current user has ever logged in before.
+   * If this is the first login, it will:
+   * 1. Mark the user as having logged in
+   * 2. Update the last login timestamp
+   * 3. Return firstLogin = true
+   * <p>
+   * On subsequent calls, it will return firstLogin = false.
    * <p>
    * Use case:
-   * - Frontend can show/hide the referral code input form based on this result
-   * - If hasReferrer is true, user has already entered a referral code
-   * - If hasReferrer is false, user can still enter a referral code
+   * - Frontend can show onboarding/welcome screen on first login
+   * - Track new user activation
    * <p>
    * Usage:
    * <pre>
-   * GET /api/users/check-has-referrer?email=test@gmail.com
+   * GET /api/users/me/first-login
    *
    * Response:
    * {
    *   "status": "success",
    *   "data": {
-   *     "email": "test@gmail.com",
-   *     "hasReferrer": true
+   *     "firstLogin": true
    *   }
    * }
    * </pre>
    *
-   * @param email Email of the user to check
-   * @return Response containing email and hasReferrer flag (true/false)
+   * @param jwt JWT token (auto-injected by Spring Security)
+   * @return Response indicating whether this is the first login
    */
-  @GetMapping("/check-has-referrer")
-  @Operation(summary = "Check if user has referrer",
-      description = "Check if user with given email has already entered a referral code")
-  public ResponseEntity<ApiResponse<CheckUserHasReferrerResponse>> checkUserHasReferrer(
-      @RequestParam @Email(message = "Invalid email format") String email) {
+  @GetMapping("/me/first-login")
+  @Operation(summary = "Check first login",
+      description = "Check if this is the user's first login and mark as logged in if so")
+  public ResponseEntity<ApiResponse<CheckFirstLoginResponse>> checkFirstLogin(
+      @AuthenticationPrincipal Jwt jwt) {
 
-    log.info("API: Checking if user has referrer by email: {}", email);
+    log.info("API: Checking first login for current user");
 
-    CheckUserHasReferrerResponse response = checkUserHasReferrerByEmailUseCase.execute(email);
+    String keycloakId = securityUtils.getKeycloakUserId(jwt);
+    CheckFirstLoginResponse response = checkFirstLoginUseCase.execute(keycloakId);
 
-    log.info("API: User with email {} has referrer: {}", email, response.isHasReferrer());
+    log.info("API: First login check result: firstLogin={}", response.isFirstLogin());
 
     return ResponseEntity
         .status(HttpStatus.OK)

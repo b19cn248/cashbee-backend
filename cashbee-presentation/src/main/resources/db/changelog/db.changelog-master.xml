@@ -90,4 +90,7 @@
     <!-- Fix vpbank_code values after migration update -->
     <include file="db/changelog/042-fix-vpbank-code-checksum.xml"/>
 
+    <!-- First login tracking for user onboarding -->
+    <include file="db/changelog/043-add-first-login-to-user.xml"/>
+
 </databaseChangeLog>

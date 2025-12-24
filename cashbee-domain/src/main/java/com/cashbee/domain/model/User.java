@@ -110,6 +110,15 @@ public class User {
     private LocalDateTime lastLoginAt;
 
     /**
+     * Whether user has ever logged into the system.
+     * Used to detect first-time login for onboarding flow.
+     * - FALSE: User has never logged in (first login)
+     * - TRUE: User has logged in at least once before
+     */
+    @Builder.Default
+    private Boolean hasEverLoggedIn = false;
+
+    /**
      * Last sync timestamp from Keycloak.
      */
     private LocalDateTime lastSyncAt;
@@ -213,6 +222,23 @@ public class User {
      */
     public void updateLastLogin() {
         this.lastLoginAt = LocalDateTime.now();
+    }
+
+    /**
+     * Check if this is the first time user logs into the system.
+     *
+     * @return true if user has never logged in before
+     */
+    public boolean isFirstLogin() {
+        return this.hasEverLoggedIn == null || !this.hasEverLoggedIn;
+    }
+
+    /**
+     * Mark user as having logged in.
+     * Should be called after first login is detected.
+     */
+    public void markAsLoggedIn() {
+        this.hasEverLoggedIn = true;
     }
 
     /**

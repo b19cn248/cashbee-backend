@@ -99,4 +99,10 @@ public class UserResponse {
      * Full bank name (e.g., "Ngân hàng TMCP Việt Nam Thịnh Vượng").
      */
     private String bankName;
+
+    /**
+     * Whether user has ever logged into the system.
+     * Used to detect first-time login for onboarding flow.
+     */
+    private Boolean hasEverLoggedIn;
 }
