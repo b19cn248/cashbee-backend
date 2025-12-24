@@ -5,7 +5,7 @@ import com.cashbee.application.dto.user.CheckFirstLoginResponse;
 import com.cashbee.application.dto.user.CheckPhoneExistsResponse;
 import com.cashbee.application.dto.user.CheckReferralCodeExistsResponse;
 import com.cashbee.application.dto.user.CheckReferredByExistsResponse;
-import com.cashbee.application.dto.user.UpdatePhoneAndReferralCommand;
+import com.cashbee.application.dto.user.UpdateUserProfileCommand;
 import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UpdateUserLevelCommand;
 import com.cashbee.application.dto.user.UserResponse;
@@ -16,7 +16,7 @@ import com.cashbee.application.usecase.user.CheckUserExistsByPhoneUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByReferralCodeUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByReferredByUseCase;
 import com.cashbee.application.usecase.user.GetUserByKeycloakIdUseCase;
-import com.cashbee.application.usecase.user.UpdatePhoneAndReferralUseCase;
+import com.cashbee.application.usecase.user.UpdateUserProfileUseCase;
 import com.cashbee.application.usecase.user.SyncUserFromKeycloakUseCase;
 import com.cashbee.application.usecase.user.UpdateUserLevelUseCase;
 import com.cashbee.application.usecase.user.UpdateUserUseCase;
@@ -63,7 +63,7 @@ public class UserController {
   private final GetUserByKeycloakIdUseCase getUserByKeycloakIdUseCase;
   private final UpdateUserUseCase updateUserUseCase;
   private final UpdateUserLevelUseCase updateUserLevelUseCase;
-  private final UpdatePhoneAndReferralUseCase updatePhoneAndReferralUseCase;
+  private final UpdateUserProfileUseCase updateUserProfileUseCase;
   private final CheckUserExistsByEmailUseCase checkUserExistsByEmailUseCase;
   private final CheckUserExistsByPhoneUseCase checkUserExistsByPhoneUseCase;
   private final CheckUserExistsByReferralCodeUseCase checkUserExistsByReferralCodeUseCase;
@@ -204,20 +204,24 @@ public class UserController {
   }
 
   /**
-   * Update phone number and referral code for current user.
+   * Update user profile information.
    * <p>
-   * This is a simplified API that only updates 2 fields:
+   * This API allows updating:
    * - phone: Phone number
    * - referredBy: Referral code of the person who referred this user
+   * - accountNumber: Bank account number
+   * - accountName: Bank account holder name
+   * - bankName: Bank name
+   * - bankCode: Bank code
    * <p>
-   * Both fields are optional - only provided fields will be updated.
+   * All fields are optional - only provided fields will be updated.
    * <p>
    * Note: referredBy can only be set once. If user already has referredBy,
    * it cannot be changed.
    * <p>
    * Usage (Frontend):
    * <pre>
-   * const response = await fetch('/api/users/me/phone-referral', {
+   * const response = await fetch('/api/users/me/profile', {
    *   method: 'PUT',
    *   headers: {
    *     'Authorization': `Bearer ${token}`,
@@ -225,35 +229,39 @@ public class UserController {
    *   },
    *   body: JSON.stringify({
    *     phone: "0987654321",
-   *     referredBy: "CB4F7A9K"
+   *     referredBy: "CB4F7A9K",
+   *     accountNumber: "1234567890",
+   *     accountName: "NGUYEN VAN A",
+   *     bankName: "Ngan hang TMCP Viet Nam Thinh Vuong",
+   *     bankCode: "VPBANK"
    *   })
    * });
    * </pre>
    *
    * @param jwt     JWT token (auto-injected by Spring Security)
-   * @param command Command containing phone and/or referredBy
+   * @param command Command containing profile fields to update
    * @return Updated user information
    */
-  @PutMapping("/me/phone-referral")
-  @Operation(summary = "Update phone and referral code",
-      description = "Update current user's phone number and referral code")
-  public ResponseEntity<ApiResponse<UserResponse>> updatePhoneAndReferral(
+  @PutMapping("/me/profile")
+  @Operation(summary = "Update user profile",
+      description = "Update current user's profile including phone, referral code, and bank account information")
+  public ResponseEntity<ApiResponse<UserResponse>> updateUserProfile(
       @AuthenticationPrincipal Jwt jwt,
-      @Valid @RequestBody UpdatePhoneAndReferralCommand command) {
+      @Valid @RequestBody UpdateUserProfileCommand command) {
 
-    log.info("API: Updating phone and referral for current user");
+    log.info("API: Updating profile for current user");
 
     // Extract keycloakId from JWT
     String keycloakId = securityUtils.getKeycloakUserId(jwt);
 
     // Execute update
-    UserResponse user = updatePhoneAndReferralUseCase.execute(keycloakId, command);
+    UserResponse user = updateUserProfileUseCase.execute(keycloakId, command);
 
-    log.info("API: Phone and referral updated successfully: userId={}", user.getId());
+    log.info("API: Profile updated successfully: userId={}", user.getId());
 
     return ResponseEntity
         .status(HttpStatus.OK)
-        .body(ApiResponse.success(user, "Phone and referral updated successfully"));
+        .body(ApiResponse.success(user, "Profile updated successfully"));
   }
 
   /**
