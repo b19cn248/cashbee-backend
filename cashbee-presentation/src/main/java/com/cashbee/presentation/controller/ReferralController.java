@@ -1,7 +1,10 @@
 package com.cashbee.presentation.controller;
 
 import com.cashbee.application.dto.referral.*;
-import com.cashbee.application.usecase.referral.*;
+import com.cashbee.application.usecase.referral.GetMyReferralsUseCase;
+import com.cashbee.application.usecase.referral.GetReferralStatsUseCase;
+import com.cashbee.application.usecase.referral.SetReferralCodeUseCase;
+import com.cashbee.application.usecase.referral.ValidateReferralCodeUseCase;
 import com.cashbee.application.util.SecurityUtils;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +26,8 @@ import org.springframework.web.bind.annotation.*;
  * - POST /api/referral/set-code - Set referral code (become a referee)
  * - GET /api/referral/validate/{code} - Validate a referral code
  * - GET /api/referral/stats - Get referral statistics for current user
+ * - GET /api/referral/my-code - Get user's referral code for sharing
+ * - GET /api/referral/my-referrals - Get list of users referred by current user
  *
  * @author CashBee Team
  */
@@ -36,6 +41,7 @@ public class ReferralController {
     private final SetReferralCodeUseCase setReferralCodeUseCase;
     private final ValidateReferralCodeUseCase validateReferralCodeUseCase;
     private final GetReferralStatsUseCase getReferralStatsUseCase;
+    private final GetMyReferralsUseCase getMyReferralsUseCase;
     private final SecurityUtils securityUtils;
 
     /**
@@ -188,5 +194,46 @@ public class ReferralController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(ApiResponse.success(stats.getMyReferralCode()));
+    }
+
+    /**
+     * Get list of users referred by current user.
+     * <p>
+     * Returns all users who have entered the current user's referral code
+     * when they registered. Information is masked for privacy.
+     * <p>
+     * Usage (Frontend):
+     * <pre>
+     * const response = await fetch('/api/referral/my-referrals', {
+     *   headers: { 'Authorization': `Bearer ${token}` }
+     * });
+     * const data = response.data;
+     * // data.myReferralCode - your referral code
+     * // data.totalReferrals - total people you referred
+     * // data.activeReferrals - referrals still in commission period
+     * // data.referrals - detailed list of referred users
+     * </pre>
+     *
+     * @param jwt JWT token (auto-injected by Spring Security)
+     * @return List of referred users with masked personal info
+     */
+    @GetMapping("/my-referrals")
+    @Operation(
+            summary = "Get my referrals",
+            description = "Get list of users who have used your referral code. Personal info is masked for privacy."
+    )
+    public ResponseEntity<ApiResponse<GetMyReferralsResponse>> getMyReferrals(
+            @AuthenticationPrincipal Jwt jwt) {
+
+        log.info("API: Getting referrals list for user");
+
+        String keycloakId = securityUtils.getKeycloakUserId(jwt);
+        GetMyReferralsResponse response = getMyReferralsUseCase.execute(keycloakId);
+
+        log.info("API: Found {} referrals for user", response.getTotalReferrals());
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ApiResponse.success(response));
     }
 }
