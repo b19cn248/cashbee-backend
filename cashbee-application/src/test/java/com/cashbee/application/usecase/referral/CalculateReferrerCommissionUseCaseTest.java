@@ -52,6 +52,7 @@ class CalculateReferrerCommissionUseCaseTest {
     @BeforeEach
     void setUp() {
         // Referee with activated referral (3+ orders completed)
+        LocalDateTime activatedAt = LocalDateTime.now().minusDays(30); // Activated 30 days ago
         referee = User.builder()
                 .id(1L)
                 .keycloakId("referee-keycloak-id")
@@ -61,7 +62,8 @@ class CalculateReferrerCommissionUseCaseTest {
                 .referredBy("REFCODE1")
                 .userLevel(UserLevel.NORMAL)
                 .totalCompletedOrders(5)
-                .referralActivatedAt(LocalDateTime.now().minusDays(30)) // Activated 30 days ago
+                .referralActivatedAt(activatedAt)
+                .referralExpiresAt(activatedAt.plusMonths(5)) // Expires 5 months from activation
                 .status(UserStatus.ACTIVE)
                 .build();
 
@@ -198,8 +200,10 @@ class CalculateReferrerCommissionUseCaseTest {
         @Test
         @DisplayName("Should not create commission if referral period expired")
         void shouldNotCreateCommissionIfReferralExpired() {
-            // Given: Referral activated 4 months ago (expired)
-            referee.setReferralActivatedAt(LocalDateTime.now().minusMonths(4));
+            // Given: Referral activated 6 months ago, expired 1 month ago (5 month commission period)
+            LocalDateTime activatedAt = LocalDateTime.now().minusMonths(6);
+            referee.setReferralActivatedAt(activatedAt);
+            referee.setReferralExpiresAt(activatedAt.plusMonths(5)); // Expired 1 month ago
             BigDecimal originalCommission = new BigDecimal("100000");
             Long orderId = 128L;
 
@@ -286,8 +290,8 @@ class CalculateReferrerCommissionUseCaseTest {
         }
 
         @Test
-        @DisplayName("Should handle inactive referrer")
-        void shouldHandleInactiveReferrer() {
+        @DisplayName("Should not create commission if referrer is inactive")
+        void shouldNotCreateCommissionIfReferrerIsInactive() {
             // Given
             referrer.setStatus(UserStatus.BANNED);
             BigDecimal originalCommission = new BigDecimal("100000");
@@ -299,9 +303,8 @@ class CalculateReferrerCommissionUseCaseTest {
             // When
             useCase.execute(1L, orderId, originalCommission);
 
-            // Then - still creates commission (referrer status doesn't affect commission creation)
-            // Commission can be created even if referrer is banned, payout will be handled separately
-            verify(referrerCommissionRepository, never()).existsBySourceOrderId(orderId);
+            // Then - should not create commission for inactive referrer
+            verify(referrerCommissionRepository, never()).save(any());
         }
     }
 }

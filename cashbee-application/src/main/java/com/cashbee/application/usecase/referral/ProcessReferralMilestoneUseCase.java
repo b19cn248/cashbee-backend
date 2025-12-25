@@ -1,16 +1,23 @@
 package com.cashbee.application.usecase.referral;
 
-import com.cashbee.domain.enums.UserLevel;
+import com.cashbee.application.dto.transaction.CreateTransactionCommand;
+import com.cashbee.application.usecase.transaction.CreateTransactionUseCase;
+import com.cashbee.domain.enums.*;
+import com.cashbee.domain.model.MilestoneConfig;
 import com.cashbee.domain.model.ReferralReward;
 import com.cashbee.domain.model.User;
+import com.cashbee.domain.model.UserWallet;
+import com.cashbee.domain.repository.MilestoneConfigRepository;
 import com.cashbee.domain.repository.ReferralRewardRepository;
 import com.cashbee.domain.repository.UserRepository;
+import com.cashbee.domain.repository.UserWalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 /**
  * Use Case: Process referral milestone when an order is completed.
@@ -18,15 +25,15 @@ import java.math.BigDecimal;
  * This use case is called when an order status changes to PAID.
  * It handles:
  * - Incrementing the user's completed order count
- * - Checking and granting milestone rewards
- * - Activating referral at 3 orders
+ * - Checking and granting milestone rewards from milestone_config table
+ * - Adding bonus directly to wallet (both referee and referrer)
+ * - Creating transactions for tracking
+ * - Activating referral at activation milestone
  * - Upgrading user tier at milestones
  *
- * Milestones:
- * - 3 orders: 10,000 VND bonus + referral activation
- * - 10 orders: 20,000 VND bonus
- * - 40 orders: VIP tier upgrade (83% cashback)
- * - 150 orders: SUPER tier upgrade (85% cashback)
+ * Milestone Types:
+ * - WITH_REFERRER: 5, 10, 80, 300 orders
+ * - WITHOUT_REFERRER: 80, 300 orders only
  *
  * @author CashBee Team
  */
@@ -37,16 +44,9 @@ public class ProcessReferralMilestoneUseCase {
 
     private final UserRepository userRepository;
     private final ReferralRewardRepository referralRewardRepository;
-
-    // Milestone constants
-    private static final int MILESTONE_ACTIVATION = 3;
-    private static final int MILESTONE_SECOND_BONUS = 10;
-    private static final int MILESTONE_VIP = 40;
-    private static final int MILESTONE_SUPER = 150;
-
-    // Bonus amounts
-    private static final BigDecimal BONUS_MILESTONE_3 = new BigDecimal("10000");
-    private static final BigDecimal BONUS_MILESTONE_10 = new BigDecimal("20000");
+    private final MilestoneConfigRepository milestoneConfigRepository;
+    private final UserWalletRepository walletRepository;
+    private final CreateTransactionUseCase createTransactionUseCase;
 
     /**
      * Execute use case when an order is completed.
@@ -70,7 +70,12 @@ public class ProcessReferralMilestoneUseCase {
 
         log.debug("User {} now has {} completed orders", userId, completedOrders);
 
-        // 3. Find referrer if user was referred
+        // 3. Determine milestone type based on referrer status
+        MilestoneType milestoneType = user.hasReferrer()
+                ? MilestoneType.WITH_REFERRER
+                : MilestoneType.WITHOUT_REFERRER;
+
+        // 4. Find referrer if user was referred
         User referrer = null;
         if (user.hasReferrer()) {
             referrer = userRepository.findByReferralCode(user.getReferredBy()).orElse(null);
@@ -80,161 +85,170 @@ public class ProcessReferralMilestoneUseCase {
             }
         }
 
-        // 4. Process milestones
-        processMilestone3(user, referrer, completedOrders);
-        processMilestone10(user, referrer, completedOrders);
-        processMilestone40(user, referrer, completedOrders);
-        processMilestone150(user, referrer, completedOrders);
+        // 5. Check if current order count matches any milestone
+        Optional<MilestoneConfig> milestoneConfigOpt = milestoneConfigRepository
+                .findActiveByMilestoneTypeAndOrdersRequired(milestoneType, completedOrders);
 
-        // 5. Save user
+        if (milestoneConfigOpt.isPresent()) {
+            processMilestone(user, referrer, milestoneConfigOpt.get());
+        }
+
+        // 6. Save user
         userRepository.save(user);
 
-        log.info("Milestone processing completed for user: {}, orders: {}",
-                userId, completedOrders);
+        log.info("Milestone processing completed for user: {}, orders: {}, type: {}",
+                userId, completedOrders, milestoneType);
     }
 
     /**
-     * Process milestone 3: First activation + 10,000 VND bonus.
+     * Process a milestone when user reaches the required order count.
      */
-    private void processMilestone3(User user, User referrer, int completedOrders) {
-        if (completedOrders != MILESTONE_ACTIVATION) {
-            return;
-        }
-
+    private void processMilestone(User user, User referrer, MilestoneConfig config) {
+        Long userId = user.getId();
+        Integer milestone = config.getOrdersRequired();
         Long referrerId = referrer != null ? referrer.getId() : null;
 
-        // Check if reward already granted
-        if (referralRewardRepository.existsByUserIdAndMilestone(user.getId(), MILESTONE_ACTIVATION)) {
-            log.debug("Milestone 3 reward already granted for user: {}", user.getId());
+        log.info("Processing milestone {} for user {}", milestone, userId);
+
+        // Check if reward already granted (prevent duplicates)
+        if (referralRewardRepository.existsByUserIdAndMilestone(userId, milestone)) {
+            log.debug("Milestone {} reward already granted for user: {}", milestone, userId);
             return;
         }
 
-        // Activate referral (only if user has referrer)
-        if (referrer != null) {
-            user.activateReferral();
-            log.info("Referral activated for user: {}, referrer: {}",
-                    user.getId(), referrer.getId());
+        // 1. Handle referral activation (for WITH_REFERRER milestones only)
+        if (config.activatesReferralCommission() && referrer != null) {
+            user.activateReferral(config.getCommissionMonths());
+            log.info("Referral activated for user: {}, referrer: {}, duration: {} months",
+                    userId, referrer.getId(), config.getCommissionMonths());
         }
 
-        // Grant bonus reward
-        ReferralReward reward = ReferralReward.createMilestoneBonus(
-                user.getId(),
-                referrerId,
-                MILESTONE_ACTIVATION,
-                BONUS_MILESTONE_3
-        );
-        reward.grant();
-        referralRewardRepository.save(reward);
+        // 2. Handle tier upgrade
+        if (config.hasTierUpgrade()) {
+            UserLevel newTier = config.getNewTier();
+            // Only upgrade if current level is lower
+            if (shouldUpgrade(user.getUserLevel(), newTier)) {
+                user.upgradeTo(newTier);
+                log.info("User {} upgraded to tier: {}", userId, newTier);
 
-        log.info("Milestone 3 bonus granted: userId={}, amount={}",
-                user.getId(), BONUS_MILESTONE_3);
+                // Create tier upgrade reward record
+                ReferralReward tierReward = ReferralReward.createTierUpgrade(
+                        userId,
+                        referrerId,
+                        milestone,
+                        newTier
+                );
+                tierReward.grant();
+                referralRewardRepository.save(tierReward);
+            }
+        }
+
+        // 3. Handle referee bonus (for the user completing orders)
+        if (config.hasRefereeBonus()) {
+            BigDecimal refereeBonus = config.getRefereeBonus();
+            ReferralReward reward = ReferralReward.createMilestoneBonus(
+                    userId,
+                    referrerId,
+                    milestone,
+                    refereeBonus
+            );
+            reward.grant();
+            ReferralReward savedReward = referralRewardRepository.save(reward);
+
+            // Add bonus to referee's wallet
+            addBonusToWallet(user, refereeBonus, savedReward.getId(),
+                    TransactionSourceType.MILESTONE_BONUS,
+                    "Milestone " + milestone + " bonus");
+
+            log.info("Referee bonus granted: userId={}, milestone={}, amount={}",
+                    userId, milestone, refereeBonus);
+        }
+
+        // 4. Handle referrer bonus (for the user who referred)
+        if (config.hasReferrerBonus() && referrer != null) {
+            BigDecimal referrerBonus = config.getReferrerBonus();
+
+            // Create reward record for referrer
+            ReferralReward referrerReward = ReferralReward.builder()
+                    .userId(referrer.getId())
+                    .referrerId(null) // Referrer's own reward
+                    .rewardType(ReferralRewardType.MILESTONE_BONUS)
+                    .milestone(milestone)
+                    .amount(referrerBonus)
+                    .status(ReferralRewardStatus.GRANTED)
+                    .build();
+            referrerReward.grant();
+            ReferralReward savedReferrerReward = referralRewardRepository.save(referrerReward);
+
+            // Add bonus to referrer's wallet
+            addBonusToWallet(referrer, referrerBonus, savedReferrerReward.getId(),
+                    TransactionSourceType.REFERRER_BONUS,
+                    "Referrer bonus for milestone " + milestone);
+
+            log.info("Referrer bonus granted: referrerId={}, milestone={}, amount={}",
+                    referrer.getId(), milestone, referrerBonus);
+        }
     }
 
     /**
-     * Process milestone 10: 20,000 VND bonus.
+     * Add bonus to user's wallet and create transaction.
      */
-    private void processMilestone10(User user, User referrer, int completedOrders) {
-        if (completedOrders != MILESTONE_SECOND_BONUS) {
-            return;
-        }
+    private void addBonusToWallet(User user, BigDecimal amount, Long rewardId,
+                                   TransactionSourceType sourceType, String description) {
+        Long userId = user.getId();
 
-        Long referrerId = referrer != null ? referrer.getId() : null;
+        // Get or create wallet
+        UserWallet wallet = walletRepository.findByUserId(userId)
+                .orElseGet(() -> {
+                    log.info("Wallet not found for user {}, creating new wallet", userId);
+                    UserWallet newWallet = UserWallet.builder()
+                            .userId(userId)
+                            .build();
+                    return walletRepository.save(newWallet);
+                });
 
-        // Check if reward already granted
-        if (referralRewardRepository.existsByUserIdAndMilestone(user.getId(), MILESTONE_SECOND_BONUS)) {
-            log.debug("Milestone 10 reward already granted for user: {}", user.getId());
-            return;
-        }
+        // Record balance before
+        BigDecimal balanceBefore = wallet.getBalance();
 
-        // Grant bonus reward
-        ReferralReward reward = ReferralReward.createMilestoneBonus(
-                user.getId(),
-                referrerId,
-                MILESTONE_SECOND_BONUS,
-                BONUS_MILESTONE_10
-        );
-        reward.grant();
-        referralRewardRepository.save(reward);
+        // Add bonus to wallet
+        wallet.addBonus(amount);
+        walletRepository.save(wallet);
 
-        log.info("Milestone 10 bonus granted: userId={}, amount={}",
-                user.getId(), BONUS_MILESTONE_10);
+        // Record balance after
+        BigDecimal balanceAfter = wallet.getBalance();
+
+        // Create transaction for tracking
+        CreateTransactionCommand transactionCommand = CreateTransactionCommand.builder()
+                .userId(userId)
+                .walletId(wallet.getId())
+                .type(TransactionType.BONUS)
+                .amount(amount)
+                .description(description)
+                .balanceBefore(balanceBefore)
+                .balanceAfter(balanceAfter)
+                .status(TransactionStatus.SUCCESS)
+                .sourceType(sourceType)
+                .sourceId(rewardId)
+                .build();
+
+        createTransactionUseCase.execute(transactionCommand);
+
+        log.debug("Bonus added to wallet: userId={}, amount={}, balance: {} -> {}",
+                userId, amount, balanceBefore, balanceAfter);
     }
 
     /**
-     * Process milestone 40: VIP tier upgrade.
+     * Check if user should be upgraded from current level to new level.
      */
-    private void processMilestone40(User user, User referrer, int completedOrders) {
-        if (completedOrders != MILESTONE_VIP) {
-            return;
+    private boolean shouldUpgrade(UserLevel current, UserLevel target) {
+        if (current == null || target == null) {
+            return false;
         }
 
-        // Only upgrade if currently NORMAL
-        if (user.getUserLevel() != UserLevel.NORMAL) {
-            log.debug("User {} already VIP or higher, skipping milestone 40", user.getId());
-            return;
-        }
+        // Order: NORMAL < VIP < SUPER
+        int currentOrdinal = current.ordinal();
+        int targetOrdinal = target.ordinal();
 
-        Long referrerId = referrer != null ? referrer.getId() : null;
-
-        // Check if reward already granted
-        if (referralRewardRepository.existsByUserIdAndMilestone(user.getId(), MILESTONE_VIP)) {
-            log.debug("Milestone 40 reward already granted for user: {}", user.getId());
-            return;
-        }
-
-        // Upgrade to VIP
-        user.upgradeTo(UserLevel.VIP);
-
-        // Grant tier upgrade reward
-        ReferralReward reward = ReferralReward.createTierUpgrade(
-                user.getId(),
-                referrerId,
-                MILESTONE_VIP,
-                UserLevel.VIP
-        );
-        reward.grant();
-        referralRewardRepository.save(reward);
-
-        log.info("Milestone 40 tier upgrade granted: userId={}, newTier=VIP",
-                user.getId());
-    }
-
-    /**
-     * Process milestone 150: SUPER tier upgrade.
-     */
-    private void processMilestone150(User user, User referrer, int completedOrders) {
-        if (completedOrders != MILESTONE_SUPER) {
-            return;
-        }
-
-        // Only upgrade if currently VIP
-        if (user.getUserLevel() != UserLevel.VIP) {
-            log.debug("User {} not VIP, cannot upgrade to SUPER at milestone 150", user.getId());
-            return;
-        }
-
-        Long referrerId = referrer != null ? referrer.getId() : null;
-
-        // Check if reward already granted
-        if (referralRewardRepository.existsByUserIdAndMilestone(user.getId(), MILESTONE_SUPER)) {
-            log.debug("Milestone 150 reward already granted for user: {}", user.getId());
-            return;
-        }
-
-        // Upgrade to SUPER
-        user.upgradeTo(UserLevel.SUPER);
-
-        // Grant tier upgrade reward
-        ReferralReward reward = ReferralReward.createTierUpgrade(
-                user.getId(),
-                referrerId,
-                MILESTONE_SUPER,
-                UserLevel.SUPER
-        );
-        reward.grant();
-        referralRewardRepository.save(reward);
-
-        log.info("Milestone 150 tier upgrade granted: userId={}, newTier=SUPER",
-                user.getId());
+        return targetOrdinal > currentOrdinal;
     }
 }

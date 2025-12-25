@@ -1,5 +1,6 @@
 package com.cashbee.application.dto.transaction;
 
+import com.cashbee.domain.enums.TransactionSourceType;
 import com.cashbee.domain.enums.TransactionStatus;
 import com.cashbee.domain.enums.TransactionType;
 import lombok.Builder;
@@ -67,4 +68,21 @@ public class CreateTransactionCommand {
      * Transaction status (SUCCESS, PENDING, FAILED, CANCELLED).
      */
     private final TransactionStatus status;
+
+    /**
+     * Source type indicating where this transaction originated from.
+     * Examples: ORDER, MILESTONE_BONUS, REFERRER_BONUS, PAYOUT, etc.
+     * Optional - can be null for legacy transactions.
+     */
+    private final TransactionSourceType sourceType;
+
+    /**
+     * ID of the source record (FK to related table based on sourceType).
+     * Examples:
+     * - ORDER: cashback.id
+     * - MILESTONE_BONUS: referral_reward.id
+     * - PAYOUT: payout_request.id
+     * Optional - can be null if sourceType is not set.
+     */
+    private final Long sourceId;
 }

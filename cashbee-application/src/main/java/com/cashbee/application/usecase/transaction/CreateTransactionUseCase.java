@@ -67,6 +67,8 @@ public class CreateTransactionUseCase {
                 .balanceBefore(command.getBalanceBefore())
                 .balanceAfter(command.getBalanceAfter())
                 .status(command.getStatus())
+                .sourceType(command.getSourceType())
+                .sourceId(command.getSourceId())
                 .createdAt(LocalDateTime.now())
                 .build();
 

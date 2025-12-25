@@ -93,4 +93,7 @@
     <!-- First login tracking for user onboarding -->
     <include file="db/changelog/043-add-first-login-to-user.xml"/>
 
+    <!-- Milestone & Referral System Update -->
+    <include file="db/changelog/044-update-milestone-referral-system.xml"/>
+
 </databaseChangeLog>

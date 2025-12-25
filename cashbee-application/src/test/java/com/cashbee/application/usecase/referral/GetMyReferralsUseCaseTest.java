@@ -56,7 +56,8 @@ class GetMyReferralsUseCaseTest {
                 .status(UserStatus.ACTIVE)
                 .build();
 
-        // User who was referred and activated (reached 3 orders, within 3 months)
+        // User who was referred and activated (reached 3 orders, within 5 months)
+        LocalDateTime activatedAt = LocalDateTime.now().minusDays(30); // Activated 30 days ago
         referredUser1 = User.builder()
                 .id(2L)
                 .keycloakId("referred-1-keycloak-id")
@@ -66,7 +67,8 @@ class GetMyReferralsUseCaseTest {
                 .referredBy("MYCODE01")
                 .userLevel(UserLevel.NORMAL)
                 .totalCompletedOrders(5)
-                .referralActivatedAt(LocalDateTime.now().minusDays(30)) // Activated 30 days ago
+                .referralActivatedAt(activatedAt)
+                .referralExpiresAt(activatedAt.plusMonths(5)) // Expires 5 months from activation
                 .status(UserStatus.ACTIVE)
                 .createdAt(LocalDateTime.now().minusDays(45))
                 .build();
@@ -129,7 +131,7 @@ class GetMyReferralsUseCaseTest {
         }
 
         @Test
-        @DisplayName("Should count active referrals correctly (within 3-month period)")
+        @DisplayName("Should count active referrals correctly (within 5-month period)")
         void shouldCountActiveReferralsCorrectly() {
             // Given
             when(userRepository.findByKeycloakId("current-user-keycloak-id"))
@@ -141,7 +143,7 @@ class GetMyReferralsUseCaseTest {
             GetMyReferralsResponse response = useCase.execute("current-user-keycloak-id");
 
             // Then
-            // referredUser1 is active (activated 30 days ago, within 3 months)
+            // referredUser1 is active (activated 30 days ago, within 5 months commission period)
             // referredUser2 is not activated yet
             assertThat(response.getTotalReferrals()).isEqualTo(2);
             assertThat(response.getActiveReferrals()).isEqualTo(1);
@@ -279,7 +281,7 @@ class GetMyReferralsUseCaseTest {
 
             // Then
             GetMyReferralsResponse.ReferredUserInfo userInfo = response.getReferrals().get(0);
-            // referredUser1 was activated 30 days ago, so still within 3-month period
+            // referredUser1 was activated 30 days ago, so still within 5-month period
             assertThat(userInfo.isWithinCommissionPeriod()).isTrue();
         }
     }
@@ -292,6 +294,7 @@ class GetMyReferralsUseCaseTest {
         @DisplayName("Should mark expired referral as not within commission period")
         void shouldMarkExpiredReferralCorrectly() {
             // Given
+            LocalDateTime expiredActivatedAt = LocalDateTime.now().minusMonths(6); // Activated 6 months ago
             User expiredReferral = User.builder()
                     .id(4L)
                     .keycloakId("expired-keycloak-id")
@@ -301,9 +304,10 @@ class GetMyReferralsUseCaseTest {
                     .referredBy("MYCODE01")
                     .userLevel(UserLevel.NORMAL)
                     .totalCompletedOrders(10)
-                    .referralActivatedAt(LocalDateTime.now().minusMonths(4)) // Activated 4 months ago (expired)
+                    .referralActivatedAt(expiredActivatedAt)
+                    .referralExpiresAt(expiredActivatedAt.plusMonths(5)) // Expired 1 month ago
                     .status(UserStatus.ACTIVE)
-                    .createdAt(LocalDateTime.now().minusMonths(5))
+                    .createdAt(LocalDateTime.now().minusMonths(7))
                     .build();
 
             when(userRepository.findByKeycloakId("current-user-keycloak-id"))

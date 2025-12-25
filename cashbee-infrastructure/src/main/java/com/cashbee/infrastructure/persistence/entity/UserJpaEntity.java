@@ -70,6 +70,9 @@ public class UserJpaEntity {
     @Column(name = "referral_activated_at")
     private LocalDateTime referralActivatedAt;
 
+    @Column(name = "referral_expires_at")
+    private LocalDateTime referralExpiresAt;
+
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 

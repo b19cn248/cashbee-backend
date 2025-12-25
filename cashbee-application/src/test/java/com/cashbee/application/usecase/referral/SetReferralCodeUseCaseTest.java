@@ -1,7 +1,9 @@
 package com.cashbee.application.usecase.referral;
 
+import com.cashbee.application.dto.referral.ReferralValidationResult;
 import com.cashbee.application.dto.referral.SetReferralCodeCommand;
 import com.cashbee.application.dto.referral.SetReferralCodeResponse;
+import com.cashbee.application.service.ReferralCodeValidator;
 import com.cashbee.common.exception.InvalidReferralCodeException;
 import com.cashbee.common.exception.ReferralCodeAlreadySetException;
 import com.cashbee.common.exception.SelfReferralException;
@@ -23,6 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -36,6 +39,9 @@ class SetReferralCodeUseCaseTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private ReferralCodeValidator referralCodeValidator;
 
     @InjectMocks
     private SetReferralCodeUseCase useCase;
@@ -85,10 +91,15 @@ class SetReferralCodeUseCaseTest {
                     .referralCode("REFCODE1")
                     .build();
 
+            ReferralValidationResult validResult = ReferralValidationResult.valid(
+                    "REFCODE1", 2L, "Re********"
+            );
+
             when(userRepository.findByKeycloakId("referee-keycloak-id"))
                     .thenReturn(Optional.of(referee));
-            when(userRepository.findByReferralCode("REFCODE1"))
-                    .thenReturn(Optional.of(referrer));
+            doNothing().when(referralCodeValidator).checkNotAlreadyReferred(referee);
+            when(referralCodeValidator.validateOrThrow("REFCODE1", 1L))
+                    .thenReturn(validResult);
             when(userRepository.save(any(User.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -103,7 +114,8 @@ class SetReferralCodeUseCaseTest {
             assertThat(response.getReferrerName()).isNotNull();
 
             verify(userRepository).findByKeycloakId("referee-keycloak-id");
-            verify(userRepository).findByReferralCode("REFCODE1");
+            verify(referralCodeValidator).checkNotAlreadyReferred(referee);
+            verify(referralCodeValidator).validateOrThrow("REFCODE1", 1L);
             verify(userRepository).save(any(User.class));
         }
 
@@ -115,10 +127,15 @@ class SetReferralCodeUseCaseTest {
                     .referralCode("REFCODE1")
                     .build();
 
+            ReferralValidationResult validResult = ReferralValidationResult.valid(
+                    "REFCODE1", 2L, "Re********"
+            );
+
             when(userRepository.findByKeycloakId("referee-keycloak-id"))
                     .thenReturn(Optional.of(referee));
-            when(userRepository.findByReferralCode("REFCODE1"))
-                    .thenReturn(Optional.of(referrer));
+            doNothing().when(referralCodeValidator).checkNotAlreadyReferred(referee);
+            when(referralCodeValidator.validateOrThrow("REFCODE1", 1L))
+                    .thenReturn(validResult);
             when(userRepository.save(any(User.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -126,8 +143,8 @@ class SetReferralCodeUseCaseTest {
             SetReferralCodeResponse response = useCase.execute("referee-keycloak-id", command);
 
             // Then
-            // Name should be partially masked for privacy
-            assertThat(response.getReferrerName()).isNotEqualTo("Referrer Full Name");
+            // Name should be partially masked for privacy (returned from validator)
+            assertThat(response.getReferrerName()).isEqualTo("Re********");
             assertThat(response.getReferrerName()).contains("*");
         }
     }
@@ -146,8 +163,9 @@ class SetReferralCodeUseCaseTest {
 
             when(userRepository.findByKeycloakId("referee-keycloak-id"))
                     .thenReturn(Optional.of(referee));
-            when(userRepository.findByReferralCode("INVALID1"))
-                    .thenReturn(Optional.empty());
+            doNothing().when(referralCodeValidator).checkNotAlreadyReferred(referee);
+            when(referralCodeValidator.validateOrThrow("INVALID1", 1L))
+                    .thenThrow(InvalidReferralCodeException.notFound("INVALID1"));
 
             // When/Then
             assertThatThrownBy(() -> useCase.execute("referee-keycloak-id", command))
@@ -168,12 +186,14 @@ class SetReferralCodeUseCaseTest {
 
             when(userRepository.findByKeycloakId("referee-keycloak-id"))
                     .thenReturn(Optional.of(referee));
+            doThrow(ReferralCodeAlreadySetException.forUser(1L, "EXISTING"))
+                    .when(referralCodeValidator).checkNotAlreadyReferred(referee);
 
             // When/Then
             assertThatThrownBy(() -> useCase.execute("referee-keycloak-id", command))
                     .isInstanceOf(ReferralCodeAlreadySetException.class);
 
-            verify(userRepository, never()).findByReferralCode(any());
+            verify(referralCodeValidator, never()).validateOrThrow(any(), any());
             verify(userRepository, never()).save(any());
         }
 
@@ -187,8 +207,9 @@ class SetReferralCodeUseCaseTest {
 
             when(userRepository.findByKeycloakId("referee-keycloak-id"))
                     .thenReturn(Optional.of(referee));
-            when(userRepository.findByReferralCode("REFEREE1"))
-                    .thenReturn(Optional.of(referee)); // Returns the same user
+            doNothing().when(referralCodeValidator).checkNotAlreadyReferred(referee);
+            when(referralCodeValidator.validateOrThrow("REFEREE1", 1L))
+                    .thenThrow(SelfReferralException.forUser(1L));
 
             // When/Then
             assertThatThrownBy(() -> useCase.execute("referee-keycloak-id", command))
@@ -220,20 +241,19 @@ class SetReferralCodeUseCaseTest {
         @DisplayName("Should throw exception when referrer is inactive")
         void shouldThrowExceptionWhenReferrerIsInactive() {
             // Given
-            referrer.setStatus(UserStatus.BANNED);
             SetReferralCodeCommand command = SetReferralCodeCommand.builder()
                     .referralCode("REFCODE1")
                     .build();
 
             when(userRepository.findByKeycloakId("referee-keycloak-id"))
                     .thenReturn(Optional.of(referee));
-            when(userRepository.findByReferralCode("REFCODE1"))
-                    .thenReturn(Optional.of(referrer));
+            doNothing().when(referralCodeValidator).checkNotAlreadyReferred(referee);
+            when(referralCodeValidator.validateOrThrow("REFCODE1", 1L))
+                    .thenThrow(new InvalidReferralCodeException("REFERRER_INACTIVE", "Mã giới thiệu không còn hoạt động"));
 
             // When/Then
             assertThatThrownBy(() -> useCase.execute("referee-keycloak-id", command))
-                    .isInstanceOf(InvalidReferralCodeException.class)
-                    .hasMessageContaining("inactive");
+                    .isInstanceOf(InvalidReferralCodeException.class);
 
             verify(userRepository, never()).save(any());
         }
@@ -246,16 +266,21 @@ class SetReferralCodeUseCaseTest {
         @Test
         @DisplayName("Should match referral code case-insensitively")
         void shouldMatchReferralCodeCaseInsensitively() {
-            // Given
+            // Given - lowercase input
             SetReferralCodeCommand command = SetReferralCodeCommand.builder()
                     .referralCode("refcode1") // lowercase
                     .build();
 
+            ReferralValidationResult validResult = ReferralValidationResult.valid(
+                    "REFCODE1", 2L, "Re********"
+            );
+
             when(userRepository.findByKeycloakId("referee-keycloak-id"))
                     .thenReturn(Optional.of(referee));
-            // Repository should be called with uppercase
-            when(userRepository.findByReferralCode("REFCODE1"))
-                    .thenReturn(Optional.of(referrer));
+            doNothing().when(referralCodeValidator).checkNotAlreadyReferred(referee);
+            // Validator should normalize to uppercase
+            when(referralCodeValidator.validateOrThrow("refcode1", 1L))
+                    .thenReturn(validResult);
             when(userRepository.save(any(User.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -264,7 +289,8 @@ class SetReferralCodeUseCaseTest {
 
             // Then
             assertThat(response.isSuccess()).isTrue();
-            verify(userRepository).findByReferralCode("REFCODE1");
+            assertThat(response.getReferralCode()).isEqualTo("REFCODE1"); // normalized
+            verify(referralCodeValidator).validateOrThrow("refcode1", 1L);
         }
     }
 }

@@ -92,11 +92,18 @@ public class User {
     private Integer totalCompletedOrders = 0;
 
     /**
-     * Timestamp when referee reaches 3 orders and referral is activated.
-     * From this point, referrer receives 5% commission for 3 months.
+     * Timestamp when referee reaches activation milestone and referral is activated.
+     * From this point, referrer receives 5% commission.
      * Null if not yet activated.
      */
     private LocalDateTime referralActivatedAt;
+
+    /**
+     * Timestamp when referral commission period expires.
+     * Set when referral is activated (activation time + commission months from config).
+     * Null if not yet activated.
+     */
+    private LocalDateTime referralExpiresAt;
 
     /**
      * User account status.
@@ -319,40 +326,41 @@ public class User {
     }
 
     /**
-     * Activate the referral relationship.
-     * Should be called when user reaches 3 completed orders.
-     * After activation, referrer will receive 5% commission for 3 months.
+     * Activate the referral relationship with specified commission duration.
+     * Should be called when user reaches activation milestone.
+     * After activation, referrer will receive 5% commission for specified months.
+     *
+     * @param commissionMonths number of months for commission period
      */
-    public void activateReferral() {
+    public void activateReferral(int commissionMonths) {
         if (this.referralActivatedAt == null) {
             this.referralActivatedAt = LocalDateTime.now();
+            this.referralExpiresAt = this.referralActivatedAt.plusMonths(commissionMonths);
         }
     }
 
     /**
-     * Get the expiration date for referrer commission.
-     * Commission is valid for 3 months after activation.
-     *
-     * @return expiration timestamp, or null if not activated
+     * Activate the referral relationship with default 5 months commission.
+     * Should be called when user reaches activation milestone.
      */
-    public LocalDateTime getReferralExpiresAt() {
-        if (this.referralActivatedAt == null) {
-            return null;
-        }
-        return this.referralActivatedAt.plusMonths(3);
+    public void activateReferral() {
+        activateReferral(5); // Default 5 months
     }
 
     /**
      * Check if the referral commission period is still active.
-     * Valid for 3 months after referral activation.
+     * Valid until referralExpiresAt timestamp.
      *
-     * @return true if within the 3-month commission period
+     * @return true if within the commission period
      */
     public boolean isWithinReferralPeriod() {
         if (!isReferralActivated()) {
             return false;
         }
-        return LocalDateTime.now().isBefore(getReferralExpiresAt());
+        if (this.referralExpiresAt == null) {
+            return false;
+        }
+        return LocalDateTime.now().isBefore(this.referralExpiresAt);
     }
 
     /**

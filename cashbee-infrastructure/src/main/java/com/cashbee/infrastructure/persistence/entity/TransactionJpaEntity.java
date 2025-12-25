@@ -1,5 +1,6 @@
 package com.cashbee.infrastructure.persistence.entity;
 
+import com.cashbee.domain.enums.TransactionSourceType;
 import com.cashbee.domain.enums.TransactionStatus;
 import com.cashbee.domain.enums.TransactionType;
 import jakarta.persistence.*;
@@ -87,6 +88,20 @@ public class TransactionJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private TransactionStatus status;
+
+    /**
+     * Source type indicating where this transaction originated from.
+     * Examples: ORDER (cashback), MILESTONE_BONUS, REFERRER_BONUS, PAYOUT, etc.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", length = 30)
+    private TransactionSourceType sourceType;
+
+    /**
+     * ID of the source record (FK to related table based on sourceType).
+     */
+    @Column(name = "source_id")
+    private Long sourceId;
 
     /**
      * When transaction was created (auto-populated).
