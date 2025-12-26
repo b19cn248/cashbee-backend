@@ -75,6 +75,8 @@ public class Tui3GangProductCommissionAdapter implements ProductCommissionServic
             price,
             info.getImageUrl(),
             info.getProductLink(),
+            sellerRate,     // NEW: hoa hồng từ seller (VD: 0.10 = 10%)
+            shopeeRate,     // NEW: hoa hồng từ Shopee (VD: 0.05 = 5%)
             commission,     // commission = rate * price
             commissionRate, // total rate (VD: 0.15 = 15%)
             null,           // sales not available in Tui3Gang API

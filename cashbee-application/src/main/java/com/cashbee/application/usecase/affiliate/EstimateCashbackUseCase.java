@@ -81,13 +81,13 @@ public class EstimateCashbackUseCase {
         BigDecimal price = productInfo.price();
         BigDecimal commissionRate = productInfo.commissionRate();
 
-        // Convert rate to percentage (0.15 -> 15.0%)
-        BigDecimal cashbackRatePercent = commissionRate
-            .multiply(BigDecimal.valueOf(100))
-            .setScale(2, RoundingMode.HALF_UP);
+        // Convert rates to percentage (0.15 -> 15.0%)
+        BigDecimal cashbackRatePercent = toPercent(commissionRate);
+        BigDecimal sellerRatePercent = toPercent(productInfo.sellerCommissionRate());
+        BigDecimal shopeeRatePercent = toPercent(productInfo.shopeeCommissionRate());
 
-        log.info("EstimateCashbackUseCase: Product: {}, Price: {}, Rate: {}%, Cashback: {}",
-            productInfo.productName(), price, cashbackRatePercent, estimatedCashback);
+        log.info("EstimateCashbackUseCase: Product: {}, Price: {}, SellerRate: {}%, ShopeeRate: {}%, TotalRate: {}%, Cashback: {}",
+            productInfo.productName(), price, sellerRatePercent, shopeeRatePercent, cashbackRatePercent, estimatedCashback);
 
         // Step 4: Build response
         String formattedCashback = VND_FORMAT.format(estimatedCashback) + "đ";
@@ -103,6 +103,8 @@ public class EstimateCashbackUseCase {
             .imageUrl(productInfo.imageUrl())
             .productLink(productInfo.productLink())
             .sales(productInfo.sales())
+            .sellerCommissionRate(sellerRatePercent)   // NEW: hoa hồng từ seller (%)
+            .shopeeCommissionRate(shopeeRatePercent)   // NEW: hoa hồng từ Shopee (%)
             .chietKhauCommission(estimatedCashback)
             .estimatedCashback(estimatedCashback)
             .cashbackRate(cashbackRatePercent)
@@ -110,5 +112,20 @@ public class EstimateCashbackUseCase {
             .maxCap(productInfo.maxCap())
             .message(message)
             .build();
+    }
+
+    /**
+     * Convert rate to percentage (0.15 -> 15.0%).
+     * Returns null if input is null.
+     *
+     * @param rate Rate as decimal (e.g., 0.15 for 15%)
+     * @return Rate as percentage or null
+     */
+    private BigDecimal toPercent(BigDecimal rate) {
+        if (rate == null) {
+            return null;
+        }
+        return rate.multiply(BigDecimal.valueOf(100))
+            .setScale(2, RoundingMode.HALF_UP);
     }
 }

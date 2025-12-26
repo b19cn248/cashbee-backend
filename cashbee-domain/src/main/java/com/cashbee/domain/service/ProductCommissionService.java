@@ -37,9 +37,11 @@ public interface ProductCommissionService {
         BigDecimal price,
         String imageUrl,
         String productLink,
-        BigDecimal commission,      // Số tiền hoa hồng = (sellerRate + shopeeRate) * price
-        BigDecimal commissionRate,  // Tỷ lệ hoa hồng (VD: 0.15 = 15%)
-        Integer sales,              // Số lượt bán
+        BigDecimal sellerCommissionRate,  // Hoa hồng từ seller (VD: 0.10 = 10%), nullable
+        BigDecimal shopeeCommissionRate,  // Hoa hồng từ Shopee (VD: 0.05 = 5%), nullable
+        BigDecimal commission,             // Số tiền hoa hồng = (sellerRate + shopeeRate) * price
+        BigDecimal commissionRate,         // Tỷ lệ hoa hồng tổng (VD: 0.15 = 15%)
+        Integer sales,                     // Số lượt bán
         Boolean isCapped,
         BigDecimal maxCap
     ) {}

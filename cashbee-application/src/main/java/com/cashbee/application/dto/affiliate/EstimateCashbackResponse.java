@@ -57,6 +57,20 @@ public class EstimateCashbackResponse {
     private Integer sales;
 
     /**
+     * Seller commission rate as percentage.
+     * Example: 10.0 means 10% from seller.
+     * Can be null if data source doesn't provide separate rates.
+     */
+    private BigDecimal sellerCommissionRate;
+
+    /**
+     * Shopee commission rate as percentage.
+     * Example: 5.0 means 5% from Shopee.
+     * Can be null if data source doesn't provide separate rates.
+     */
+    private BigDecimal shopeeCommissionRate;
+
+    /**
      * Commission from ChietKhau.Pro (for reference).
      * This is what ChietKhau.Pro pays their users (~52% of Shopee commission).
      */

@@ -56,6 +56,8 @@ public class ChietKhauProductCommissionAdapter implements ProductCommissionServi
             price,
             info.getImageUrl(),
             info.getProductLink(),
+            null,             // sellerCommissionRate: ChietKhau API không cung cấp
+            null,             // shopeeCommissionRate: ChietKhau API không cung cấp
             commission,
             commissionRate,   // commission / price
             info.getSales(),  // Số lượt bán
