@@ -71,6 +71,18 @@ public class EstimateCashbackResponse {
     private BigDecimal shopeeCommissionRate;
 
     /**
+     * Commission amount from seller (in VND).
+     * Formula: price * sellerCommissionRate (no cap).
+     */
+    private BigDecimal sellerCommission;
+
+    /**
+     * Commission amount from Shopee (in VND).
+     * Formula: min(price * shopeeCommissionRate, 50000) - capped at 50k.
+     */
+    private BigDecimal shopeeCommission;
+
+    /**
      * Commission from ChietKhau.Pro (for reference).
      * This is what ChietKhau.Pro pays their users (~52% of Shopee commission).
      */
@@ -78,7 +90,7 @@ public class EstimateCashbackResponse {
 
     /**
      * Estimated cashback amount user will receive from CashBee (in VND).
-     * Formula: commissionRate * price
+     * Formula: sellerCommission + shopeeCommission
      */
     private BigDecimal estimatedCashback;
 

@@ -113,7 +113,8 @@
       "WebFetch(domain:s.shopee.vn)",
       "WebFetch(domain:s.shopeefood.vn)",
       "WebFetch(domain:shopeefood.vn)",
-      "Bash(C:)"
+      "Bash(C:)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

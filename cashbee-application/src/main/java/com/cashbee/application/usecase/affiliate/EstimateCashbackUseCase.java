@@ -25,9 +25,9 @@ import java.util.Optional;
  * 3. Returns estimated cashback with product details
  *
  * Formula:
- * - commissionRate = sellerCommissionRate + shopeeCommissionRate
- * - estimatedCashback = commissionRate * price
- * - cashbackRate (%) = commissionRate * 100
+ * - shopeeCommission = min(price * shopeeRate, 50000)  // Capped at 50k
+ * - sellerCommission = price * sellerRate              // No cap
+ * - estimatedCashback = shopeeCommission + sellerCommission
  *
  * @author CashBee Team
  */
@@ -43,6 +43,11 @@ public class EstimateCashbackUseCase {
      * Number formatter for Vietnamese currency.
      */
     private static final NumberFormat VND_FORMAT = NumberFormat.getInstance(new Locale("vi", "VN"));
+
+    /**
+     * Maximum commission from Shopee (50,000 VND).
+     */
+    private static final BigDecimal SHOPEE_COMMISSION_CAP = new BigDecimal("50000");
 
     /**
      * Execute the use case to estimate cashback.
@@ -76,18 +81,39 @@ public class EstimateCashbackUseCase {
 
         ProductCommissionInfo productInfo = productInfoOpt.get();
 
-        // Step 3: Get values directly from adapter (already calculated)
-        BigDecimal estimatedCashback = productInfo.commission();
+        // Step 3: Calculate commissions with proper caps
         BigDecimal price = productInfo.price();
-        BigDecimal commissionRate = productInfo.commissionRate();
+        BigDecimal sellerRate = productInfo.sellerCommissionRate();
+        BigDecimal shopeeRate = productInfo.shopeeCommissionRate();
 
-        // Convert rates to percentage (0.15 -> 15.0%)
-        BigDecimal cashbackRatePercent = toPercent(commissionRate);
-        BigDecimal sellerRatePercent = toPercent(productInfo.sellerCommissionRate());
-        BigDecimal shopeeRatePercent = toPercent(productInfo.shopeeCommissionRate());
+        // Calculate seller commission (no cap)
+        BigDecimal sellerCommission = BigDecimal.ZERO;
+        if (sellerRate != null && price != null) {
+            sellerCommission = price.multiply(sellerRate).setScale(2, RoundingMode.HALF_UP);
+        }
 
-        log.info("EstimateCashbackUseCase: Product: {}, Price: {}, SellerRate: {}%, ShopeeRate: {}%, TotalRate: {}%, Cashback: {}",
-            productInfo.productName(), price, sellerRatePercent, shopeeRatePercent, cashbackRatePercent, estimatedCashback);
+        // Calculate shopee commission (capped at 50k)
+        BigDecimal shopeeCommission = BigDecimal.ZERO;
+        if (shopeeRate != null && price != null) {
+            shopeeCommission = price.multiply(shopeeRate).setScale(2, RoundingMode.HALF_UP);
+            // Apply cap: max 50,000 VND
+            if (shopeeCommission.compareTo(SHOPEE_COMMISSION_CAP) > 0) {
+                shopeeCommission = SHOPEE_COMMISSION_CAP;
+            }
+        }
+
+        // Total estimated cashback
+        BigDecimal estimatedCashback = sellerCommission.add(shopeeCommission);
+
+        // Convert rates to percentage for display (0.05 -> 5.0%)
+        BigDecimal sellerRatePercent = toPercent(sellerRate);
+        BigDecimal shopeeRatePercent = toPercent(shopeeRate);
+        BigDecimal cashbackRatePercent = toPercent(productInfo.commissionRate());
+
+        log.info("EstimateCashbackUseCase: Product: {}, Price: {}, SellerRate: {}%, ShopeeRate: {}%, " +
+                "SellerCommission: {}, ShopeeCommission: {} (cap 50k), TotalCashback: {}",
+            productInfo.productName(), price, sellerRatePercent, shopeeRatePercent,
+            sellerCommission, shopeeCommission, estimatedCashback);
 
         // Step 4: Build response
         String formattedCashback = VND_FORMAT.format(estimatedCashback) + "đ";
@@ -103,13 +129,15 @@ public class EstimateCashbackUseCase {
             .imageUrl(productInfo.imageUrl())
             .productLink(productInfo.productLink())
             .sales(productInfo.sales())
-            .sellerCommissionRate(sellerRatePercent)   // NEW: hoa hồng từ seller (%)
-            .shopeeCommissionRate(shopeeRatePercent)   // NEW: hoa hồng từ Shopee (%)
-            .chietKhauCommission(estimatedCashback)
-            .estimatedCashback(estimatedCashback)
+            .sellerCommissionRate(sellerRatePercent)
+            .shopeeCommissionRate(shopeeRatePercent)
+            .sellerCommission(sellerCommission)        // Tiền từ seller (không giới hạn)
+            .shopeeCommission(shopeeCommission)        // Tiền từ Shopee (đã cap 50k)
+            .chietKhauCommission(productInfo.commission())  // Giá trị gốc từ API
+            .estimatedCashback(estimatedCashback)      // Tổng đã tính đúng
             .cashbackRate(cashbackRatePercent)
-            .isCapped(productInfo.isCapped())
-            .maxCap(productInfo.maxCap())
+            .isCapped(shopeeCommission.compareTo(SHOPEE_COMMISSION_CAP) == 0)  // True nếu đạt cap
+            .maxCap(SHOPEE_COMMISSION_CAP)
             .message(message)
             .build();
     }
