@@ -4,6 +4,7 @@ import com.cashbee.application.dto.affiliate.FallbackMatchResult;
 import com.cashbee.application.dto.affiliate.ImportOrdersRequest;
 import com.cashbee.application.dto.affiliate.ImportOrdersResponse;
 import com.cashbee.application.usecase.cashback.CalculateCashbackUseCase;
+import com.cashbee.application.usecase.referral.ProcessReferralOnOrderCompletedUseCase;
 import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
 import com.cashbee.application.util.affiliate.ShopeeCSVParser;
 import com.cashbee.application.util.affiliate.TrackingCodeGenerator;
@@ -75,6 +76,7 @@ public class ImportShopeeOrdersUseCase {
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final CalculateCashbackUseCase calculateCashbackUseCase;
     private final RecalculateWalletUseCase recalculateWalletUseCase;
+    private final ProcessReferralOnOrderCompletedUseCase processReferralUseCase;
     private final EntityManager entityManager;
 
     /**
@@ -762,6 +764,18 @@ public class ImportShopeeOrdersUseCase {
         // Track affected user for wallet recalculation
         affectedUserIds.add(finalUserId);
 
+        // Process referral milestone when new order is created with APPROVED status
+        // For new orders, oldStatus is null (simulating transition from nothing to current status)
+        if (isOrderCompleted) {
+            try {
+                processReferralUseCase.execute(order.getId(), null, OrderStatus.APPROVED);
+                log.debug("Processed referral milestone for new completed order {}", orderId);
+            } catch (Exception e) {
+                log.error("Failed to process referral for order {}: {}", orderId, e.getMessage(), e);
+                // Don't fail the import if referral processing fails
+            }
+        }
+
         // Match with click if found
         // Note: An order can be BOTH "new" (successCount) AND "matched" (matchedCount)
         // - successCount tracks NEW orders created
@@ -968,6 +982,20 @@ public class ImportShopeeOrdersUseCase {
             }
 
             batch.incrementUpdated();
+
+            // Process referral milestone when order is APPROVED (including APPROVED → APPROVED for re-imports)
+            // This allows fixing historical data where referral wasn't processed before
+            if (newStatus == OrderStatus.APPROVED) {
+                try {
+                    processReferralUseCase.execute(existingOrder.getId(), oldStatus, newStatus);
+                    log.debug("Processed referral for order {} (status: {} → {})",
+                        existingOrder.getOrderId(), oldStatus, newStatus);
+                } catch (Exception e) {
+                    log.error("Failed to process referral for order {}: {}",
+                        existingOrder.getOrderId(), e.getMessage(), e);
+                    // Don't fail the import if referral processing fails
+                }
+            }
 
             // Track affected user for wallet recalculation
             affectedUserIds.add(existingOrder.getUserId());

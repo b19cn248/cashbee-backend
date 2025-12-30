@@ -1,10 +1,13 @@
 package com.cashbee.application.usecase.referral;
 
 import com.cashbee.application.dto.referral.ReferralStatsResponse;
+import com.cashbee.domain.enums.MilestoneType;
 import com.cashbee.domain.enums.ReferralRewardStatus;
 import com.cashbee.domain.enums.ReferralRewardType;
+import com.cashbee.domain.model.MilestoneConfig;
 import com.cashbee.domain.model.ReferralReward;
 import com.cashbee.domain.model.User;
+import com.cashbee.domain.repository.MilestoneConfigRepository;
 import com.cashbee.domain.repository.ReferralRewardRepository;
 import com.cashbee.domain.repository.ReferrerCommissionRepository;
 import com.cashbee.domain.repository.UserRepository;
@@ -39,15 +42,7 @@ public class GetReferralStatsUseCase {
     private final UserRepository userRepository;
     private final ReferralRewardRepository referralRewardRepository;
     private final ReferrerCommissionRepository referrerCommissionRepository;
-
-    // Milestones for referee rewards
-    private static final int[] MILESTONES = {3, 10, 40, 150};
-    private static final String[] MILESTONE_REWARDS = {
-            "10,000 VND bonus + Referral activation",
-            "20,000 VND bonus",
-            "VIP tier upgrade (83% cashback)",
-            "SUPER tier upgrade (85% cashback)"
-    };
+    private final MilestoneConfigRepository milestoneConfigRepository;
 
     /**
      * Execute use case to get referral statistics.
@@ -85,12 +80,21 @@ public class GetReferralStatsUseCase {
                     });
         }
 
+        // Determine milestone type based on user's referrer status
+        MilestoneType milestoneType = user.hasReferrer()
+                ? MilestoneType.WITH_REFERRER
+                : MilestoneType.WITHOUT_REFERRER;
+
+        // Get milestone configs from database
+        List<MilestoneConfig> milestoneConfigs = milestoneConfigRepository.findActiveByMilestoneType(milestoneType);
+
         // Next milestone calculation
         int completedOrders = user.getTotalCompletedOrders() != null ? user.getTotalCompletedOrders() : 0;
-        int nextMilestone = calculateNextMilestone(completedOrders);
+        MilestoneConfig nextMilestoneConfig = calculateNextMilestone(completedOrders, milestoneConfigs);
+        int nextMilestone = nextMilestoneConfig != null ? nextMilestoneConfig.getOrdersRequired() : 0;
         builder.nextMilestone(nextMilestone)
                 .ordersToNextMilestone(nextMilestone > 0 ? nextMilestone - completedOrders : 0)
-                .nextMilestoneReward(getNextMilestoneReward(nextMilestone));
+                .nextMilestoneReward(getNextMilestoneReward(nextMilestoneConfig));
 
         // Referral earnings (as referrer)
         List<User> referrals = userRepository.findByReferredBy(user.getReferralCode());
@@ -116,7 +120,7 @@ public class GetReferralStatsUseCase {
                 .collect(Collectors.toSet());
 
         List<ReferralStatsResponse.MilestoneProgress> milestoneProgress = buildMilestoneProgress(
-                completedOrders, achievedMilestones, rewards);
+                completedOrders, achievedMilestones, rewards, milestoneConfigs);
         builder.milestones(milestoneProgress);
 
         // Recent rewards
@@ -129,40 +133,90 @@ public class GetReferralStatsUseCase {
 
     /**
      * Calculate the next milestone based on completed orders.
+     *
+     * @param completedOrders Number of orders the user has completed
+     * @param milestoneConfigs List of milestone configs from database
+     * @return MilestoneConfig for next milestone, or null if all achieved
      */
-    private int calculateNextMilestone(int completedOrders) {
-        for (int milestone : MILESTONES) {
-            if (completedOrders < milestone) {
-                return milestone;
-            }
-        }
-        return 0; // All milestones achieved
+    private MilestoneConfig calculateNextMilestone(int completedOrders, List<MilestoneConfig> milestoneConfigs) {
+        return milestoneConfigs.stream()
+                .filter(config -> completedOrders < config.getOrdersRequired())
+                .min((a, b) -> Integer.compare(a.getOrdersRequired(), b.getOrdersRequired()))
+                .orElse(null);
     }
 
     /**
-     * Get description of next milestone reward.
+     * Get description of next milestone reward from config.
+     *
+     * @param milestoneConfig The milestone config, or null if all achieved
+     * @return Description of the reward
      */
-    private String getNextMilestoneReward(int nextMilestone) {
-        for (int i = 0; i < MILESTONES.length; i++) {
-            if (MILESTONES[i] == nextMilestone) {
-                return MILESTONE_REWARDS[i];
-            }
+    private String getNextMilestoneReward(MilestoneConfig milestoneConfig) {
+        if (milestoneConfig == null) {
+            return "All milestones achieved!";
         }
-        return "All milestones achieved!";
+
+        // Build description from config
+        StringBuilder description = new StringBuilder();
+
+        if (milestoneConfig.hasRefereeBonus()) {
+            description.append(formatAmount(milestoneConfig.getRefereeBonus())).append(" bonus");
+        }
+
+        if (milestoneConfig.activatesReferralCommission()) {
+            if (!description.isEmpty()) {
+                description.append(" + ");
+            }
+            description.append("Referral activation (")
+                    .append(milestoneConfig.getCommissionMonths())
+                    .append(" months)");
+        }
+
+        if (milestoneConfig.hasTierUpgrade()) {
+            if (!description.isEmpty()) {
+                description.append(" + ");
+            }
+            description.append(milestoneConfig.getNewTier().name())
+                    .append(" tier upgrade");
+        }
+
+        return description.isEmpty() ? milestoneConfig.getDescription() : description.toString();
     }
 
     /**
-     * Build milestone progress list.
+     * Format amount for display.
+     */
+    private String formatAmount(BigDecimal amount) {
+        if (amount == null) {
+            return "0 VND";
+        }
+        return String.format("%,.0f VND", amount);
+    }
+
+    /**
+     * Build milestone progress list from database configs.
+     *
+     * @param completedOrders User's completed orders
+     * @param achievedMilestones Set of milestone numbers already achieved
+     * @param rewards List of user's referral rewards
+     * @param milestoneConfigs List of milestone configs from database
+     * @return List of milestone progress for display
      */
     private List<ReferralStatsResponse.MilestoneProgress> buildMilestoneProgress(
             int completedOrders,
             Set<Integer> achievedMilestones,
-            List<ReferralReward> rewards) {
+            List<ReferralReward> rewards,
+            List<MilestoneConfig> milestoneConfigs) {
+
+        // Sort configs by ordersRequired ascending
+        List<MilestoneConfig> sortedConfigs = milestoneConfigs.stream()
+                .sorted((a, b) -> Integer.compare(a.getOrdersRequired(), b.getOrdersRequired()))
+                .toList();
 
         List<ReferralStatsResponse.MilestoneProgress> progress = new ArrayList<>();
 
-        for (int i = 0; i < MILESTONES.length; i++) {
-            int milestone = MILESTONES[i];
+        for (MilestoneConfig config : sortedConfigs) {
+            int milestone = config.getOrdersRequired();
             boolean achieved = achievedMilestones.contains(milestone);
 
             LocalDateTime achievedAt = null;
@@ -176,13 +230,45 @@ public class GetReferralStatsUseCase {
 
             progress.add(ReferralStatsResponse.MilestoneProgress.builder()
                     .milestone(milestone)
-                    .rewardDescription(MILESTONE_REWARDS[i])
+                    .rewardDescription(buildMilestoneDescription(config))
                     .achieved(achieved)
                     .achievedAt(achievedAt)
                     .build());
         }
 
         return progress;
+    }
+
+    /**
+     * Build description for a milestone config.
+     */
+    private String buildMilestoneDescription(MilestoneConfig config) {
+        StringBuilder description = new StringBuilder();
+
+        if (config.hasRefereeBonus()) {
+            description.append(formatAmount(config.getRefereeBonus())).append(" bonus");
+        }
+
+        if (config.activatesReferralCommission()) {
+            if (!description.isEmpty()) {
+                description.append(" + ");
+            }
+            description.append("Referral activation");
+        }
+
+        if (config.hasTierUpgrade()) {
+            if (!description.isEmpty()) {
+                description.append(" + ");
+            }
+            description.append(config.getNewTier().name()).append(" tier");
+        }
+
+        // Fallback to database description if no specific rewards
+        if (description.isEmpty() && config.getDescription() != null) {
+            return config.getDescription();
+        }
+
+        return description.isEmpty() ? "Milestone reward" : description.toString();
     }
 
     /**

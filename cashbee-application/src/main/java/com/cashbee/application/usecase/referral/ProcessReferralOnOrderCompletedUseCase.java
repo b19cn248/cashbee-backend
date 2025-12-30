@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 /**
  * Use Case: Process referral rewards when an order is completed.
@@ -26,6 +27,17 @@ import java.math.BigDecimal;
 @Slf4j
 public class ProcessReferralOnOrderCompletedUseCase {
 
+    /**
+     * Set of order statuses that indicate a completed order.
+     * Both APPROVED and PAID are considered completion statuses:
+     * - APPROVED: Order confirmed by platform (import from Shopee/Lazada sets this)
+     * - PAID: Order paid out to user (final state)
+     */
+    private static final Set<OrderStatus> COMPLETED_STATUSES = Set.of(
+            OrderStatus.APPROVED,
+            OrderStatus.PAID
+    );
+
     private final AffiliateOrderRepository orderRepository;
     private final ProcessReferralMilestoneUseCase processMilestoneUseCase;
     private final CalculateReferrerCommissionUseCase calculateCommissionUseCase;
@@ -42,16 +54,19 @@ public class ProcessReferralOnOrderCompletedUseCase {
         log.debug("Processing referral for order {} (status: {} → {})",
                 orderId, oldStatus, newStatus);
 
-        // Only process when transitioning TO PAID (final completion)
-        // We use PAID as the trigger because that's when the order is truly complete
-        if (newStatus != OrderStatus.PAID) {
-            log.debug("Order {} not PAID yet, skipping referral processing", orderId);
+        // Only process when transitioning TO a completed status (APPROVED or PAID)
+        // Import typically sets APPROVED, while manual updates may set PAID directly
+        if (!isCompletedStatus(newStatus)) {
+            log.debug("Order {} not completed yet (status={}), skipping referral processing",
+                    orderId, newStatus);
             return;
         }
 
-        // Don't reprocess if already PAID
-        if (oldStatus == OrderStatus.PAID) {
-            log.debug("Order {} already processed (was PAID), skipping", orderId);
+        // Only skip APPROVED → PAID transition (already counted when became APPROVED)
+        // Allow APPROVED → APPROVED for re-import scenarios to fix historical data
+        if (oldStatus == OrderStatus.APPROVED && newStatus == OrderStatus.PAID) {
+            log.debug("Order {} transitioning APPROVED → PAID, already counted, skipping",
+                    orderId);
             return;
         }
 
@@ -128,5 +143,15 @@ public class ProcessReferralOnOrderCompletedUseCase {
         }
 
         log.info("Referral processing completed: userId={}, orderId={}", userId, orderId);
+    }
+
+    /**
+     * Check if an order status represents a completed order.
+     *
+     * @param status Order status to check
+     * @return true if status indicates completion (APPROVED or PAID)
+     */
+    private boolean isCompletedStatus(OrderStatus status) {
+        return status != null && COMPLETED_STATUSES.contains(status);
     }
 }

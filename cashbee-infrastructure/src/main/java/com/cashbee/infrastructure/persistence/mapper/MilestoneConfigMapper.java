@@ -57,7 +57,7 @@ public interface MilestoneConfigMapper {
 
     @Named("stringToMilestoneType")
     default MilestoneType stringToMilestoneType(String type) {
-        return type != null ? MilestoneType.valueOf(type) : null;
+        return (type != null && !type.isBlank()) ? MilestoneType.valueOf(type) : null;
     }
 
     @Named("userLevelToString")
@@ -67,6 +67,6 @@ public interface MilestoneConfigMapper {
 
     @Named("stringToUserLevel")
     default UserLevel stringToUserLevel(String level) {
-        return level != null ? UserLevel.valueOf(level) : null;
+        return (level != null && !level.isBlank()) ? UserLevel.valueOf(level) : null;
     }
 }
