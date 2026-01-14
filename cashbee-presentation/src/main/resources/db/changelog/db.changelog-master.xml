@@ -96,4 +96,16 @@
     <!-- Milestone & Referral System Update -->
     <include file="db/changelog/044-update-milestone-referral-system.xml"/>
 
+    <!-- Payment Invoice & Notification Preferences -->
+    <include file="db/changelog/045-create-payment-invoice-tables.xml"/>
+
+    <!-- Promotion Voucher Management -->
+    <include file="db/changelog/046-create-promotion-voucher-table.xml"/>
+
+    <!-- Referral System Optimization: new milestones, reduced activation threshold -->
+    <include file="db/changelog/047-optimize-referral-milestones.xml"/>
+
+    <!-- Referrer Tier System: tiered commission rates based on referral count -->
+    <include file="db/changelog/048-create-referrer-tier-system.xml"/>
+
 </databaseChangeLog>

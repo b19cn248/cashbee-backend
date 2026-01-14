@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CashBee - Biên lai thanh toán</title>
+    <style>
+        /* Reset and Base Styles */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f5f5f5;
+        }
+
+        /* Container */
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #FFB800 0%, #FF9500 100%);
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .header-title {
+            color: #ffffff;
+            font-size: 18px;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+
+        /* Content */
+        .content {
+            padding: 40px;
+        }
+
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            margin-bottom: 30px;
+            color: #555555;
+        }
+
+        /* Invoice Card */
+        .invoice-card {
+            background-color: #f9f9f9;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eeeeee;
+        }
+
+        .invoice-number {
+            font-size: 14px;
+            color: #888888;
+        }
+
+        .invoice-status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-success {
+            background-color: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .status-pending {
+            background-color: #FFF3E0;
+            color: #EF6C00;
+        }
+
+        /* Amount Section */
+        .amount-section {
+            text-align: center;
+            padding: 25px 0;
+            margin-bottom: 20px;
+        }
+
+        .amount-label {
+            font-size: 14px;
+            color: #888888;
+            margin-bottom: 8px;
+        }
+
+        .amount-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #FFB800;
+        }
+
+        .amount-currency {
+            font-size: 20px;
+            color: #888888;
+            margin-left: 5px;
+        }
+
+        /* Info Grid */
+        .info-grid {
+            display: table;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .info-row {
+            display: table-row;
+        }
+
+        .info-label {
+            display: table-cell;
+            padding: 10px 0;
+            color: #888888;
+            font-size: 14px;
+            width: 40%;
+            vertical-align: top;
+        }
+
+        .info-value {
+            display: table-cell;
+            padding: 10px 0;
+            font-weight: 500;
+            text-align: right;
+        }
+
+        /* Platform Breakdown */
+        .breakdown-section {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 2px solid #eeeeee;
+        }
+
+        .breakdown-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666666;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .platform-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .platform-table th,
+        .platform-table td {
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 1px solid #eeeeee;
+        }
+
+        .platform-table th {
+            font-size: 12px;
+            color: #888888;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .platform-table td {
+            font-size: 14px;
+        }
+
+        .platform-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .platform-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .amount-positive {
+            color: #2E7D32;
+            font-weight: 600;
+        }
+
+        /* CTA Button */
+        .cta-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #FFB800 0%, #FF9500 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: #f9f9f9;
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .footer-text {
+            font-size: 13px;
+            color: #888888;
+            margin-bottom: 15px;
+        }
+
+        .social-links {
+            margin-bottom: 15px;
+        }
+
+        .social-link {
+            display: inline-block;
+            margin: 0 8px;
+            color: #888888;
+            text-decoration: none;
+        }
+
+        .footer-copyright {
+            font-size: 12px;
+            color: #aaaaaa;
+        }
+
+        /* Responsive */
+        @media only screen and (max-width: 600px) {
+            .content {
+                padding: 25px;
+            }
+
+            .invoice-card {
+                padding: 20px;
+            }
+
+            .amount-value {
+                font-size: 28px;
+            }
+
+            .info-label,
+            .info-value {
+                display: block;
+                width: 100%;
+                text-align: left;
+            }
+
+            .info-value {
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <a href="https://cashbee.vn" class="logo">CashBee</a>
+            <div class="header-title">Biên lai thanh toán</div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <div class="greeting">
+                Xin chào <strong th:text="${userName}">Quý khách</strong>,
+            </div>
+
+            <div class="message">
+                Chúng tôi vui lòng thông báo khoản thanh toán hoàn tiền của bạn đã được chuyển thành công.
+                Dưới đây là chi tiết biên lai thanh toán:
+            </div>
+
+            <!-- Invoice Card -->
+            <div class="invoice-card">
+                <!-- Invoice Header -->
+                <div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eeeeee;">
+                    <div style="display: inline-block;">
+                        <span class="invoice-number">Số biên lai: </span>
+                        <strong th:text="${invoiceNumber}">INV-20260104-00001</strong>
+                    </div>
+                    <div style="float: right;">
+                        <span class="invoice-status status-success">Thành công</span>
+                    </div>
+                    <div style="clear: both;"></div>
+                </div>
+
+                <!-- Amount -->
+                <div class="amount-section">
+                    <div class="amount-label">Tổng tiền nhận được</div>
+                    <div>
+                        <span class="amount-value" th:text="${#numbers.formatDecimal(amount, 0, 'COMMA', 0, 'POINT')}">100,000</span>
+                        <span class="amount-currency" th:text="${currency}">VND</span>
+                    </div>
+                </div>
+
+                <!-- Bank Info -->
+                <div class="info-grid">
+                    <div class="info-row">
+                        <div class="info-label">Ngân hàng</div>
+                        <div class="info-value" th:text="${bankName}">Vietcombank</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Số tài khoản</div>
+                        <div class="info-value" th:text="${bankAccountNumber}">****1234</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Thời gian chuyển</div>
+                        <div class="info-value" th:text="${transferTime}">14:30 03/01/2026</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Tổng số đơn</div>
+                        <div class="info-value" th:text="${totalOrders}">15</div>
+                    </div>
+                </div>
+
+                <!-- Platform Breakdown -->
+                <div class="breakdown-section">
+                    <div class="breakdown-title">Chi tiết theo sàn TMDT</div>
+                    <table class="platform-table">
+                        <thead>
+                            <tr>
+                                <th>Sàn</th>
+                                <th class="text-center">Số đơn</th>
+                                <th class="text-right">Số tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Shopee -->
+                            <tr th:if="${shopeeOrders != null and shopeeOrders > 0}">
+                                <td>
+                                    <span class="platform-name">
+                                        <span style="color: #EE4D2D; font-weight: 600;">Shopee</span>
+                                    </span>
+                                </td>
+                                <td class="text-center" th:text="${shopeeOrders}">5</td>
+                                <td class="text-right amount-positive"
+                                    th:text="${#numbers.formatDecimal(shopeeAmount, 0, 'COMMA', 0, 'POINT') + ' VND'}">50,000 VND</td>
+                            </tr>
+                            <!-- Lazada -->
+                            <tr th:if="${lazadaOrders != null and lazadaOrders > 0}">
+                                <td>
+                                    <span class="platform-name">
+                                        <span style="color: #0F146D; font-weight: 600;">Lazada</span>
+                                    </span>
+                                </td>
+                                <td class="text-center" th:text="${lazadaOrders}">3</td>
+                                <td class="text-right amount-positive"
+                                    th:text="${#numbers.formatDecimal(lazadaAmount, 0, 'COMMA', 0, 'POINT') + ' VND'}">25,000 VND</td>
+                            </tr>
+                            <!-- Tiki -->
+                            <tr th:if="${tikiOrders != null and tikiOrders > 0}">
+                                <td>
+                                    <span class="platform-name">
+                                        <span style="color: #1A94FF; font-weight: 600;">Tiki</span>
+                                    </span>
+                                </td>
+                                <td class="text-center" th:text="${tikiOrders}">2</td>
+                                <td class="text-right amount-positive"
+                                    th:text="${#numbers.formatDecimal(tikiAmount, 0, 'COMMA', 0, 'POINT') + ' VND'}">15,000 VND</td>
+                            </tr>
+                            <!-- TikTok -->
+                            <tr th:if="${tiktokOrders != null and tiktokOrders > 0}">
+                                <td>
+                                    <span class="platform-name">
+                                        <span style="color: #000000; font-weight: 600;">TikTok Shop</span>
+                                    </span>
+                                </td>
+                                <td class="text-center" th:text="${tiktokOrders}">3</td>
+                                <td class="text-right amount-positive"
+                                    th:text="${#numbers.formatDecimal(tiktokAmount, 0, 'COMMA', 0, 'POINT') + ' VND'}">8,000 VND</td>
+                            </tr>
+                            <!-- Other -->
+                            <tr th:if="${otherOrders != null and otherOrders > 0}">
+                                <td>
+                                    <span class="platform-name">
+                                        <span style="color: #666666; font-weight: 600;">Khác</span>
+                                    </span>
+                                </td>
+                                <td class="text-center" th:text="${otherOrders}">2</td>
+                                <td class="text-right amount-positive"
+                                    th:text="${#numbers.formatDecimal(otherAmount, 0, 'COMMA', 0, 'POINT') + ' VND'}">2,000 VND</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="cta-section">
+                <a href="https://cashbee.vn/invoices" class="cta-button">Xem chi tiết trong ứng dụng</a>
+            </div>
+
+            <div class="message" style="font-size: 14px; color: #888888;">
+                Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi qua email
+                <a href="mailto:support@cashbee.vn" style="color: #FFB800;">support@cashbee.vn</a>
+                hoặc qua ứng dụng CashBee.
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-text">
+                Bạn nhận được email này vì bạn đã đăng ký nhận thông báo từ CashBee.
+                <br>
+                <a href="https://cashbee.vn/settings/notifications" style="color: #FFB800;">Quản lý thông báo</a>
+            </div>
+
+            <div class="social-links">
+                <a href="https://facebook.com/cashbee" class="social-link">Facebook</a>
+                <a href="https://zalo.me/cashbee" class="social-link">Zalo</a>
+            </div>
+
+            <div class="footer-copyright">
+                &copy; 2026 CashBee. All rights reserved.
+                <br>
+                123 Nguyen Van Linh, District 7, Ho Chi Minh City
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,8 +1,10 @@
 package com.cashbee.application.usecase.referral;
 
 import com.cashbee.domain.model.ReferrerCommission;
+import com.cashbee.domain.model.ReferrerTierConfig;
 import com.cashbee.domain.model.User;
 import com.cashbee.domain.repository.ReferrerCommissionRepository;
+import com.cashbee.domain.repository.ReferrerTierConfigRepository;
 import com.cashbee.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,15 +18,15 @@ import java.time.LocalDateTime;
  * Use Case: Calculate and save referrer commission for a completed order.
  *
  * This use case is called when an order is confirmed/paid.
- * It calculates 5% of the original Shopee commission and saves it
+ * It calculates commission based on referrer's tier and saves it
  * as pending commission for the referrer.
  *
  * Business rules:
  * - Referee must have a referrer (referredBy is set)
  * - Referral must be activated (3+ orders completed)
- * - Must be within 3-month commission period
+ * - Must be within commission period (configurable, default 12 months)
  * - Original commission must be greater than zero
- * - Commission is 5% of original Shopee commission
+ * - Commission rate depends on referrer's tier (BRONZE 5%, SILVER 7%, GOLD 10%)
  * - App pays this commission (not deducted from referee)
  *
  * @author CashBee Team
@@ -34,8 +36,11 @@ import java.time.LocalDateTime;
 @Slf4j
 public class CalculateReferrerCommissionUseCase {
 
+    private static final BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("5.00"); // 5% default (BRONZE)
+
     private final UserRepository userRepository;
     private final ReferrerCommissionRepository referrerCommissionRepository;
+    private final ReferrerTierConfigRepository tierConfigRepository;
 
     /**
      * Execute use case to calculate and save referrer commission.
@@ -104,21 +109,52 @@ public class CalculateReferrerCommissionUseCase {
         // 8. Get referral expiration date
         LocalDateTime expiresAt = referee.getReferralExpiresAt();
 
-        // 9. Create commission
-        ReferrerCommission commission = ReferrerCommission.create(
+        // 9. Get referrer's tier config for commission rate
+        int activatedReferrals = referrer.getActivatedReferralsCount();
+        BigDecimal commissionRate = getCommissionRateForReferrer(activatedReferrals, referrer.getReferrerTier());
+
+        // 10. Create commission with tier-based rate
+        ReferrerCommission commission = ReferrerCommission.createWithRate(
                 referrer.getId(),
                 referee.getId(),
                 orderId,
                 originalCommission,
+                commissionRate,
                 expiresAt
         );
 
-        // 10. Save commission
+        // 11. Save commission
         referrerCommissionRepository.save(commission);
 
         log.info("Referrer commission created: referrerId={}, refereeId={}, orderId={}, " +
-                        "originalCommission={}, commissionAmount={}, expiresAt={}",
+                        "originalCommission={}, commissionRate={}%, commissionAmount={}, " +
+                        "referrerTier={}, activatedReferrals={}, expiresAt={}",
                 referrer.getId(), referee.getId(), orderId,
-                originalCommission, commission.getCommissionAmount(), expiresAt);
+                originalCommission, commissionRate, commission.getCommissionAmount(),
+                referrer.getReferrerTier(), activatedReferrals, expiresAt);
+    }
+
+    /**
+     * Get commission rate for referrer based on tier configuration.
+     * Looks up from database first, then falls back to stored tier, then default.
+     *
+     * @param activatedReferrals number of activated referrals
+     * @param storedTier tier stored in user record (fallback)
+     * @return commission rate (e.g., 5.00 for 5%)
+     */
+    private BigDecimal getCommissionRateForReferrer(int activatedReferrals, String storedTier) {
+        // 1. Try to get tier from database based on actual referral count
+        return tierConfigRepository.findTierByReferralCount(activatedReferrals)
+                .map(ReferrerTierConfig::getCommissionRate)
+                .orElseGet(() -> {
+                    // 2. Fallback: try to get by stored tier name
+                    if (storedTier != null && !storedTier.isBlank()) {
+                        return tierConfigRepository.findByTierName(storedTier)
+                                .map(ReferrerTierConfig::getCommissionRate)
+                                .orElse(DEFAULT_COMMISSION_RATE);
+                    }
+                    // 3. Ultimate fallback: default 5%
+                    return DEFAULT_COMMISSION_RATE;
+                });
     }
 }

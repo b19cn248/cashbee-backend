@@ -173,6 +173,33 @@ public class UserWalletRepositoryAdapter implements UserWalletRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<UserWallet> findAllById(List<Long> ids) {
+        log.debug("Finding wallets by IDs: count={}", ids.size());
+        List<UserWalletJpaEntity> entities = jpaRepository.findAllById(ids);
+        log.debug("Found {} wallets", entities.size());
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    @Transactional
+    public List<UserWallet> saveAll(List<UserWallet> wallets) {
+        log.debug("Bulk saving {} wallets", wallets.size());
+
+        // Validate and scale all wallets
+        wallets.forEach(wallet -> {
+            wallet.validate();
+            wallet.scaleBalances();
+        });
+
+        List<UserWalletJpaEntity> entities = mapper.toEntityList(wallets);
+        List<UserWalletJpaEntity> savedEntities = jpaRepository.saveAll(entities);
+
+        log.debug("Bulk saved {} wallets", savedEntities.size());
+        return mapper.toDomainList(savedEntities);
+    }
+
+    @Override
     @Transactional
     public void deleteByUserId(Long userId) {
         log.warn("Deleting wallet for userId: {} - This should rarely be used!", userId);

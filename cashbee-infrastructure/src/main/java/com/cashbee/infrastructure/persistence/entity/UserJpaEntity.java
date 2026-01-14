@@ -64,6 +64,20 @@ public class UserJpaEntity {
     @Column(name = "user_level", nullable = false, length = 20)
     private String userLevel;
 
+    /**
+     * Referrer tier for commission rate differentiation.
+     * BRONZE (5%), SILVER (7%), GOLD (10%).
+     */
+    @Column(name = "referrer_tier", nullable = false, length = 20)
+    private String referrerTier;
+
+    /**
+     * Total number of activated referrals this user has.
+     * Used to determine referrer tier level.
+     */
+    @Column(name = "total_activated_referrals", nullable = false)
+    private Integer totalActivatedReferrals;
+
     @Column(name = "total_completed_orders", nullable = false)
     private Integer totalCompletedOrders;
 
@@ -100,6 +114,12 @@ public class UserJpaEntity {
         this.updatedAt = LocalDateTime.now();
         if (this.userLevel == null) {
             this.userLevel = "NORMAL";
+        }
+        if (this.referrerTier == null) {
+            this.referrerTier = "BRONZE";
+        }
+        if (this.totalActivatedReferrals == null) {
+            this.totalActivatedReferrals = 0;
         }
         if (this.totalCompletedOrders == null) {
             this.totalCompletedOrders = 0;

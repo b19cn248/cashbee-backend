@@ -8,6 +8,7 @@ import com.cashbee.domain.model.MilestoneConfig;
 import com.cashbee.domain.model.ReferralReward;
 import com.cashbee.domain.model.User;
 import com.cashbee.domain.model.UserWallet;
+import com.cashbee.domain.repository.CashbackRepository;
 import com.cashbee.domain.repository.MilestoneConfigRepository;
 import com.cashbee.domain.repository.ReferralRewardRepository;
 import com.cashbee.domain.repository.UserRepository;
@@ -22,6 +23,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -56,7 +58,13 @@ class ProcessReferralMilestoneUseCaseTest {
     private UserWalletRepository walletRepository;
 
     @Mock
+    private CashbackRepository cashbackRepository;
+
+    @Mock
     private CreateTransactionUseCase createTransactionUseCase;
+
+    @Mock
+    private UpdateReferrerTierUseCase updateReferrerTierUseCase;
 
     @InjectMocks
     private ProcessReferralMilestoneUseCase useCase;
@@ -140,9 +148,10 @@ class ProcessReferralMilestoneUseCaseTest {
         @DisplayName("Should grant 10,000 VND bonus to referee and 20,000 VND to referrer at 5 orders")
         void shouldGrantBonusesToBothPartiesAt5Orders() {
             // Given
-            referee.setTotalCompletedOrders(4); // Will be 5 after increment
+            referee.setTotalCompletedOrders(4); // Previous count
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(5); // Recalculated count
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITH_REFERRER, 5)).thenReturn(Optional.of(activationConfig));
@@ -205,6 +214,7 @@ class ProcessReferralMilestoneUseCaseTest {
             assertThat(referee.isReferralActivated()).isFalse();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(5);
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITH_REFERRER, 5)).thenReturn(Optional.of(activationConfig));
@@ -237,6 +247,7 @@ class ProcessReferralMilestoneUseCaseTest {
             referee.setTotalCompletedOrders(4);
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(5);
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITH_REFERRER, 5)).thenReturn(Optional.of(activationConfig));
@@ -274,9 +285,10 @@ class ProcessReferralMilestoneUseCaseTest {
         @DisplayName("Should grant 20,000 VND bonus to referee at 10 orders (no referrer bonus)")
         void shouldGrantBonusAt10Orders() {
             // Given
-            referee.setTotalCompletedOrders(9); // Will be 10 after increment
+            referee.setTotalCompletedOrders(9); // Previous count
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(10); // Recalculated count
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITH_REFERRER, 10)).thenReturn(Optional.of(milestone10Config));
@@ -329,9 +341,10 @@ class ProcessReferralMilestoneUseCaseTest {
         @DisplayName("Should upgrade to VIP tier at 80 orders")
         void shouldUpgradeToVipAt80Orders() {
             // Given
-            referee.setTotalCompletedOrders(79); // Will be 80 after increment
+            referee.setTotalCompletedOrders(79); // Previous count
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(80); // Recalculated count
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITH_REFERRER, 80)).thenReturn(Optional.of(vipConfig));
@@ -380,9 +393,10 @@ class ProcessReferralMilestoneUseCaseTest {
         void shouldUpgradeToSuperAt300Orders() {
             // Given
             referee.setUserLevel(UserLevel.VIP);
-            referee.setTotalCompletedOrders(299); // Will be 300 after increment
+            referee.setTotalCompletedOrders(299); // Previous count
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(300); // Recalculated count
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITH_REFERRER, 300)).thenReturn(Optional.of(superConfig));
@@ -427,13 +441,14 @@ class ProcessReferralMilestoneUseCaseTest {
         }
 
         @Test
-        @DisplayName("Should increment orders for non-referred user (no milestone match at 6 orders)")
+        @DisplayName("Should update orders for non-referred user (no milestone match at 6 orders)")
         void shouldIncrementOrdersForNonReferredUser() {
             // Given
             referee.setReferredBy(null); // No referrer
             referee.setTotalCompletedOrders(5);
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(6); // Recalculated count
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITHOUT_REFERRER, 6)).thenReturn(Optional.empty());
             when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -457,6 +472,7 @@ class ProcessReferralMilestoneUseCaseTest {
             referee.setTotalCompletedOrders(79); // Will be 80 after increment
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(80); // Recalculated count
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITHOUT_REFERRER, 80)).thenReturn(Optional.of(vipConfigNoReferrer));
             when(referralRewardRepository.existsByUserIdAndMilestone(1L, 80)).thenReturn(false);
@@ -486,6 +502,7 @@ class ProcessReferralMilestoneUseCaseTest {
             referee.setTotalCompletedOrders(4); // Will be 5 after increment
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(5); // Recalculated count
             // No milestone config for WITHOUT_REFERRER at 5 orders
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITHOUT_REFERRER, 5)).thenReturn(Optional.empty());
@@ -521,10 +538,11 @@ class ProcessReferralMilestoneUseCaseTest {
         @Test
         @DisplayName("Should handle null totalCompletedOrders")
         void shouldHandleNullTotalCompletedOrders() {
-            // Given
-            referee.setTotalCompletedOrders(null);
+            // Given - Use reflection to set field to null (simulates legacy DB data)
+            ReflectionTestUtils.setField(referee, "totalCompletedOrders", null);
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(1); // Recalculated count
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITH_REFERRER, 1)).thenReturn(Optional.empty());
@@ -555,6 +573,7 @@ class ProcessReferralMilestoneUseCaseTest {
             referee.setTotalCompletedOrders(4);
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(referee));
+            when(cashbackRepository.countConfirmedOrdersByUserId(1L)).thenReturn(5); // Recalculated count
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(milestoneConfigRepository.findActiveByMilestoneTypeAndOrdersRequired(
                     MilestoneType.WITH_REFERRER, 5)).thenReturn(Optional.of(bonusConfig));

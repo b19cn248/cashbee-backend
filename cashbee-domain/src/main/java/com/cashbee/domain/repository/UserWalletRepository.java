@@ -171,6 +171,24 @@ public interface UserWalletRepository {
     }
 
     /**
+     * Find all wallets by IDs.
+     * Used for bulk loading in batch operations.
+     *
+     * @param ids List of wallet IDs
+     * @return List of wallets found
+     */
+    List<UserWallet> findAllById(List<Long> ids);
+
+    /**
+     * Save multiple wallets in bulk.
+     * Used for batch operations to reduce DB round-trips.
+     *
+     * @param wallets List of wallets to save
+     * @return List of saved wallets
+     */
+    List<UserWallet> saveAll(List<UserWallet> wallets);
+
+    /**
      * Delete wallet by user ID.
      * NOTE: Should rarely be used due to financial data integrity.
      *

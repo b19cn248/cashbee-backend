@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- =====================================================
+         MIGRATION: Referrer Tier System
+         Date: 2026-01-14
+         Author: CashBee Team
+
+         This creates a tiered system for referrers:
+         - BRONZE (default): 5% commission
+         - SILVER (5+ referrals): 7% commission + 5k bonus per activation
+         - GOLD (20+ referrals): 10% commission + 10k bonus per activation
+         ===================================================== -->
+
+    <changeSet id="048-1-create-referrer-tier-config-table" author="cashbee">
+        <comment>Create referrer_tier_config table for tiered commission rates</comment>
+        <createTable tableName="referrer_tier_config">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tier_name" type="VARCHAR(30)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="min_referrals" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="commission_rate" type="DECIMAL(5,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="bonus_per_activation" type="DECIMAL(19,2)" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="VARCHAR(255)"/>
+            <column name="is_active" type="TINYINT(1)" defaultValue="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="referrer_tier_config" indexName="idx_referrer_tier_min_referrals">
+            <column name="min_referrals"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="048-2-seed-referrer-tier-config" author="cashbee">
+        <comment>Seed default referrer tiers</comment>
+        <insert tableName="referrer_tier_config">
+            <column name="tier_name" value="BRONZE"/>
+            <column name="min_referrals" value="0"/>
+            <column name="commission_rate" value="5.00"/>
+            <column name="bonus_per_activation" value="0"/>
+            <column name="description" value="Default tier: 5% commission"/>
+            <column name="is_active" value="1"/>
+        </insert>
+        <insert tableName="referrer_tier_config">
+            <column name="tier_name" value="SILVER"/>
+            <column name="min_referrals" value="5"/>
+            <column name="commission_rate" value="7.00"/>
+            <column name="bonus_per_activation" value="5000"/>
+            <column name="description" value="Silver tier: 7% commission + 5k bonus per activation"/>
+            <column name="is_active" value="1"/>
+        </insert>
+        <insert tableName="referrer_tier_config">
+            <column name="tier_name" value="GOLD"/>
+            <column name="min_referrals" value="20"/>
+            <column name="commission_rate" value="10.00"/>
+            <column name="bonus_per_activation" value="10000"/>
+            <column name="description" value="Gold tier: 10% commission + 10k bonus per activation"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="048-3-add-referrer-tier-columns-to-user" author="cashbee">
+        <comment>Add referrer tier tracking columns to user table</comment>
+        <addColumn tableName="user">
+            <column name="referrer_tier" type="VARCHAR(30)" defaultValue="BRONZE" afterColumn="user_level">
+                <constraints nullable="false"/>
+            </column>
+            <column name="total_activated_referrals" type="INT" defaultValue="0" afterColumn="referrer_tier">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

@@ -7,6 +7,7 @@ import com.cashbee.domain.model.MilestoneConfig;
 import com.cashbee.domain.model.ReferralReward;
 import com.cashbee.domain.model.User;
 import com.cashbee.domain.model.UserWallet;
+import com.cashbee.domain.repository.CashbackRepository;
 import com.cashbee.domain.repository.MilestoneConfigRepository;
 import com.cashbee.domain.repository.ReferralRewardRepository;
 import com.cashbee.domain.repository.UserRepository;
@@ -47,6 +48,8 @@ public class ProcessReferralMilestoneUseCase {
     private final MilestoneConfigRepository milestoneConfigRepository;
     private final UserWalletRepository walletRepository;
     private final CreateTransactionUseCase createTransactionUseCase;
+    private final CashbackRepository cashbackRepository;
+    private final UpdateReferrerTierUseCase updateReferrerTierUseCase;
 
     /**
      * Execute use case when an order is completed.
@@ -64,11 +67,14 @@ public class ProcessReferralMilestoneUseCase {
             return;
         }
 
-        // 2. Increment completed orders
-        user.incrementCompletedOrders();
-        int completedOrders = user.getTotalCompletedOrders();
+        // 2. Recalculate completed orders from cashback table
+        // Count distinct orders that have CONFIRMED or PAID cashback status
+        // This approach prevents double-counting during re-import scenarios
+        int completedOrders = cashbackRepository.countConfirmedOrdersByUserId(userId);
+        int previousCount = user.getTotalCompletedOrders() != null ? user.getTotalCompletedOrders() : 0;
+        user.setTotalCompletedOrders(completedOrders);
 
-        log.debug("User {} now has {} completed orders", userId, completedOrders);
+        log.debug("User {} completed orders updated: {} -> {}", userId, previousCount, completedOrders);
 
         // 3. Determine milestone type based on referrer status
         MilestoneType milestoneType = user.hasReferrer()
@@ -121,6 +127,9 @@ public class ProcessReferralMilestoneUseCase {
             user.activateReferral(config.getCommissionMonths());
             log.info("Referral activated for user: {}, referrer: {}, duration: {} months",
                     userId, referrer.getId(), config.getCommissionMonths());
+
+            // Increment referrer's activated referrals count and update tier
+            updateReferrerTierUseCase.incrementAndUpdateTier(referrer.getId());
         }
 
         // 2. Handle tier upgrade

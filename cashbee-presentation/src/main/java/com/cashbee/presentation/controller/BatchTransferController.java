@@ -24,20 +24,22 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST Controller for batch transfer operations.
- *
- * Provides endpoints for:
- * - Creating batch export metadata
- * - Downloading Excel files
- * - Sending files via email
- * - Viewing export history
- *
+ * <p>
+ * Provides endpoints for: - Creating batch export metadata - Downloading Excel files - Sending
+ * files via email - Viewing export history
+ * <p>
  * All endpoints require ADMIN role.
  *
  * @author CashBee Team
@@ -48,364 +50,317 @@ import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Batch Transfer", description = "Batch transfer management APIs")
 public class BatchTransferController {
-    private static final Logger log = LoggerFactory.getLogger(BatchTransferController.class);
 
-    private final ExportBatchTransferUseCase exportBatchTransferUseCase;
-    private final GenerateBatchTransferFileUseCase generateBatchTransferFileUseCase;
-    private final GetBatchExportHistoryUseCase getBatchExportHistoryUseCase;
-    private final CompleteBatchTransferUseCase completeBatchTransferUseCase;
-    private final GetBatchCashbacksUseCase getBatchCashbacksUseCase;
-    private final BatchTransferEmailService emailService;
-    private final SecurityUtils securityUtils;
+  private static final Logger log = LoggerFactory.getLogger(BatchTransferController.class);
 
-    /**
-     * Create batch export metadata.
-     *
-     * POST /api/admin/batch-transfer/export
-     *
-     * Request body:
-     * {
-     *   "minBalance": 50000,
-     *   "remarkTemplate": "Hoan tien CashBee 11/2025",
-     *   "exportType": "MANUAL"
-     * }
-     *
-     * Response:
-     * {
-     *   "success": true,
-     *   "data": {
-     *     "batchCode": "BATCH_20251119_001",
-     *     "fileName": "BATCH_20251119_001.xls",
-     *     "totalUsers": 25,
-     *     "totalAmount": 15500000,
-     *     "exportedAt": "2025-11-19T14:30:00",
-     *     "message": "Export completed. 25 users eligible for transfer (total: 15,500,000 VND)"
-     *   }
-     * }
-     */
-    @PostMapping("/export")
-    @Operation(summary = "Create batch export metadata", description = "Create batch export metadata and calculate totals")
-    public ResponseEntity<ApiResponse<ExportBatchTransferResponse>> exportBatchTransfer(
-            @RequestBody(required = false) ExportBatchTransferRequest request) {
+  private final ExportBatchTransferUseCase exportBatchTransferUseCase;
+  private final GenerateBatchTransferFileUseCase generateBatchTransferFileUseCase;
+  private final GetBatchExportHistoryUseCase getBatchExportHistoryUseCase;
+  private final CompleteBatchTransferUseCase completeBatchTransferUseCase;
+  private final GetBatchCashbacksUseCase getBatchCashbacksUseCase;
+  private final BatchTransferEmailService emailService;
+  private final SecurityUtils securityUtils;
 
-        log.info("BatchTransferController: POST /export - request: {}", request);
+  /**
+   * Create batch export metadata.
+   * <p>
+   * POST /api/admin/batch-transfer/export
+   * <p>
+   * Request body: { "minBalance": 50000, "remarkTemplate": "Hoan tien CashBee 11/2025",
+   * "exportType": "MANUAL" }
+   * <p>
+   * Response: { "success": true, "data": { "batchCode": "BATCH_20251119_001", "fileName":
+   * "BATCH_20251119_001.xls", "totalUsers": 25, "totalAmount": 15500000, "exportedAt":
+   * "2025-11-19T14:30:00", "message": "Export completed. 25 users eligible for transfer (total:
+   * 15,500,000 VND)" } }
+   */
+  @PostMapping("/export")
+  @Operation(summary = "Create batch export metadata", description = "Create batch export metadata and calculate totals")
+  public ResponseEntity<ApiResponse<ExportBatchTransferResponse>> exportBatchTransfer(
+      @RequestBody(required = false) ExportBatchTransferRequest request) {
 
-        // Use default request if not provided
-        if (request == null) {
-            request = ExportBatchTransferRequest.builder().build();
-        }
+    log.info("BatchTransferController: POST /export - request: {}", request);
 
-        ExportBatchTransferResponse response = exportBatchTransferUseCase.execute(request);
-
-        return ResponseEntity.ok(ApiResponse.success(response));
+    // Use default request if not provided
+    if (request == null) {
+      request = ExportBatchTransferRequest.builder().build();
     }
 
-    /**
-     * Download batch transfer Excel file.
-     *
-     * GET /api/admin/batch-transfer/download?batchCode=BATCH_20251119_001&bankTemplate=VPBANK
-     *
-     * Supports two bank templates:
-     * - VPBANK (default): Returns .xls file with bank_name column
-     * - VIETINBANK: Returns .xlsx file with vietinbank_code (8 digits) column
-     *
-     * Note: File is generated fresh each time (realtime data).
-     */
-    @GetMapping("/download")
-    @Operation(summary = "Download batch transfer file",
-            description = "Generate and download Excel file for batch transfer. " +
-                    "Supports templates: VPBANK (.xls) and VIETINBANK (.xlsx)")
-    public ResponseEntity<byte[]> downloadBatchTransferFile(
-            @RequestParam(required = false) String batchCode,
-            @RequestParam(defaultValue = "VPBANK") String bankTemplate) {
+    ExportBatchTransferResponse response = exportBatchTransferUseCase.execute(request);
 
-        log.info("BatchTransferController: GET /download - batchCode: {}, bankTemplate: {}", batchCode, bankTemplate);
+    return ResponseEntity.ok(ApiResponse.success(response));
+  }
 
-        // Parse bank template
-        BankTemplate template;
-        try {
-            template = BankTemplate.valueOf(bankTemplate.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            log.warn("BatchTransferController: Invalid bankTemplate '{}', defaulting to VPBANK", bankTemplate);
-            template = BankTemplate.VPBANK;
-        }
+  /**
+   * Download batch transfer Excel file.
+   * <p>
+   * GET /api/admin/batch-transfer/download?batchCode=BATCH_20251119_001&bankTemplate=VPBANK
+   * <p>
+   * Supports two bank templates: - VPBANK (default): Returns .xls file with bank_name column -
+   * VIETINBANK: Returns .xlsx file with vietinbank_code (8 digits) column
+   * <p>
+   * Note: File is generated fresh each time (realtime data).
+   */
+  @GetMapping("/download")
+  @Operation(summary = "Download batch transfer file",
+      description = "Generate and download Excel file for batch transfer. " +
+          "Supports templates: VPBANK (.xls) and VIETINBANK (.xlsx)")
+  public ResponseEntity<byte[]> downloadBatchTransferFile(
+      @RequestParam(required = false) String batchCode,
+      @RequestParam(defaultValue = "VPBANK") String bankTemplate) {
 
-        byte[] excelBytes;
-        String fileName;
+    log.info("BatchTransferController: GET /download - batchCode: {}, bankTemplate: {}", batchCode,
+        bankTemplate);
 
-        if (batchCode != null && !batchCode.isBlank()) {
-            // Generate by batch code with specified template
-            excelBytes = generateBatchTransferFileUseCase.generateByBatchCode(batchCode, template);
-            fileName = batchCode + template.getFileExtension();
-        } else {
-            // Generate fresh with default criteria and specified template
-            excelBytes = generateBatchTransferFileUseCase.generateFile(
-                    java.math.BigDecimal.valueOf(10000),
-                    null, // Use default remark
-                    template
-            );
-            fileName = "BATCH_TRANSFER_" +
-                    java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) +
-                    template.getFileExtension();
-        }
-
-        // Set content type based on file extension
-        MediaType contentType = template == BankTemplate.VIETINBANK
-                ? MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                : MediaType.APPLICATION_OCTET_STREAM;
-
-        // Set headers for file download
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(contentType);
-        headers.setContentDispositionFormData("attachment", fileName);
-        headers.setContentLength(excelBytes.length);
-
-        log.info("BatchTransferController: Returning file {} ({} bytes, template: {})",
-                fileName, excelBytes.length, template);
-
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(excelBytes);
+    // Parse bank template
+    BankTemplate template;
+    try {
+      template = BankTemplate.valueOf(bankTemplate.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      log.warn("BatchTransferController: Invalid bankTemplate '{}', defaulting to VPBANK",
+          bankTemplate);
+      template = BankTemplate.VPBANK;
     }
 
-    /**
-     * Send batch transfer file via email.
-     *
-     * POST /api/admin/batch-transfer/send-email
-     *
-     * Request body:
-     * {
-     *   "batchCode": "BATCH_20251119_001",
-     *   "recipientEmail": "admin@cashbee.com"
-     * }
-     *
-     * Response:
-     * {
-     *   "success": true,
-     *   "message": "Email sent successfully"
-     * }
-     */
-    @PostMapping("/send-email")
-    @Operation(summary = "Send batch transfer file via email", description = "Generate and send Excel file via email")
-    public ResponseEntity<ApiResponse<String>> sendBatchTransferEmail(
-            @RequestBody SendEmailRequest request) {
+    byte[] excelBytes;
+    String fileName;
 
-        log.info("BatchTransferController: POST /send-email - request: {}", request);
-
-        // Generate file
-        byte[] excelBytes;
-        String fileName;
-        Integer totalUsers;
-        java.math.BigDecimal totalAmount;
-
-        if (request.getBatchCode() != null && !request.getBatchCode().isBlank()) {
-            // Generate by batch code and get metadata
-            excelBytes = generateBatchTransferFileUseCase.generateByBatchCode(request.getBatchCode());
-            fileName = request.getBatchCode() + ".xls";
-
-            // Get metadata from database (we would need to add this logic)
-            // For now, use placeholders
-            totalUsers = 0;
-            totalAmount = java.math.BigDecimal.ZERO;
-
-        } else {
-            // Generate fresh
-            excelBytes = generateBatchTransferFileUseCase.generateFile(
-                    java.math.BigDecimal.valueOf(50000),
-                    null
-            );
-            fileName = "BATCH_TRANSFER_" +
-                    java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) +
-                    ".xls";
-            totalUsers = 0;
-            totalAmount = java.math.BigDecimal.ZERO;
-        }
-
-        // Send email
-        emailService.sendBatchTransferFile(
-                fileName,
-                excelBytes,
-                totalUsers,
-                totalAmount,
-                request.getRecipientEmail()
-        );
-
-        return ResponseEntity.ok(ApiResponse.success("Email sent successfully to " +
-                (request.getRecipientEmail() != null ? request.getRecipientEmail() : "admin email")));
+    if (batchCode != null && !batchCode.isBlank()) {
+      // Generate by batch code with specified template
+      excelBytes = generateBatchTransferFileUseCase.generateByBatchCode(batchCode, template);
+      fileName = batchCode + template.getFileExtension();
+    } else {
+      // Generate fresh with default criteria and specified template
+      excelBytes = generateBatchTransferFileUseCase.generateFile(
+          java.math.BigDecimal.valueOf(10000),
+          null, // Use default remark
+          template
+      );
+      fileName = "BATCH_TRANSFER_" +
+          java.time.LocalDateTime.now()
+              .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) +
+          template.getFileExtension();
     }
 
-    /**
-     * Get batch export history.
-     *
-     * GET /api/admin/batch-transfer/history?page=0&size=10
-     *
-     * Response:
-     * {
-     *   "success": true,
-     *   "data": {
-     *     "content": [...],
-     *     "totalElements": 100,
-     *     "totalPages": 10,
-     *     "size": 10,
-     *     "number": 0
-     *   }
-     * }
-     */
-    @GetMapping("/history")
-    @Operation(summary = "Get batch export history", description = "View all batch export history with pagination")
-    public ResponseEntity<ApiResponse<Page<ExportBatchTransferResponse>>> getBatchExportHistory(
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+    // Set content type based on file extension
+    MediaType contentType = template == BankTemplate.VIETINBANK
+        ? MediaType.parseMediaType(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        : MediaType.APPLICATION_OCTET_STREAM;
 
-        log.info("BatchTransferController: GET /history - page: {}", pageable.getPageNumber());
+    // Set headers for file download
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(contentType);
+    headers.setContentDispositionFormData("attachment", fileName);
+    headers.setContentLength(excelBytes.length);
 
-        Page<ExportBatchTransferResponse> history = getBatchExportHistoryUseCase.execute(pageable);
+    log.info("BatchTransferController: Returning file {} ({} bytes, template: {})",
+        fileName, excelBytes.length, template);
 
-        return ResponseEntity.ok(ApiResponse.success(history));
+    return ResponseEntity.ok()
+        .headers(headers)
+        .body(excelBytes);
+  }
+
+  /**
+   * Send batch transfer file via email.
+   * <p>
+   * POST /api/admin/batch-transfer/send-email
+   * <p>
+   * Request body: { "batchCode": "BATCH_20251119_001", "recipientEmail": "admin@cashbee.com" }
+   * <p>
+   * Response: { "success": true, "message": "Email sent successfully" }
+   */
+  @PostMapping("/send-email")
+  @Operation(summary = "Send batch transfer file via email", description = "Generate and send Excel file via email")
+  public ResponseEntity<ApiResponse<String>> sendBatchTransferEmail(
+      @RequestBody SendEmailRequest request) {
+
+    log.info("BatchTransferController: POST /send-email - request: {}", request);
+
+    // Generate file
+    byte[] excelBytes;
+    String fileName;
+    Integer totalUsers;
+    java.math.BigDecimal totalAmount;
+
+    if (request.getBatchCode() != null && !request.getBatchCode().isBlank()) {
+      // Generate by batch code and get metadata
+      excelBytes = generateBatchTransferFileUseCase.generateByBatchCode(request.getBatchCode());
+      fileName = request.getBatchCode() + ".xls";
+
+      // Get metadata from database (we would need to add this logic)
+      // For now, use placeholders
+      totalUsers = 0;
+      totalAmount = java.math.BigDecimal.ZERO;
+
+    } else {
+      // Generate fresh
+      excelBytes = generateBatchTransferFileUseCase.generateFile(
+          java.math.BigDecimal.valueOf(50000),
+          null
+      );
+      fileName = "BATCH_TRANSFER_" +
+          java.time.LocalDateTime.now()
+              .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) +
+          ".xls";
+      totalUsers = 0;
+      totalAmount = java.math.BigDecimal.ZERO;
     }
 
-    /**
-     * Get batch export history by type.
-     *
-     * GET /api/admin/batch-transfer/history/MANUAL?page=0&size=10
-     */
-    @GetMapping("/history/{exportType}")
-    @Operation(summary = "Get batch export history by type", description = "View batch export history filtered by type")
-    public ResponseEntity<ApiResponse<Page<ExportBatchTransferResponse>>> getBatchExportHistoryByType(
-            @PathVariable String exportType,
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+    // Send email
+    emailService.sendBatchTransferFile(
+        fileName,
+        excelBytes,
+        totalUsers,
+        totalAmount,
+        request.getRecipientEmail()
+    );
 
-        log.info("BatchTransferController: GET /history/{} - page: {}", exportType, pageable.getPageNumber());
+    return ResponseEntity.ok(ApiResponse.success("Email sent successfully to " +
+        (request.getRecipientEmail() != null ? request.getRecipientEmail() : "admin email")));
+  }
 
-        Page<ExportBatchTransferResponse> history = getBatchExportHistoryUseCase.executeByType(exportType, pageable);
+  /**
+   * Get batch export history.
+   * <p>
+   * GET /api/admin/batch-transfer/history?page=0&size=10
+   * <p>
+   * Response: { "success": true, "data": { "content": [...], "totalElements": 100, "totalPages":
+   * 10, "size": 10, "number": 0 } }
+   */
+  @GetMapping("/history")
+  @Operation(summary = "Get batch export history", description = "View all batch export history with pagination")
+  public ResponseEntity<ApiResponse<Page<ExportBatchTransferResponse>>> getBatchExportHistory(
+      @PageableDefault(sort = "createdAt") Pageable pageable) {
 
-        return ResponseEntity.ok(ApiResponse.success(history));
+    log.info("BatchTransferController: GET /history - page: {}", pageable.getPageNumber());
+
+    Page<ExportBatchTransferResponse> history = getBatchExportHistoryUseCase.execute(pageable);
+
+    return ResponseEntity.ok(ApiResponse.success(history));
+  }
+
+  /**
+   * Get batch export history by type.
+   * <p>
+   * GET /api/admin/batch-transfer/history/MANUAL?page=0&size=10
+   */
+  @GetMapping("/history/{exportType}")
+  @Operation(summary = "Get batch export history by type", description = "View batch export history filtered by type")
+  public ResponseEntity<ApiResponse<Page<ExportBatchTransferResponse>>> getBatchExportHistoryByType(
+      @PathVariable String exportType,
+      @PageableDefault(sort = "createdAt") Pageable pageable) {
+
+    log.info("BatchTransferController: GET /history/{} - page: {}", exportType,
+        pageable.getPageNumber());
+
+    Page<ExportBatchTransferResponse> history = getBatchExportHistoryUseCase.executeByType(
+        exportType, pageable);
+
+    return ResponseEntity.ok(ApiResponse.success(history));
+  }
+
+  /**
+   * Complete batch transfer after admin has transferred money.
+   * <p>
+   * POST /api/admin/batch-transfer/{batchCode}/complete
+   * <p>
+   * This endpoint should be called after admin has: 1. Downloaded the Excel file 2. Imported it to
+   * bank's web interface 3. Bank has successfully transferred money to all users
+   * <p>
+   * What this does: - Deducts balance from all users in the batch - Creates transaction records for
+   * each user - Marks batch as COMPLETED/PARTIAL_FAILED/FAILED - Records admin ID and completion
+   * timestamp for audit trail
+   * <p>
+   * Response: { "success": true, "data": { "batchCode": "BATCH_20251119_001", "status":
+   * "COMPLETED", "successCount": 25, "failedCount": 0, "message": "Batch completed. 25 success, 0
+   * failed." } }
+   */
+  @PostMapping("/{batchCode}/complete")
+  @Operation(summary = "Complete batch transfer",
+      description = "Mark batch as completed and deduct balance from all users. " +
+          "Records admin ID for audit trail. Returns COMPLETED/PARTIAL_FAILED/FAILED status.")
+  public ResponseEntity<ApiResponse<CompleteBatchResponse>> completeBatchTransfer(
+      @PathVariable String batchCode,
+      @AuthenticationPrincipal Jwt jwt) {
+
+    // Get admin user ID from JWT for audit trail
+    Long adminId = null;
+    try {
+      adminId = securityUtils.getCurrentUserId(jwt);
+      log.info("BatchTransferController: POST /{}/complete by admin {}", batchCode, adminId);
+    } catch (Exception e) {
+      log.warn("BatchTransferController: Could not extract admin ID from JWT: {}", e.getMessage());
+      log.info("BatchTransferController: POST /{}/complete (no admin ID)", batchCode);
     }
 
-    /**
-     * Complete batch transfer after admin has transferred money.
-     *
-     * POST /api/admin/batch-transfer/{batchCode}/complete
-     *
-     * This endpoint should be called after admin has:
-     * 1. Downloaded the Excel file
-     * 2. Imported it to bank's web interface
-     * 3. Bank has successfully transferred money to all users
-     *
-     * What this does:
-     * - Deducts balance from all users in the batch
-     * - Creates transaction records for each user
-     * - Marks batch as COMPLETED/PARTIAL_FAILED/FAILED
-     * - Records admin ID and completion timestamp for audit trail
-     *
-     * Response:
-     * {
-     *   "success": true,
-     *   "data": {
-     *     "batchCode": "BATCH_20251119_001",
-     *     "status": "COMPLETED",
-     *     "successCount": 25,
-     *     "failedCount": 0,
-     *     "message": "Batch completed. 25 success, 0 failed."
-     *   }
-     * }
-     */
-    @PostMapping("/{batchCode}/complete")
-    @Operation(summary = "Complete batch transfer",
-            description = "Mark batch as completed and deduct balance from all users. " +
-                    "Records admin ID for audit trail. Returns COMPLETED/PARTIAL_FAILED/FAILED status.")
-    public ResponseEntity<ApiResponse<CompleteBatchResponse>> completeBatchTransfer(
-            @PathVariable String batchCode,
-            @AuthenticationPrincipal Jwt jwt) {
+    BatchTransferExport completedBatch = completeBatchTransferUseCase.execute(batchCode, adminId);
 
-        // Get admin user ID from JWT for audit trail
-        Long adminId = null;
-        try {
-            adminId = securityUtils.getCurrentUserId(jwt);
-            log.info("BatchTransferController: POST /{}/complete by admin {}", batchCode, adminId);
-        } catch (Exception e) {
-            log.warn("BatchTransferController: Could not extract admin ID from JWT: {}", e.getMessage());
-            log.info("BatchTransferController: POST /{}/complete (no admin ID)", batchCode);
-        }
+    CompleteBatchResponse response = new CompleteBatchResponse(
+        completedBatch.getBatchCode(),
+        completedBatch.getStatus().name(),
+        completedBatch.getSuccessCount(),
+        completedBatch.getFailedCount(),
+        String.format("Batch %s. %d success, %d failed.",
+            completedBatch.getStatus().name().toLowerCase().replace("_", " "),
+            completedBatch.getSuccessCount(),
+            completedBatch.getFailedCount())
+    );
 
-        BatchTransferExport completedBatch = completeBatchTransferUseCase.execute(batchCode, adminId);
+    return ResponseEntity.ok(ApiResponse.success(response));
+  }
 
-        CompleteBatchResponse response = new CompleteBatchResponse(
-                completedBatch.getBatchCode(),
-                completedBatch.getStatus().name(),
-                completedBatch.getSuccessCount(),
-                completedBatch.getFailedCount(),
-                String.format("Batch %s. %d success, %d failed.",
-                        completedBatch.getStatus().name().toLowerCase().replace("_", " "),
-                        completedBatch.getSuccessCount(),
-                        completedBatch.getFailedCount())
-        );
+  /**
+   * Get all cashbacks paid by a specific batch.
+   * <p>
+   * GET /api/admin/batch-transfer/{batchCode}/cashbacks
+   * <p>
+   * This endpoint enables traceability: batchCode → cashbacks → orders Use this to see which orders
+   * were paid in a specific batch.
+   * <p>
+   * Response: { "success": true, "data": { "batchCode": "BATCH_20251119_001", "status":
+   * "COMPLETED", "totalCashbacks": 50, "totalCashbackAmount": 2500000, "cashbacks": [ {
+   * "cashbackId": 123, "userId": 456, "orderId": 789, "orderItemId": 101, "cashbackAmount": 50000,
+   * "paidAt": "2025-11-19T14:30:00" } ] } }
+   */
+  @GetMapping("/{batchCode}/cashbacks")
+  @Operation(summary = "Get batch cashbacks",
+      description = "Get all cashbacks paid by a specific batch. Enables traceability: batchCode → cashbacks → orders")
+  public ResponseEntity<ApiResponse<BatchCashbackResponse>> getBatchCashbacks(
+      @PathVariable String batchCode) {
 
-        return ResponseEntity.ok(ApiResponse.success(response));
+    log.info("BatchTransferController: GET /{}/cashbacks", batchCode);
+
+    BatchCashbackResponse response = getBatchCashbacksUseCase.execute(batchCode);
+
+    return ResponseEntity.ok(ApiResponse.success(response));
+  }
+
+  /**
+   * Response DTO for complete batch endpoint.
+   */
+  public record CompleteBatchResponse(
+      String batchCode,
+      String status,
+      Integer successCount,
+      Integer failedCount,
+      String message
+  ) {
+
+  }
+
+  /**
+   * Request DTO for send email endpoint.
+   */
+  public record SendEmailRequest(String batchCode, String recipientEmail) {
+
+    public String getBatchCode() {
+      return batchCode;
     }
 
-    /**
-     * Get all cashbacks paid by a specific batch.
-     *
-     * GET /api/admin/batch-transfer/{batchCode}/cashbacks
-     *
-     * This endpoint enables traceability: batchCode → cashbacks → orders
-     * Use this to see which orders were paid in a specific batch.
-     *
-     * Response:
-     * {
-     *   "success": true,
-     *   "data": {
-     *     "batchCode": "BATCH_20251119_001",
-     *     "status": "COMPLETED",
-     *     "totalCashbacks": 50,
-     *     "totalCashbackAmount": 2500000,
-     *     "cashbacks": [
-     *       {
-     *         "cashbackId": 123,
-     *         "userId": 456,
-     *         "orderId": 789,
-     *         "orderItemId": 101,
-     *         "cashbackAmount": 50000,
-     *         "paidAt": "2025-11-19T14:30:00"
-     *       }
-     *     ]
-     *   }
-     * }
-     */
-    @GetMapping("/{batchCode}/cashbacks")
-    @Operation(summary = "Get batch cashbacks",
-            description = "Get all cashbacks paid by a specific batch. Enables traceability: batchCode → cashbacks → orders")
-    public ResponseEntity<ApiResponse<BatchCashbackResponse>> getBatchCashbacks(
-            @PathVariable String batchCode) {
-
-        log.info("BatchTransferController: GET /{}/cashbacks", batchCode);
-
-        BatchCashbackResponse response = getBatchCashbacksUseCase.execute(batchCode);
-
-        return ResponseEntity.ok(ApiResponse.success(response));
+    public String getRecipientEmail() {
+      return recipientEmail;
     }
-
-    /**
-     * Response DTO for complete batch endpoint.
-     */
-    public record CompleteBatchResponse(
-            String batchCode,
-            String status,
-            Integer successCount,
-            Integer failedCount,
-            String message
-    ) {}
-
-    /**
-     * Request DTO for send email endpoint.
-     */
-    public record SendEmailRequest(String batchCode, String recipientEmail) {
-        public String getBatchCode() {
-            return batchCode;
-        }
-
-        public String getRecipientEmail() {
-            return recipientEmail;
-        }
-    }
+  }
 }

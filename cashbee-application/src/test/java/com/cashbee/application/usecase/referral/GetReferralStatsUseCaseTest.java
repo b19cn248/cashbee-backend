@@ -1,12 +1,15 @@
 package com.cashbee.application.usecase.referral;
 
 import com.cashbee.application.dto.referral.ReferralStatsResponse;
+import com.cashbee.domain.enums.MilestoneType;
 import com.cashbee.domain.enums.ReferralRewardStatus;
 import com.cashbee.domain.enums.ReferralRewardType;
 import com.cashbee.domain.enums.UserLevel;
 import com.cashbee.domain.enums.UserStatus;
+import com.cashbee.domain.model.MilestoneConfig;
 import com.cashbee.domain.model.ReferralReward;
 import com.cashbee.domain.model.User;
+import com.cashbee.domain.repository.MilestoneConfigRepository;
 import com.cashbee.domain.repository.ReferralRewardRepository;
 import com.cashbee.domain.repository.ReferrerCommissionRepository;
 import com.cashbee.domain.repository.UserRepository;
@@ -45,6 +48,9 @@ class GetReferralStatsUseCaseTest {
 
     @Mock
     private ReferrerCommissionRepository referrerCommissionRepository;
+
+    @Mock
+    private MilestoneConfigRepository milestoneConfigRepository;
 
     @InjectMocks
     private GetReferralStatsUseCase useCase;
@@ -155,12 +161,36 @@ class GetReferralStatsUseCaseTest {
             // Given
             user.setTotalCompletedOrders(5);
 
+            // Milestone configs for users WITH_REFERRER
+            List<MilestoneConfig> milestoneConfigs = List.of(
+                    MilestoneConfig.builder()
+                            .id(1L)
+                            .milestoneType(MilestoneType.WITH_REFERRER)
+                            .ordersRequired(3)
+                            .refereeBonus(new BigDecimal("10000"))
+                            .build(),
+                    MilestoneConfig.builder()
+                            .id(2L)
+                            .milestoneType(MilestoneType.WITH_REFERRER)
+                            .ordersRequired(10)
+                            .refereeBonus(new BigDecimal("20000"))
+                            .build(),
+                    MilestoneConfig.builder()
+                            .id(3L)
+                            .milestoneType(MilestoneType.WITH_REFERRER)
+                            .ordersRequired(50)
+                            .refereeBonus(new BigDecimal("50000"))
+                            .build()
+            );
+
             when(userRepository.findByKeycloakId("user-keycloak-id"))
                     .thenReturn(Optional.of(user));
             when(userRepository.findByReferralCode("REFCODE1"))
                     .thenReturn(Optional.of(referrer));
             when(userRepository.findByReferredBy("MYCODE01"))
                     .thenReturn(Collections.emptyList());
+            when(milestoneConfigRepository.findActiveByMilestoneType(MilestoneType.WITH_REFERRER))
+                    .thenReturn(milestoneConfigs);
             when(referralRewardRepository.findByUserId(1L))
                     .thenReturn(Collections.emptyList());
             when(referrerCommissionRepository.sumCommissionByReferrerId(1L))
@@ -195,12 +225,32 @@ class GetReferralStatsUseCaseTest {
                     .grantedAt(LocalDateTime.now().minusDays(5))
                     .build();
 
+            // Milestone configs for users WITH_REFERRER
+            List<MilestoneConfig> milestoneConfigs = List.of(
+                    MilestoneConfig.builder()
+                            .id(1L)
+                            .milestoneType(MilestoneType.WITH_REFERRER)
+                            .ordersRequired(3)
+                            .refereeBonus(new BigDecimal("10000"))
+                            .description("3rd order milestone bonus")
+                            .build(),
+                    MilestoneConfig.builder()
+                            .id(2L)
+                            .milestoneType(MilestoneType.WITH_REFERRER)
+                            .ordersRequired(10)
+                            .refereeBonus(new BigDecimal("20000"))
+                            .description("10th order milestone bonus")
+                            .build()
+            );
+
             when(userRepository.findByKeycloakId("user-keycloak-id"))
                     .thenReturn(Optional.of(user));
             when(userRepository.findByReferralCode("REFCODE1"))
                     .thenReturn(Optional.of(referrer));
             when(userRepository.findByReferredBy("MYCODE01"))
                     .thenReturn(Collections.emptyList());
+            when(milestoneConfigRepository.findActiveByMilestoneType(MilestoneType.WITH_REFERRER))
+                    .thenReturn(milestoneConfigs);
             when(referralRewardRepository.findByUserId(1L))
                     .thenReturn(List.of(reward3));
             when(referrerCommissionRepository.sumCommissionByReferrerId(1L))

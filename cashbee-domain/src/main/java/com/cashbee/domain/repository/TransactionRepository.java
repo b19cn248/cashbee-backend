@@ -86,6 +86,15 @@ public interface TransactionRepository {
     long count();
 
     /**
+     * Save multiple transactions in bulk.
+     * Used for batch operations to reduce DB round-trips.
+     *
+     * @param transactions List of transactions to save
+     * @return List of saved transactions
+     */
+    List<Transaction> saveAll(List<Transaction> transactions);
+
+    /**
      * Delete transaction by ID.
      * Note: Normally transactions should NOT be deleted (audit trail).
      * This is here for admin corrections only.

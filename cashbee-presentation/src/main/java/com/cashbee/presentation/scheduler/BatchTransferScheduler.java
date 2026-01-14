@@ -17,7 +17,7 @@ import java.math.BigDecimal;
 
 /**
  * Scheduled job for automatic batch transfer exports.
- *
+ * <p>
  * Runs every Monday at 08:00 (configurable via cron expression).
  *
  * What it does:

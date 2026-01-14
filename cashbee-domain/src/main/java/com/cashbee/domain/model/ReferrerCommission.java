@@ -262,7 +262,7 @@ public class ReferrerCommission {
     // ===== Factory Method =====
 
     /**
-     * Create a new referrer commission from an order.
+     * Create a new referrer commission from an order using default 5% rate.
      *
      * @param referrerId         referrer user ID
      * @param refereeId          referee user ID
@@ -282,6 +282,39 @@ public class ReferrerCommission {
                 .sourceOrderId(sourceOrderId)
                 .originalCommission(originalCommission)
                 .commissionRate(DEFAULT_COMMISSION_RATE)
+                .commissionAmount(commissionAmount)
+                .status(ReferrerCommissionStatus.CONFIRMED)
+                .confirmedAt(LocalDateTime.now())
+                .expiresAt(expiresAt)
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     * Create a new referrer commission from an order with custom commission rate.
+     * Used by tier system where referrers have different commission rates.
+     *
+     * @param referrerId         referrer user ID
+     * @param refereeId          referee user ID
+     * @param sourceOrderId      source order ID
+     * @param originalCommission original platform commission
+     * @param commissionRate     custom commission rate (e.g., 5.00, 7.00, 10.00)
+     * @param expiresAt          commission expiration date
+     * @return new ReferrerCommission instance
+     */
+    public static ReferrerCommission createWithRate(Long referrerId, Long refereeId,
+                                                     Long sourceOrderId, BigDecimal originalCommission,
+                                                     BigDecimal commissionRate, LocalDateTime expiresAt) {
+        BigDecimal rateDecimal = commissionRate.divide(new BigDecimal("100"));
+        BigDecimal commissionAmount = originalCommission.multiply(rateDecimal)
+                .setScale(0, RoundingMode.FLOOR);
+
+        return ReferrerCommission.builder()
+                .referrerId(referrerId)
+                .refereeId(refereeId)
+                .sourceOrderId(sourceOrderId)
+                .originalCommission(originalCommission)
+                .commissionRate(commissionRate)
                 .commissionAmount(commissionAmount)
                 .status(ReferrerCommissionStatus.CONFIRMED)
                 .confirmedAt(LocalDateTime.now())

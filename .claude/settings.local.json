@@ -114,7 +114,19 @@
       "WebFetch(domain:s.shopeefood.vn)",
       "WebFetch(domain:shopeefood.vn)",
       "Bash(C:)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "WebFetch(domain:event.accesstrade.vn)",
+      "WebFetch(domain:ecomobi.com)",
+      "WebFetch(domain:seller-us.tiktok.com)",
+      "WebFetch(domain:www.echotik.live)",
+      "Bash(./mvnw test-compile:*)",
+      "Bash(xargs:*)",
+      "Bash(mvn compile:*)",
+      "Bash(mvnw test:*)",
+      "Bash(.\\\\mvnw.cmd test:*)",
+      "Bash(cmd /c \"mvnw.cmd test -pl cashbee-application -Dtest=ProcessReferralMilestoneUseCaseTest -q 2>&1\")",
+      "Bash(cmd /c \"mvnw.cmd test -q 2>&1\")",
+      "Bash(cmd /c \"mvnw.cmd compile -q 2>&1\")"
     ],
     "deny": [],
     "ask": []

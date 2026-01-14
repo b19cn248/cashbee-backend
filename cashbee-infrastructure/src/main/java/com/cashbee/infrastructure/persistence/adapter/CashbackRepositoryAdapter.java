@@ -128,6 +128,13 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     }
 
     @Override
+    public List<Cashback> findByPaidBatchIdAndUserId(Long batchId, Long userId) {
+        return jpaRepository.findByPaidBatchIdAndUserId(batchId, userId).stream()
+            .map(mapper::toDomain)
+            .collect(Collectors.toList());
+    }
+
+    @Override
     public BigDecimal sumUnpaidConfirmedCashbackByUserId(Long userId) {
         return jpaRepository.sumUnpaidConfirmedCashbackByUserId(userId);
     }
@@ -138,5 +145,21 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
             return 0;
         }
         return jpaRepository.updateStatusByCashbackIdsWithBatchId(cashbackIds, oldStatus, newStatus, batchId);
+    }
+
+    @Override
+    public int countConfirmedOrdersByUserId(Long userId) {
+        if (userId == null) {
+            return 0;
+        }
+        return jpaRepository.countConfirmedOrdersByUserId(userId);
+    }
+
+    @Override
+    public List<Object[]> findCashbacksWithOrderDetailsByBatchIdAndUserId(Long batchId, Long userId) {
+        if (batchId == null || userId == null) {
+            return List.of();
+        }
+        return jpaRepository.findCashbacksWithOrderDetailsByBatchIdAndUserId(batchId, userId);
     }
 }

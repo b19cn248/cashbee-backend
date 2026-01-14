@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- =====================================================
+         MIGRATION: Referral System Optimization v2.0
+         Date: 2026-01-14
+         Author: CashBee Team
+
+         Changes:
+         - Add First Order Bonus (1 order)
+         - Reduce activation from 5 to 3 orders
+         - Add intermediate milestones (20, 40, 150 orders)
+         - Extend commission period from 5 to 12 months
+         ===================================================== -->
+
+    <changeSet id="047-1-deactivate-old-milestone-5" author="cashbee">
+        <comment>Deactivate old activation milestone at 5 orders</comment>
+        <update tableName="milestone_config">
+            <column name="is_active" value="0"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITH_REFERRER' AND orders_required = 5</where>
+        </update>
+    </changeSet>
+
+    <!-- WITH_REFERRER milestones -->
+    <changeSet id="047-2-add-first-order-bonus" author="cashbee">
+        <comment>Add First Order Bonus milestone: B +5k, A +5k</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" value="1"/>
+            <column name="referee_bonus" value="5000.00"/>
+            <column name="referrer_bonus" value="5000.00"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" value="0"/>
+            <column name="activates_referral" value="0"/>
+            <column name="description" value="First Order Bonus: B +5k, A +5k"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="047-3-add-activation-3-orders" author="cashbee">
+        <comment>Add activation milestone at 3 orders (reduced from 5): B +10k, A +20k, 12 months commission</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" value="3"/>
+            <column name="referee_bonus" value="10000.00"/>
+            <column name="referrer_bonus" value="20000.00"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" value="12"/>
+            <column name="activates_referral" value="1"/>
+            <column name="description" value="Referral activation: B +10k, A +20k, A receives 5% commission for 12 months"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="047-4-add-milestone-20" author="cashbee">
+        <comment>Add milestone at 20 orders: B +15k</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" value="20"/>
+            <column name="referee_bonus" value="15000.00"/>
+            <column name="referrer_bonus" value="0.00"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" value="0"/>
+            <column name="activates_referral" value="0"/>
+            <column name="description" value="Milestone bonus: B +15k"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="047-5-add-milestone-40" author="cashbee">
+        <comment>Add milestone at 40 orders (pre-VIP): B +20k</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" value="40"/>
+            <column name="referee_bonus" value="20000.00"/>
+            <column name="referrer_bonus" value="0.00"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" value="0"/>
+            <column name="activates_referral" value="0"/>
+            <column name="description" value="Pre-VIP milestone: B +20k"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="047-6-add-milestone-150" author="cashbee">
+        <comment>Add milestone at 150 orders (pre-SUPER): B +50k</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" value="150"/>
+            <column name="referee_bonus" value="50000.00"/>
+            <column name="referrer_bonus" value="0.00"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" value="0"/>
+            <column name="activates_referral" value="0"/>
+            <column name="description" value="Pre-SUPER milestone: B +50k"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+    <!-- WITHOUT_REFERRER milestones -->
+    <changeSet id="047-7-add-welcome-bonus-no-referrer" author="cashbee">
+        <comment>Add Welcome Bonus for users without referrer: +3k</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITHOUT_REFERRER"/>
+            <column name="orders_required" value="1"/>
+            <column name="referee_bonus" value="3000.00"/>
+            <column name="referrer_bonus" value="0.00"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" value="0"/>
+            <column name="activates_referral" value="0"/>
+            <column name="description" value="Welcome Bonus: +3k for first order"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="047-8-add-milestone-20-no-referrer" author="cashbee">
+        <comment>Add milestone at 20 orders for users without referrer: +10k</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITHOUT_REFERRER"/>
+            <column name="orders_required" value="20"/>
+            <column name="referee_bonus" value="10000.00"/>
+            <column name="referrer_bonus" value="0.00"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" value="0"/>
+            <column name="activates_referral" value="0"/>
+            <column name="description" value="Milestone bonus: +10k"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="047-9-add-milestone-40-no-referrer" author="cashbee">
+        <comment>Add milestone at 40 orders for users without referrer: +15k</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITHOUT_REFERRER"/>
+            <column name="orders_required" value="40"/>
+            <column name="referee_bonus" value="15000.00"/>
+            <column name="referrer_bonus" value="0.00"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" value="0"/>
+            <column name="activates_referral" value="0"/>
+            <column name="description" value="Pre-VIP milestone: +15k"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="047-10-add-milestone-150-no-referrer" author="cashbee">
+        <comment>Add milestone at 150 orders for users without referrer: +30k</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITHOUT_REFERRER"/>
+            <column name="orders_required" value="150"/>
+            <column name="referee_bonus" value="30000.00"/>
+            <column name="referrer_bonus" value="0.00"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" value="0"/>
+            <column name="activates_referral" value="0"/>
+            <column name="description" value="Pre-SUPER milestone: +30k"/>
+            <column name="is_active" value="1"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

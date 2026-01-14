@@ -144,6 +144,14 @@ public interface UserRepository {
     List<User> findAll();
 
     /**
+     * Find users by list of IDs.
+     *
+     * @param ids List of user IDs
+     * @return List of users found
+     */
+    List<User> findAllById(List<Long> ids);
+
+    /**
      * Find all users with PAGINATION (excluding deleted).
      * This is the RECOMMENDED method for listing users!
      * Prevents memory issues when there are many users.

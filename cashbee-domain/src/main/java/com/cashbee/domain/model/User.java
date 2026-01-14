@@ -85,6 +85,21 @@ public class User {
     private UserLevel userLevel = UserLevel.NORMAL;
 
     /**
+     * Referrer tier for commission rate differentiation.
+     * BRONZE (5%), SILVER (7%), GOLD (10%).
+     * Determines commission rate when this user is a referrer.
+     */
+    @Builder.Default
+    private String referrerTier = "BRONZE";
+
+    /**
+     * Total number of activated referrals this user has.
+     * Used to determine referrer tier level.
+     */
+    @Builder.Default
+    private Integer totalActivatedReferrals = 0;
+
+    /**
      * Total number of completed (PAID) orders.
      * Used for milestone tracking and tier upgrades.
      */
@@ -311,9 +326,26 @@ public class User {
     /**
      * Increment the total completed orders count.
      * Should be called when an order status changes to PAID.
+     *
+     * @deprecated Use {@link #setTotalCompletedOrders(int)} instead for accurate counting.
+     *             Increment can cause double-counting issues during re-import.
      */
+    @Deprecated
     public void incrementCompletedOrders() {
         this.totalCompletedOrders = (this.totalCompletedOrders == null ? 0 : this.totalCompletedOrders) + 1;
+    }
+
+    /**
+     * Set the total completed orders count to a specific value.
+     * This should be used instead of incrementCompletedOrders() to ensure accuracy.
+     *
+     * The count should be calculated from database (e.g., count of orders with CONFIRMED/PAID cashback)
+     * rather than incrementing, to prevent double-counting during re-import scenarios.
+     *
+     * @param count the exact count of completed orders from database
+     */
+    public void setTotalCompletedOrders(int count) {
+        this.totalCompletedOrders = Math.max(0, count);
     }
 
     /**
@@ -410,5 +442,35 @@ public class User {
             return UserLevel.VIP;
         }
         return UserLevel.NORMAL;
+    }
+
+    // ===== Referrer Tier Methods =====
+
+    /**
+     * Increment the count of activated referrals.
+     * Should be called when a referee reaches activation milestone.
+     */
+    public void incrementActivatedReferrals() {
+        this.totalActivatedReferrals = (this.totalActivatedReferrals == null ? 0 : this.totalActivatedReferrals) + 1;
+    }
+
+    /**
+     * Get total activated referrals count.
+     *
+     * @return total activated referrals, 0 if null
+     */
+    public int getActivatedReferralsCount() {
+        return this.totalActivatedReferrals == null ? 0 : this.totalActivatedReferrals;
+    }
+
+    /**
+     * Update referrer tier.
+     *
+     * @param newTier the new tier name (BRONZE, SILVER, GOLD)
+     */
+    public void updateReferrerTier(String newTier) {
+        if (newTier != null && !newTier.isBlank()) {
+            this.referrerTier = newTier;
+        }
     }
 }

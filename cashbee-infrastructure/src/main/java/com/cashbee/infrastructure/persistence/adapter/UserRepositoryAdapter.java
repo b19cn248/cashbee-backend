@@ -173,6 +173,17 @@ public class UserRepositoryAdapter implements UserRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public List<User> findAllById(List<Long> ids) {
+        log.debug("Finding users by ids: count={}", ids.size());
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<UserJpaEntity> entities = jpaRepository.findAllById(ids);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Page<User> findAll(Pageable pageable) {
         log.debug("Finding all active users with pagination: page={}, size={}",
                 pageable.getPageNumber(), pageable.getPageSize());

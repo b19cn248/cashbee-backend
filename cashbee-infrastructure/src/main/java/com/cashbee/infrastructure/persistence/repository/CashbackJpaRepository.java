@@ -115,6 +115,12 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
     List<CashbackJpaEntity> findByPaidBatchId(Long paidBatchId);
 
     /**
+     * Find all cashbacks paid by a specific batch for a specific user.
+     * Used for generating payment invoice with platform breakdown.
+     */
+    List<CashbackJpaEntity> findByPaidBatchIdAndUserId(Long paidBatchId, Long userId);
+
+    /**
      * Update status for unpaid cashbacks of a user that were CONFIRMED before batch creation.
      *
      * FIX: Only updates cashbacks where:
@@ -147,4 +153,67 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
     @Modifying
     @Query("UPDATE CashbackJpaEntity c SET c.status = :newStatus, c.paidAt = CURRENT_TIMESTAMP, c.updatedAt = CURRENT_TIMESTAMP, c.paidBatchId = :batchId WHERE c.id IN :cashbackIds AND c.status = :oldStatus")
     int updateStatusByCashbackIdsWithBatchId(@Param("cashbackIds") List<Long> cashbackIds, @Param("oldStatus") CashbackStatus oldStatus, @Param("newStatus") CashbackStatus newStatus, @Param("batchId") Long batchId);
+
+    /**
+     * Count distinct orders that have cashback with CONFIRMED or PAID status for a user.
+     *
+     * Why COUNT(DISTINCT c.orderId)?
+     * - One order may have multiple items → multiple cashback records
+     * - We want to count completed ORDERS, not cashback items
+     *
+     * Why include both CONFIRMED and PAID?
+     * - CONFIRMED = order verified, user will receive cashback
+     * - PAID = cashback already paid to user
+     * - Both represent "completed" orders from user perspective
+     */
+    @Query("SELECT COUNT(DISTINCT c.orderId) FROM CashbackJpaEntity c WHERE c.userId = :userId AND c.status IN ('CONFIRMED', 'PAID')")
+    int countConfirmedOrdersByUserId(@Param("userId") Long userId);
+
+    /**
+     * Find cashbacks with full order and item details for invoice display.
+     *
+     * This native query performs a JOIN across:
+     * - cashback (c)
+     * - affiliate_order (ao)
+     * - affiliate_order_item (aoi)
+     * - affiliate_platform (ap)
+     *
+     * Returns projection arrays with all necessary info for detailed invoice display.
+     *
+     * @param batchId Batch ID that paid these cashbacks
+     * @param userId User ID
+     * @return List of projection arrays containing cashback + order + item + platform info
+     */
+    @Query(value = """
+        SELECT
+            c.id AS cashback_id,
+            c.cashback_amount,
+            c.commission_amount AS cashback_commission,
+            c.cashback_rate,
+            ao.id AS order_internal_id,
+            ao.order_id AS order_code,
+            ao.order_time,
+            ao.product_price AS order_product_price,
+            ao.commission_amount AS order_commission,
+            aoi.id AS item_id,
+            aoi.item_name,
+            aoi.shop_name,
+            aoi.quantity,
+            aoi.actual_amount AS item_price,
+            aoi.item_commission,
+            aoi.category_lv1,
+            aoi.img_url,
+            ap.id AS platform_id,
+            ap.name AS platform_name
+        FROM cashback c
+        INNER JOIN affiliate_order ao ON ao.id = c.order_id
+        LEFT JOIN affiliate_order_item aoi ON aoi.id = c.order_item_id
+        INNER JOIN affiliate_platform ap ON ap.id = c.platform_id
+        WHERE c.paid_batch_id = :batchId
+          AND c.user_id = :userId
+        ORDER BY ao.order_time DESC, aoi.id ASC
+        """, nativeQuery = true)
+    List<Object[]> findCashbacksWithOrderDetailsByBatchIdAndUserId(
+            @Param("batchId") Long batchId,
+            @Param("userId") Long userId);
 }

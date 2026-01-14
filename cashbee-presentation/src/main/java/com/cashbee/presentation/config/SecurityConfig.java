@@ -100,7 +100,9 @@ public class SecurityConfig {
                 "/api/auth/resend-otp",
                 "/api/users/sync",
                 // Public API endpoints - No auth required
-                "/api/public/**"
+                "/api/public/**",
+                // Voucher/Promotion endpoints - Public (for Telegram tool integration)
+                "/api/vouchers/**"
             ).permitAll()
             // Protected endpoints - Authentication required
             // All other /api/** endpoints now require valid JWT token

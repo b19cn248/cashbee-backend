@@ -123,6 +123,17 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
+    public List<Transaction> saveAll(List<Transaction> transactions) {
+        log.debug("Bulk saving {} transactions", transactions.size());
+
+        List<TransactionJpaEntity> entities = mapper.toEntityList(transactions);
+        List<TransactionJpaEntity> savedEntities = jpaRepository.saveAll(entities);
+
+        log.debug("Bulk saved {} transactions", savedEntities.size());
+        return mapper.toDomainList(savedEntities);
+    }
+
+    @Override
     public void deleteById(Long id) {
         log.warn("Deleting transaction by ID: {} (should be rare for audit trail)", id);
         jpaRepository.deleteById(id);

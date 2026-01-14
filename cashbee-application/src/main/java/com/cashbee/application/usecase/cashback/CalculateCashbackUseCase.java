@@ -6,8 +6,10 @@ import com.cashbee.domain.enums.UserLevel;
 import com.cashbee.domain.model.Cashback;
 import com.cashbee.domain.model.CashbackPolicy;
 import com.cashbee.domain.model.UserWallet;
+import com.cashbee.domain.model.User;
 import com.cashbee.domain.repository.CashbackPolicyRepository;
 import com.cashbee.domain.repository.CashbackRepository;
+import com.cashbee.domain.repository.UserRepository;
 import com.cashbee.domain.repository.UserWalletRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +45,7 @@ public class CalculateCashbackUseCase {
     private final CashbackRepository cashbackRepository;
     private final CashbackPolicyRepository policyRepository;
     private final UserWalletRepository walletRepository;
+    private final UserRepository userRepository;
     private final EntityManager entityManager;
 
     /**
@@ -86,10 +89,12 @@ public class CalculateCashbackUseCase {
                 .orElseThrow(() -> new NotFoundException("Cashback not found for order: " + orderId));
         }
 
-        // Get active cashback policy for platform
-        // Using UserLevel.NORMAL as default user level
+        // Get active cashback policy for platform based on user's actual level
+        UserLevel userLevel = getUserLevel(userId);
+        log.info("UseCase: User {} has level {}", userId, userLevel);
+
         CashbackPolicy policy = policyRepository
-            .findActivePolicyFor(platformId, UserLevel.NORMAL, LocalDateTime.now())
+            .findActivePolicyFor(platformId, userLevel, LocalDateTime.now())
             .orElse(null);
 
         BigDecimal cashbackRate;
@@ -202,8 +207,8 @@ public class CalculateCashbackUseCase {
                 .orElseThrow(() -> new NotFoundException("Cashback not found for item: " + orderItemId));
         }
 
-        // Calculate using same logic
-        BigDecimal cashbackRate = getDefaultCashbackRate(platformId);
+        // Calculate using same logic - pass userId to get correct rate based on user level
+        BigDecimal cashbackRate = getDefaultCashbackRate(platformId, userId);
         BigDecimal cashbackAmount = commissionAmount
             .multiply(cashbackRate)
             .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
@@ -436,15 +441,43 @@ public class CalculateCashbackUseCase {
         return result;
     }
 
-    private BigDecimal getDefaultCashbackRate(Long platformId) {
+    private BigDecimal getDefaultCashbackRate(Long platformId, Long userId) {
+        UserLevel userLevel = getUserLevel(userId);
+        log.debug("getDefaultCashbackRate: User {} has level {}", userId, userLevel);
+
         CashbackPolicy policy = policyRepository
-            .findActivePolicyFor(platformId, UserLevel.NORMAL, LocalDateTime.now())
+            .findActivePolicyFor(platformId, userLevel, LocalDateTime.now())
             .orElse(null);
 
         if (policy != null) {
+            log.debug("getDefaultCashbackRate: Found policy {} with rate {}% for user level {}",
+                policy.getPolicyName(), policy.getCashbackRate(), userLevel);
             return policy.getCashbackRate();
         }
+        log.warn("getDefaultCashbackRate: No policy found for platform {} and userLevel {}, using default 70%",
+            platformId, userLevel);
         return new BigDecimal("70.00"); // Default 70%
+    }
+
+    /**
+     * Get user's level from database.
+     * Falls back to NORMAL if user not found.
+     *
+     * @param userId User ID
+     * @return User's level
+     */
+    private UserLevel getUserLevel(Long userId) {
+        if (userId == null) {
+            log.warn("getUserLevel: userId is null, returning NORMAL");
+            return UserLevel.NORMAL;
+        }
+
+        return userRepository.findById(userId)
+            .map(User::getUserLevel)
+            .orElseGet(() -> {
+                log.warn("getUserLevel: User {} not found, returning NORMAL", userId);
+                return UserLevel.NORMAL;
+            });
     }
 
     /**

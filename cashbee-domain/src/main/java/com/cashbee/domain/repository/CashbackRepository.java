@@ -194,4 +194,44 @@ public interface CashbackRepository {
      * @return Number of records updated
      */
     int updateStatusByCashbackIdsWithBatchId(List<Long> cashbackIds, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId);
+
+    /**
+     * Count distinct orders that have cashback with CONFIRMED or PAID status for a user.
+     * Used to calculate total_completed_orders accurately.
+     *
+     * This method counts unique order IDs (not cashback records) because:
+     * - One order may have multiple items → multiple cashback records
+     * - We want to count completed ORDERS, not cashback items
+     *
+     * @param userId User ID
+     * @return Count of distinct orders with confirmed/paid cashback
+     */
+    int countConfirmedOrdersByUserId(Long userId);
+
+    /**
+     * Find all cashbacks paid by a specific batch for a specific user.
+     * Used for generating payment invoice with platform breakdown.
+     *
+     * @param batchId Batch ID
+     * @param userId User ID
+     * @return List of cashbacks paid in this batch for this user
+     */
+    List<Cashback> findByPaidBatchIdAndUserId(Long batchId, Long userId);
+
+    /**
+     * Find cashbacks with full order and item details for invoice display.
+     *
+     * This method performs a JOIN across:
+     * - cashback
+     * - affiliate_order
+     * - affiliate_order_item
+     * - affiliate_platform
+     *
+     * Used for displaying detailed invoice breakdown to users.
+     *
+     * @param batchId Batch ID that paid these cashbacks
+     * @param userId User ID
+     * @return List of projection arrays containing cashback + order + item info
+     */
+    List<Object[]> findCashbacksWithOrderDetailsByBatchIdAndUserId(Long batchId, Long userId);
 }
