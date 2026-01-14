@@ -52,4 +52,14 @@ public class ReferrerTierConfigRepositoryAdapter implements ReferrerTierConfigRe
         var saved = jpaRepository.save(entity);
         return mapper.toDomain(saved);
     }
+
+    @Override
+    public List<ReferrerTierConfig> findAll() {
+        return mapper.toDomainList(jpaRepository.findAll());
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        jpaRepository.deleteById(id);
+    }
 }

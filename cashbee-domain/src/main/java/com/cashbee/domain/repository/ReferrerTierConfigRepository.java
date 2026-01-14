@@ -52,4 +52,18 @@ public interface ReferrerTierConfigRepository {
      * @return saved tier config
      */
     ReferrerTierConfig save(ReferrerTierConfig tierConfig);
+
+    /**
+     * Find all tier configs (both active and inactive).
+     *
+     * @return list of all tier configs
+     */
+    List<ReferrerTierConfig> findAll();
+
+    /**
+     * Delete a tier config by ID.
+     *
+     * @param id tier config ID
+     */
+    void deleteById(Long id);
 }

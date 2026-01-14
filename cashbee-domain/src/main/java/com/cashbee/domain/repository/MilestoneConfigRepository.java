@@ -110,4 +110,11 @@ public interface MilestoneConfigRepository {
      * @param id Config ID
      */
     void deleteById(Long id);
+
+    /**
+     * Find all milestone configs (both active and inactive).
+     *
+     * @return List of all configs
+     */
+    List<MilestoneConfig> findAll();
 }

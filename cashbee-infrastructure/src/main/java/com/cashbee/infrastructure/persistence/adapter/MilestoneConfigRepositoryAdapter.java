@@ -139,4 +139,12 @@ public class MilestoneConfigRepositoryAdapter implements MilestoneConfigReposito
         log.debug("Deleting milestone config by id: {}", id);
         jpaRepository.deleteById(id);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MilestoneConfig> findAll() {
+        log.debug("Finding all milestone configs");
+        List<MilestoneConfigJpaEntity> entities = jpaRepository.findAll();
+        return mapper.toDomainList(entities);
+    }
 }
