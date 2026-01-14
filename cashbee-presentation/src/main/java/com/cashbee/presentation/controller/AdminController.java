@@ -10,6 +10,7 @@ import com.cashbee.application.usecase.admin.GetSystemStatisticsUseCase;
 import com.cashbee.application.usecase.affiliate.GetAffiliateClicksUseCase;
 import com.cashbee.application.usecase.user.GetUsersUseCase;
 import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
+import com.cashbee.application.usecase.referral.SyncAllUsersCompletedOrdersUseCase;
 import com.cashbee.domain.enums.ClickStatus;
 import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.presentation.dto.ApiResponse;
@@ -51,6 +52,7 @@ public class AdminController {
     private final GetUsersUseCase getUsersUseCase;
     private final GetAffiliateClicksUseCase getAffiliateClicksUseCase;
     private final RecalculateWalletUseCase recalculateWalletUseCase;
+    private final SyncAllUsersCompletedOrdersUseCase syncAllUsersCompletedOrdersUseCase;
 
     // ============================================================
     // SYSTEM STATISTICS
@@ -319,5 +321,46 @@ public class AdminController {
         log.info("API: [ADMIN] Wallet recalculated successfully for user {}", userId);
 
         return ResponseEntity.ok(ApiResponse.success("Wallet recalculated successfully for user " + userId));
+    }
+
+    // ============================================================
+    // REFERRAL DATA SYNC
+    // ============================================================
+
+    /**
+     * Sync total_completed_orders for all users.
+     *
+     * This endpoint recalculates the total_completed_orders count for all users
+     * based on distinct orders with CONFIRMED or PAID cashback status.
+     *
+     * Use this to fix data after:
+     * - Re-import causing double counting
+     * - Orders imported before milestone tracking was implemented
+     *
+     * Example: POST /api/admin/users/sync-completed-orders
+     *
+     * @return Number of users updated
+     */
+    @PostMapping("/users/sync-completed-orders")
+    @Operation(
+            summary = "[ADMIN] Sync completed orders count for all users",
+            description = "Recalculate total_completed_orders for all users from cashback data"
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Sync completed successfully"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Admin access required"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<ApiResponse<String>> syncAllUsersCompletedOrders() {
+        log.info("API: [ADMIN] Starting sync of total_completed_orders for all users");
+
+        int updatedCount = syncAllUsersCompletedOrdersUseCase.execute();
+
+        log.info("API: [ADMIN] Sync completed: {} users updated", updatedCount);
+
+        return ResponseEntity.ok(ApiResponse.success("Sync completed: " + updatedCount + " users updated"));
     }
 }
