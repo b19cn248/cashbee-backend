@@ -1,12 +1,15 @@
 package com.cashbee.presentation.controller;
 
 import com.cashbee.application.dto.referraladmin.CreateMilestoneRequest;
+import com.cashbee.application.dto.referraladmin.GrantMissingRewardsResponse;
 import com.cashbee.application.dto.referraladmin.MilestoneConfigResponse;
+import com.cashbee.application.dto.referraladmin.MissingMilestoneInfo;
 import com.cashbee.application.dto.referraladmin.UpdateMilestoneRequest;
 import com.cashbee.application.usecase.referraladmin.CreateMilestoneUseCase;
 import com.cashbee.application.usecase.referraladmin.DeleteMilestoneUseCase;
 import com.cashbee.application.usecase.referraladmin.GetAllMilestonesUseCase;
 import com.cashbee.application.usecase.referraladmin.GetMilestoneByIdUseCase;
+import com.cashbee.application.usecase.referraladmin.GrantMissingMilestoneRewardsUseCase;
 import com.cashbee.application.usecase.referraladmin.UpdateMilestoneUseCase;
 import com.cashbee.domain.enums.MilestoneType;
 import com.cashbee.presentation.dto.ApiResponse;
@@ -41,6 +44,7 @@ public class MilestoneAdminController {
     private final CreateMilestoneUseCase createMilestoneUseCase;
     private final UpdateMilestoneUseCase updateMilestoneUseCase;
     private final DeleteMilestoneUseCase deleteMilestoneUseCase;
+    private final GrantMissingMilestoneRewardsUseCase grantMissingMilestoneRewardsUseCase;
 
     /**
      * Get all milestone configurations with optional filters.
@@ -152,6 +156,95 @@ public class MilestoneAdminController {
 
         return ResponseEntity.ok(
             ApiResponse.success(null, "Milestone deleted successfully")
+        );
+    }
+
+    // ===================== Missing Milestone Rewards Endpoints =====================
+
+    /**
+     * Find missing milestone rewards for a specific user.
+     */
+    @GetMapping("/missing/{userId}")
+    @Operation(
+        summary = "Find missing rewards for user",
+        description = "Find all milestone rewards that should have been granted to a user but were missed"
+    )
+    public ResponseEntity<ApiResponse<List<MissingMilestoneInfo>>> findMissingRewardsForUser(
+        @Parameter(description = "User ID to check", required = true)
+        @PathVariable Long userId
+    ) {
+        log.info("API: Finding missing milestone rewards for user: {}", userId);
+
+        var missingRewards = grantMissingMilestoneRewardsUseCase.findMissingRewards(userId);
+
+        return ResponseEntity.ok(
+            ApiResponse.success(missingRewards,
+                "Found " + missingRewards.size() + " missing rewards for user " + userId)
+        );
+    }
+
+    /**
+     * Find all missing milestone rewards across all users.
+     */
+    @GetMapping("/missing")
+    @Operation(
+        summary = "Find all missing rewards",
+        description = "Find all milestone rewards that should have been granted but were missed across all users"
+    )
+    public ResponseEntity<ApiResponse<List<MissingMilestoneInfo>>> findAllMissingRewards() {
+        log.info("API: Finding all missing milestone rewards");
+
+        var missingRewards = grantMissingMilestoneRewardsUseCase.findAllMissingRewards();
+
+        return ResponseEntity.ok(
+            ApiResponse.success(missingRewards,
+                "Found " + missingRewards.size() + " total missing rewards")
+        );
+    }
+
+    /**
+     * Grant missing milestone rewards for a specific user.
+     */
+    @PostMapping("/grant-missing/{userId}")
+    @Operation(
+        summary = "Grant missing rewards for user",
+        description = "Retroactively grant all missing milestone rewards for a specific user"
+    )
+    public ResponseEntity<ApiResponse<GrantMissingRewardsResponse>> grantMissingRewardsForUser(
+        @Parameter(description = "User ID to grant rewards for", required = true)
+        @PathVariable Long userId
+    ) {
+        log.info("API: Granting missing milestone rewards for user: {}", userId);
+
+        var response = grantMissingMilestoneRewardsUseCase.grantMissingRewardsForUser(userId);
+
+        String message = response.getRewardsGranted() > 0
+            ? "Granted " + response.getRewardsGranted() + " missing rewards for user " + userId
+            : "No missing rewards found for user " + userId;
+
+        return ResponseEntity.ok(ApiResponse.success(response, message));
+    }
+
+    /**
+     * Grant all missing milestone rewards for all users.
+     */
+    @PostMapping("/grant-missing-all")
+    @Operation(
+        summary = "Grant all missing rewards",
+        description = "Retroactively grant all missing milestone rewards for all users. Use with caution."
+    )
+    public ResponseEntity<ApiResponse<List<GrantMissingRewardsResponse>>> grantAllMissingRewards() {
+        log.info("API: Granting all missing milestone rewards for all users");
+
+        var responses = grantMissingMilestoneRewardsUseCase.grantAllMissingRewards();
+
+        int totalGranted = responses.stream()
+            .mapToInt(GrantMissingRewardsResponse::getRewardsGranted)
+            .sum();
+
+        return ResponseEntity.ok(
+            ApiResponse.success(responses,
+                "Processed " + responses.size() + " users, granted " + totalGranted + " total rewards")
         );
     }
 }

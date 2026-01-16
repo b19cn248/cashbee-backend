@@ -1,5 +1,6 @@
 package com.cashbee.domain.repository;
 
+import com.cashbee.domain.enums.TransactionSourceType;
 import com.cashbee.domain.model.Transaction;
 
 import java.time.LocalDateTime;
@@ -102,4 +103,14 @@ public interface TransactionRepository {
      * @param id Transaction ID
      */
     void deleteById(Long id);
+
+    /**
+     * Check if transaction exists by source ID and source type.
+     * Used for anti-duplicate protection (Layer 3).
+     *
+     * @param sourceId   Source entity ID (e.g., referrer_commission.id)
+     * @param sourceType Source type (e.g., REFERRER_COMMISSION)
+     * @return true if transaction already exists
+     */
+    boolean existsBySourceIdAndSourceType(Long sourceId, TransactionSourceType sourceType);
 }

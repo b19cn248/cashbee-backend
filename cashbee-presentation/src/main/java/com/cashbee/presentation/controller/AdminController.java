@@ -11,6 +11,7 @@ import com.cashbee.application.usecase.affiliate.GetAffiliateClicksUseCase;
 import com.cashbee.application.usecase.user.GetUsersUseCase;
 import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
 import com.cashbee.application.usecase.referral.SyncAllUsersCompletedOrdersUseCase;
+import com.cashbee.application.usecase.referral.GrantMissingReferrerCommissionsUseCase;
 import com.cashbee.domain.enums.ClickStatus;
 import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.presentation.dto.ApiResponse;
@@ -53,6 +54,7 @@ public class AdminController {
     private final GetAffiliateClicksUseCase getAffiliateClicksUseCase;
     private final RecalculateWalletUseCase recalculateWalletUseCase;
     private final SyncAllUsersCompletedOrdersUseCase syncAllUsersCompletedOrdersUseCase;
+    private final GrantMissingReferrerCommissionsUseCase grantMissingReferrerCommissionsUseCase;
 
     // ============================================================
     // SYSTEM STATISTICS
@@ -362,5 +364,48 @@ public class AdminController {
         log.info("API: [ADMIN] Sync completed: {} users updated", updatedCount);
 
         return ResponseEntity.ok(ApiResponse.success("Sync completed: " + updatedCount + " users updated"));
+    }
+
+    // ============================================================
+    // REFERRER COMMISSION FIX
+    // ============================================================
+
+    /**
+     * Grant missing referrer commissions (Retroactive Fix).
+     *
+     * This endpoint processes all CONFIRMED referrer commissions that were
+     * recorded in the database but never paid to referrers' wallets.
+     *
+     * This is a ONE-TIME fix for historical data due to a bug where the 5%
+     * referrer commission was tracked but never actually added to wallet balance.
+     *
+     * Example: POST /api/admin/referral/grant-missing-commissions
+     *
+     * @return Summary of the retroactive fix operation
+     */
+    @PostMapping("/referral/grant-missing-commissions")
+    @Operation(
+            summary = "[ADMIN] Grant missing referrer commissions (Retroactive Fix)",
+            description = "Process all CONFIRMED commissions that were never paid to referrers' wallets. One-time fix for historical data."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Retroactive fix completed successfully"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Admin access required"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<ApiResponse<GrantMissingReferrerCommissionsUseCase.GrantResult>> grantMissingCommissions() {
+        log.info("API: [ADMIN] Starting retroactive fix for missing referrer commissions");
+
+        GrantMissingReferrerCommissionsUseCase.GrantResult result =
+                grantMissingReferrerCommissionsUseCase.execute();
+
+        log.info("API: [ADMIN] Retroactive fix completed: found={}, success={}, skipped={}, errors={}, totalPaid={}",
+                result.totalFound(), result.successCount(), result.skippedCount(),
+                result.errorCount(), result.totalAmountPaid());
+
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 }

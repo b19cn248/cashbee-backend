@@ -108,4 +108,7 @@
     <!-- Referrer Tier System: tiered commission rates based on referral count -->
     <include file="db/changelog/048-create-referrer-tier-system.xml"/>
 
+    <!-- Anti-duplicate protection: UNIQUE constraint on referrer_commission.source_order_id -->
+    <include file="db/changelog/049-add-unique-constraint-referrer-commission.xml"/>
+
 </databaseChangeLog>

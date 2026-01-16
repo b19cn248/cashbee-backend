@@ -1,7 +1,7 @@
 package com.cashbee.application.usecase.cashback;
 
+import com.cashbee.application.usecase.referral.PayReferrerCommissionUseCase;
 import com.cashbee.application.usecase.referral.ProcessReferralOnOrderCompletedUseCase;
-import com.cashbee.common.exception.NotFoundException;
 import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.Cashback;
 import com.cashbee.domain.repository.CashbackRepository;
@@ -44,6 +44,7 @@ public class UpdateCashbackOnOrderStatusChangeUseCase {
     private final CashbackRepository cashbackRepository;
     private final AddCashbackToWalletUseCase addCashbackToWalletUseCase;
     private final ProcessReferralOnOrderCompletedUseCase processReferralUseCase;
+    private final PayReferrerCommissionUseCase payReferrerCommissionUseCase;
 
     /**
      * Update cashback when order status changes.
@@ -93,6 +94,19 @@ public class UpdateCashbackOnOrderStatusChangeUseCase {
     }
 
     /**
+     * Pay referrer commission when referee's cashback is confirmed.
+     * This adds the 5% commission to the referrer's wallet balance.
+     */
+    private void payReferrerCommission(Long orderId) {
+        try {
+            payReferrerCommissionUseCase.execute(orderId);
+        } catch (Exception e) {
+            log.error("Failed to pay referrer commission for order {}: {}", orderId, e.getMessage(), e);
+            // Don't fail the cashback confirmation if commission payment fails
+        }
+    }
+
+    /**
      * Handle different status transition scenarios.
      */
     private void handleStatusTransition(Long orderId, OrderStatus oldStatus,
@@ -107,6 +121,9 @@ public class UpdateCashbackOnOrderStatusChangeUseCase {
 
             // Move from pending_balance → balance
             addCashbackToWalletUseCase.confirmCashbackForOrder(orderId);
+
+            // Pay referrer commission when referee's cashback is confirmed
+            payReferrerCommission(orderId);
 
             log.info("UseCase: Successfully confirmed cashback for order {}", orderId);
             return;
