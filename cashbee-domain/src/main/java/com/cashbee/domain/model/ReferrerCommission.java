@@ -124,6 +124,12 @@ public class ReferrerCommission {
      */
     private LocalDateTime expiresAt;
 
+    /**
+     * Batch ID that paid this commission (null if not yet paid in batch).
+     * Set when batch transfer is completed.
+     */
+    private Long paidBatchId;
+
     // ===== Business Logic Methods =====
 
     /**
@@ -213,6 +219,29 @@ public class ReferrerCommission {
         }
         this.status = ReferrerCommissionStatus.PAID;
         this.paidAt = LocalDateTime.now();
+    }
+
+    /**
+     * Mark commission as paid by a specific batch.
+     * Used when completing batch transfers.
+     *
+     * @param batchId The batch ID that paid this commission
+     */
+    public void markAsPaidByBatch(Long batchId) {
+        this.paidBatchId = batchId;
+        if (this.status == ReferrerCommissionStatus.CONFIRMED) {
+            this.status = ReferrerCommissionStatus.PAID;
+        }
+        this.paidAt = LocalDateTime.now();
+    }
+
+    /**
+     * Check if commission was paid by a batch.
+     *
+     * @return true if paidBatchId is set
+     */
+    public boolean isPaidByBatch() {
+        return this.paidBatchId != null;
     }
 
     /**

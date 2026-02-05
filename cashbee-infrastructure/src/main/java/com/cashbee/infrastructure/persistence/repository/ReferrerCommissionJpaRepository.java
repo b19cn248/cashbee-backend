@@ -2,6 +2,7 @@ package com.cashbee.infrastructure.persistence.repository;
 
 import com.cashbee.infrastructure.persistence.entity.ReferrerCommissionJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -98,4 +99,37 @@ public interface ReferrerCommissionJpaRepository extends JpaRepository<ReferrerC
      * Find commissions between referrer and referee.
      */
     List<ReferrerCommissionJpaEntity> findByReferrerIdAndRefereeId(Long referrerId, Long refereeId);
+
+    /**
+     * Find all unpaid commissions for a referrer.
+     * Unpaid = status IN ('CONFIRMED', 'PAID') AND paid_batch_id IS NULL
+     */
+    @Query("SELECT c FROM ReferrerCommissionJpaEntity c " +
+           "WHERE c.referrerId = :referrerId " +
+           "AND c.status IN ('CONFIRMED', 'PAID') " +
+           "AND c.paidBatchId IS NULL")
+    List<ReferrerCommissionJpaEntity> findUnpaidByReferrerId(@Param("referrerId") Long referrerId);
+
+    /**
+     * Sum unpaid commission amount for a referrer.
+     */
+    @Query("SELECT COALESCE(SUM(c.commissionAmount), 0) FROM ReferrerCommissionJpaEntity c " +
+           "WHERE c.referrerId = :referrerId " +
+           "AND c.status IN ('CONFIRMED', 'PAID') " +
+           "AND c.paidBatchId IS NULL")
+    BigDecimal sumUnpaidCommissionByReferrerId(@Param("referrerId") Long referrerId);
+
+    /**
+     * Mark commissions as paid by batch.
+     */
+    @Modifying
+    @Query("UPDATE ReferrerCommissionJpaEntity c " +
+           "SET c.paidBatchId = :batchId, c.paidAt = CURRENT_TIMESTAMP " +
+           "WHERE c.id IN :commissionIds")
+    int markAsPaidByBatch(@Param("commissionIds") List<Long> commissionIds, @Param("batchId") Long batchId);
+
+    /**
+     * Find commissions paid by a batch for a specific referrer.
+     */
+    List<ReferrerCommissionJpaEntity> findByPaidBatchIdAndReferrerId(Long paidBatchId, Long referrerId);
 }

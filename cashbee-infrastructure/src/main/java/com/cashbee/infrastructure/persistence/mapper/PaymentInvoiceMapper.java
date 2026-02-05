@@ -58,6 +58,11 @@ public class PaymentInvoiceMapper {
                 .tiktokAmount(entity.getTiktokAmount())
                 .otherOrders(entity.getOtherOrders())
                 .otherAmount(entity.getOtherAmount())
+                // Bonus summary
+                .bonusOrders(entity.getBonusOrders())
+                .bonusAmount(entity.getBonusAmount())
+                .referrerCommissionOrders(entity.getReferrerCommissionOrders())
+                .referrerCommissionAmount(entity.getReferrerCommissionAmount())
                 // Additional info
                 .description(entity.getDescription())
                 .remark(entity.getRemark())
@@ -116,6 +121,11 @@ public class PaymentInvoiceMapper {
                 .tiktokAmount(domain.getTiktokAmount())
                 .otherOrders(domain.getOtherOrders())
                 .otherAmount(domain.getOtherAmount())
+                // Bonus summary
+                .bonusOrders(domain.getBonusOrders())
+                .bonusAmount(domain.getBonusAmount())
+                .referrerCommissionOrders(domain.getReferrerCommissionOrders())
+                .referrerCommissionAmount(domain.getReferrerCommissionAmount())
                 // Additional info
                 .description(domain.getDescription())
                 .remark(domain.getRemark())

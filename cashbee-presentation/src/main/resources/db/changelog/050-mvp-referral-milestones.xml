@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ================================================================
+         MVP Referral Milestones Refactoring
+         Date: 2026-01-30
+
+         Changes:
+         - FIX BUG: Add total_bonus column to prevent bonus loss
+         - CLEANUP: Delete old bonus transactions (never paid, never notified)
+         - CLEANUP: Delete old referral_reward records
+         - RESET: Reset referral activation for re-processing
+         - Simplified milestones: 5 WITH_REFERRER, 4 WITHOUT_REFERRER
+         - VIP at 50 orders (was 80), SUPER at 150 orders (was 300)
+         - Activation on first order (was 3rd/5th)
+         - Anti-abuse: min order amount > 100k (code change)
+         ================================================================ -->
+
+    <!-- ============ PHASE 0: CLEANUP OLD BONUS + FIX BUG ============ -->
+
+    <!-- Step 1: Add total_bonus column to track bonus separately (for future) -->
+    <changeSet id="050-00-add-total-bonus-column" author="cashbee">
+        <comment>Add total_bonus column to user_wallet for bonus tracking</comment>
+        <addColumn tableName="user_wallet">
+            <column name="total_bonus" type="DECIMAL(15,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 2: DELETE all old BONUS transactions (never paid, never notified) -->
+    <changeSet id="050-00-delete-old-bonus-transactions" author="cashbee">
+        <comment>Delete old BONUS transactions that were never actually paid due to bug</comment>
+        <sql>
+            DELETE FROM transactions WHERE type = 'BONUS';
+        </sql>
+        <rollback>
+            <!-- Cannot rollback deleted transactions -->
+        </rollback>
+    </changeSet>
+
+    <!-- Step 3: DELETE all referral_reward records (to allow re-processing with new milestones) -->
+    <changeSet id="050-00-delete-old-referral-rewards" author="cashbee">
+        <comment>Delete old referral rewards to allow new milestone processing</comment>
+        <sql>
+            DELETE FROM referral_reward;
+        </sql>
+        <rollback>
+            <!-- Cannot rollback deleted records -->
+        </rollback>
+    </changeSet>
+
+    <!-- Step 4: Reset referral activation for re-processing -->
+    <changeSet id="050-00-reset-referral-activation" author="cashbee">
+        <comment>Reset referral activation to re-apply with new rules</comment>
+        <sql>
+            UPDATE user
+            SET referral_activated_at = NULL,
+                referral_expires_at = NULL,
+                updated_at = NOW()
+            WHERE referred_by IS NOT NULL;
+        </sql>
+    </changeSet>
+
+    <!-- ============ PHASE 1: Deactivate all current milestones ============ -->
+
+    <changeSet id="050-01-deactivate-with-referrer" author="cashbee">
+        <comment>Deactivate all WITH_REFERRER milestones</comment>
+        <update tableName="milestone_config">
+            <column name="is_active" valueBoolean="false"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITH_REFERRER' AND is_active = 1</where>
+        </update>
+        <rollback>
+            <update tableName="milestone_config">
+                <column name="is_active" valueBoolean="true"/>
+                <where>milestone_type = 'WITH_REFERRER' AND orders_required IN (1,3,10,20,40,80,150,300)</where>
+            </update>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="050-02-deactivate-without-referrer" author="cashbee">
+        <comment>Deactivate all WITHOUT_REFERRER milestones</comment>
+        <update tableName="milestone_config">
+            <column name="is_active" valueBoolean="false"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITHOUT_REFERRER' AND is_active = 1</where>
+        </update>
+        <rollback>
+            <update tableName="milestone_config">
+                <column name="is_active" valueBoolean="true"/>
+                <where>milestone_type = 'WITHOUT_REFERRER' AND orders_required IN (1,20,40,80,150,300)</where>
+            </update>
+        </rollback>
+    </changeSet>
+
+    <!-- ============ PHASE 2: WITH_REFERRER milestones (5 total) ============ -->
+
+    <!-- Milestone 1: First order - ACTIVATE + Bonus -->
+    <changeSet id="050-03-with-referrer-m1" author="cashbee">
+        <comment>Milestone 1: B +10k, A +20k, activate referral 12 months</comment>
+        <update tableName="milestone_config">
+            <column name="referee_bonus" valueNumeric="10000"/>
+            <column name="referrer_bonus" valueNumeric="20000"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" valueNumeric="12"/>
+            <column name="activates_referral" valueBoolean="true"/>
+            <column name="description" value="MVP: B +10k, A +20k, activate 12-month commission"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITH_REFERRER' AND orders_required = 1</where>
+        </update>
+    </changeSet>
+
+    <!-- Milestone 5: Second bonus -->
+    <changeSet id="050-04-with-referrer-m5" author="cashbee">
+        <comment>Milestone 5: B +15k, A +10k</comment>
+        <update tableName="milestone_config">
+            <column name="referee_bonus" valueNumeric="15000"/>
+            <column name="referrer_bonus" valueNumeric="10000"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" valueNumeric="0"/>
+            <column name="activates_referral" valueBoolean="false"/>
+            <column name="description" value="MVP: B +15k, A +10k"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITH_REFERRER' AND orders_required = 5</where>
+        </update>
+    </changeSet>
+
+    <!-- Milestone 20: Pre-VIP bonus -->
+    <changeSet id="050-05-with-referrer-m20" author="cashbee">
+        <comment>Milestone 20: B +20k (Pre-VIP)</comment>
+        <update tableName="milestone_config">
+            <column name="referee_bonus" valueNumeric="20000"/>
+            <column name="referrer_bonus" valueNumeric="0"/>
+            <column name="new_tier" value=""/>
+            <column name="description" value="MVP Pre-VIP: B +20k"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITH_REFERRER' AND orders_required = 20</where>
+        </update>
+    </changeSet>
+
+    <!-- Milestone 50: VIP tier (NEW - insert if not exists) -->
+    <changeSet id="050-06-with-referrer-m50" author="cashbee">
+        <comment>Milestone 50: VIP tier upgrade (83% cashback)</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" valueNumeric="50"/>
+            <column name="referee_bonus" valueNumeric="0"/>
+            <column name="referrer_bonus" valueNumeric="0"/>
+            <column name="new_tier" value="VIP"/>
+            <column name="commission_months" valueNumeric="0"/>
+            <column name="activates_referral" valueBoolean="false"/>
+            <column name="description" value="MVP VIP: 83% cashback"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+        <rollback>
+            <delete tableName="milestone_config">
+                <where>milestone_type = 'WITH_REFERRER' AND orders_required = 50</where>
+            </delete>
+        </rollback>
+    </changeSet>
+
+    <!-- Milestone 150: SUPER tier + Bonus -->
+    <changeSet id="050-07-with-referrer-m150" author="cashbee">
+        <comment>Milestone 150: B +30k, SUPER tier (85% cashback)</comment>
+        <update tableName="milestone_config">
+            <column name="referee_bonus" valueNumeric="30000"/>
+            <column name="referrer_bonus" valueNumeric="0"/>
+            <column name="new_tier" value="SUPER"/>
+            <column name="description" value="MVP SUPER: B +30k, 85% cashback"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITH_REFERRER' AND orders_required = 150</where>
+        </update>
+    </changeSet>
+
+    <!-- ============ PHASE 3: WITHOUT_REFERRER milestones (4 total) ============ -->
+
+    <!-- Milestone 1: Welcome bonus -->
+    <changeSet id="050-08-without-referrer-m1" author="cashbee">
+        <comment>Milestone 1: +5k welcome bonus</comment>
+        <update tableName="milestone_config">
+            <column name="referee_bonus" valueNumeric="5000"/>
+            <column name="description" value="MVP Welcome: +5k"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITHOUT_REFERRER' AND orders_required = 1</where>
+        </update>
+    </changeSet>
+
+    <!-- Milestone 20: Milestone bonus -->
+    <changeSet id="050-09-without-referrer-m20" author="cashbee">
+        <comment>Milestone 20: +10k</comment>
+        <update tableName="milestone_config">
+            <column name="referee_bonus" valueNumeric="10000"/>
+            <column name="description" value="MVP Milestone: +10k"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITHOUT_REFERRER' AND orders_required = 20</where>
+        </update>
+    </changeSet>
+
+    <!-- Milestone 50: VIP tier (NEW - insert if not exists) -->
+    <changeSet id="050-10-without-referrer-m50" author="cashbee">
+        <comment>Milestone 50: VIP tier (no referrer)</comment>
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITHOUT_REFERRER"/>
+            <column name="orders_required" valueNumeric="50"/>
+            <column name="referee_bonus" valueNumeric="0"/>
+            <column name="referrer_bonus" valueNumeric="0"/>
+            <column name="new_tier" value="VIP"/>
+            <column name="commission_months" valueNumeric="0"/>
+            <column name="activates_referral" valueBoolean="false"/>
+            <column name="description" value="MVP VIP: 83% cashback (no referrer)"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+        <rollback>
+            <delete tableName="milestone_config">
+                <where>milestone_type = 'WITHOUT_REFERRER' AND orders_required = 50</where>
+            </delete>
+        </rollback>
+    </changeSet>
+
+    <!-- Milestone 150: SUPER tier + Bonus -->
+    <changeSet id="050-11-without-referrer-m150" author="cashbee">
+        <comment>Milestone 150: +20k, SUPER tier (no referrer)</comment>
+        <update tableName="milestone_config">
+            <column name="referee_bonus" valueNumeric="20000"/>
+            <column name="new_tier" value="SUPER"/>
+            <column name="description" value="MVP SUPER: +20k, 85% cashback (no referrer)"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="updated_at" valueComputed="NOW()"/>
+            <where>milestone_type = 'WITHOUT_REFERRER' AND orders_required = 150</where>
+        </update>
+    </changeSet>
+
+    <!-- ============ PHASE 4: Backfill - Activate referrals for users with qualifying orders ============ -->
+
+    <changeSet id="050-12-backfill-activate" author="cashbee">
+        <comment>Activate referral for users with 1+ orders > 100k who haven't been activated</comment>
+        <sql>
+            UPDATE user u
+            JOIN (
+                SELECT DISTINCT c.user_id
+                FROM cashback c
+                JOIN affiliate_order ao ON c.order_id = ao.id
+                WHERE c.status IN ('CONFIRMED', 'PAID')
+                AND ao.product_price > 100000
+            ) qualified ON u.id = qualified.user_id
+            SET
+                u.referral_activated_at = NOW(),
+                u.referral_expires_at = DATE_ADD(NOW(), INTERVAL 12 MONTH),
+                u.updated_at = NOW()
+            WHERE
+                u.referred_by IS NOT NULL
+                AND u.referral_activated_at IS NULL;
+        </sql>
+        <rollback>
+            <!-- Cannot easily rollback activation, but safe to leave -->
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

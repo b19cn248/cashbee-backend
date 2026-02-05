@@ -234,4 +234,27 @@ public interface CashbackRepository {
      * @return List of projection arrays containing cashback + order + item info
      */
     List<Object[]> findCashbacksWithOrderDetailsByBatchIdAndUserId(Long batchId, Long userId);
+
+    /**
+     * Count distinct orders with CONFIRMED/PAID status and minimum order amount.
+     * Used for milestone calculation with anti-abuse filter.
+     *
+     * This method counts unique order IDs where:
+     * - Cashback status is CONFIRMED or PAID
+     * - Order product_price is GREATER THAN minAmount (exclusive, uses > not >=)
+     *
+     * @param userId User ID
+     * @param minAmount Minimum product_price (exclusive, uses > not >=)
+     * @return Count of qualifying orders
+     */
+    int countConfirmedOrdersByUserIdWithMinAmount(Long userId, java.math.BigDecimal minAmount);
+
+    /**
+     * Find all user IDs that have qualifying orders (for batch re-processing).
+     * Used by admin to re-process milestones for all users with orders > minAmount.
+     *
+     * @param minAmount Minimum product_price threshold
+     * @return List of distinct user IDs with qualifying orders
+     */
+    java.util.List<Long> findUsersWithQualifyingOrders(java.math.BigDecimal minAmount);
 }

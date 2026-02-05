@@ -147,4 +147,20 @@ public class MilestoneConfigRepositoryAdapter implements MilestoneConfigReposito
         List<MilestoneConfigJpaEntity> entities = jpaRepository.findAll();
         return mapper.toDomainList(entities);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MilestoneConfig> findActiveByMilestoneTypeAndOrdersRequiredLessThanOrEqual(
+            MilestoneType milestoneType,
+            Integer maxOrders
+    ) {
+        log.debug("Finding active milestones for type={} with ordersRequired <= {}",
+                milestoneType, maxOrders);
+        List<MilestoneConfigJpaEntity> entities = jpaRepository
+                .findActiveByMilestoneTypeAndOrdersRequiredLessThanOrEqual(
+                        milestoneType.name(),
+                        maxOrders
+                );
+        return mapper.toDomainList(entities);
+    }
 }

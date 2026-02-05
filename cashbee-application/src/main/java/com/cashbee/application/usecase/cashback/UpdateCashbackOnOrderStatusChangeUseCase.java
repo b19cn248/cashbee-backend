@@ -79,6 +79,23 @@ public class UpdateCashbackOnOrderStatusChangeUseCase {
 
         // Process referral rewards when order is completed (APPROVED or PAID)
         processReferralRewards(orderId, oldStatus, newStatus);
+
+        // Pay referrer commission AFTER processReferralRewards creates the commission
+        // FIX: Previously called inside handleStatusTransition() BEFORE commission was created
+        if (isTransitionToCompleted(oldStatus, newStatus)) {
+            payReferrerCommission(orderId);
+        }
+    }
+
+    /**
+     * Check if this is a transition to completed status (APPROVED or PAID).
+     * Used to determine when to pay referrer commission.
+     */
+    private boolean isTransitionToCompleted(OrderStatus oldStatus, OrderStatus newStatus) {
+        // Only pay commission when transitioning FROM non-completed TO completed
+        boolean wasNotCompleted = oldStatus != OrderStatus.APPROVED && oldStatus != OrderStatus.PAID;
+        boolean isNowCompleted = newStatus == OrderStatus.APPROVED || newStatus == OrderStatus.PAID;
+        return wasNotCompleted && isNowCompleted;
     }
 
     /**
@@ -122,8 +139,8 @@ public class UpdateCashbackOnOrderStatusChangeUseCase {
             // Move from pending_balance → balance
             addCashbackToWalletUseCase.confirmCashbackForOrder(orderId);
 
-            // Pay referrer commission when referee's cashback is confirmed
-            payReferrerCommission(orderId);
+            // NOTE: payReferrerCommission() is now called in execute() AFTER processReferralRewards()
+            // to ensure commission exists before attempting to pay it
 
             log.info("UseCase: Successfully confirmed cashback for order {}", orderId);
             return;

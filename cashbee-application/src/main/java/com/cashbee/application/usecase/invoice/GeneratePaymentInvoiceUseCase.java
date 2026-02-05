@@ -92,6 +92,13 @@ public class GeneratePaymentInvoiceUseCase {
             }
         }
 
+        // Calculate total cashback = sum of all platform cashbacks
+        BigDecimal totalCashbackAmount = shopeeAmount
+                .add(lazadaAmount)
+                .add(tikiAmount)
+                .add(tiktokAmount)
+                .add(otherAmount);
+
         // Create domain model
         PaymentInvoice invoice = PaymentInvoice.builder()
                 .invoiceNumber(invoiceNumber)
@@ -115,6 +122,13 @@ public class GeneratePaymentInvoiceUseCase {
                 .tiktokOrders(tiktokOrders)
                 .otherAmount(otherAmount)
                 .otherOrders(otherOrders)
+                // Total cashback from all platforms
+                .totalCashbackAmount(totalCashbackAmount)
+                // Bonus breakdown
+                .bonusOrders(command.getBonusOrders() != null ? command.getBonusOrders() : 0)
+                .bonusAmount(command.getBonusAmount() != null ? command.getBonusAmount() : BigDecimal.ZERO)
+                .referrerCommissionOrders(command.getReferrerCommissionOrders() != null ? command.getReferrerCommissionOrders() : 0)
+                .referrerCommissionAmount(command.getReferrerCommissionAmount() != null ? command.getReferrerCommissionAmount() : BigDecimal.ZERO)
                 .emailSent(false)
                 .createdAt(LocalDateTime.now())
                 .build();

@@ -202,6 +202,32 @@ public class PaymentInvoice {
     @Builder.Default
     private BigDecimal otherAmount = BigDecimal.ZERO;
 
+    // ===== Bonus Summary (Milestone & Referrer) =====
+
+    /**
+     * Number of milestone bonus rewards paid.
+     */
+    @Builder.Default
+    private Integer bonusOrders = 0;
+
+    /**
+     * Total milestone bonus amount (MILESTONE_BONUS type rewards).
+     */
+    @Builder.Default
+    private BigDecimal bonusAmount = BigDecimal.ZERO;
+
+    /**
+     * Number of referrer rewards paid (REFERRER_BONUS, REFERRER_COMMISSION).
+     */
+    @Builder.Default
+    private Integer referrerCommissionOrders = 0;
+
+    /**
+     * Total referrer commission amount.
+     */
+    @Builder.Default
+    private BigDecimal referrerCommissionAmount = BigDecimal.ZERO;
+
     // ===== Additional Info =====
 
     /**

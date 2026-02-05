@@ -56,6 +56,10 @@ public class PaymentInvoiceResponse {
     private PlatformBreakdown tiktok;
     private PlatformBreakdown other;
 
+    // Bonus breakdown
+    private BonusBreakdown milestoneBonus;
+    private BonusBreakdown referrerCommission;
+
     // Metadata
     private String description;
     private String remark;
@@ -71,6 +75,19 @@ public class PaymentInvoiceResponse {
     public static class PlatformBreakdown {
         private String platformName;
         private Integer orderCount;
+        private BigDecimal amount;
+    }
+
+    /**
+     * Bonus breakdown (milestone bonus or referrer commission).
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BonusBreakdown {
+        private String type;
+        private Integer count;
         private BigDecimal amount;
     }
 
@@ -123,6 +140,16 @@ public class PaymentInvoiceResponse {
                         .platformName("Other")
                         .orderCount(invoice.getOtherOrders())
                         .amount(invoice.getOtherAmount())
+                        .build())
+                .milestoneBonus(BonusBreakdown.builder()
+                        .type("Milestone Bonus")
+                        .count(invoice.getBonusOrders())
+                        .amount(invoice.getBonusAmount())
+                        .build())
+                .referrerCommission(BonusBreakdown.builder()
+                        .type("Referrer Commission")
+                        .count(invoice.getReferrerCommissionOrders())
+                        .amount(invoice.getReferrerCommissionAmount())
                         .build())
                 .description(invoice.getDescription())
                 .remark(invoice.getRemark())

@@ -216,4 +216,35 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
     List<Object[]> findCashbacksWithOrderDetailsByBatchIdAndUserId(
             @Param("batchId") Long batchId,
             @Param("userId") Long userId);
+
+    /**
+     * Count confirmed orders with minimum amount filter (anti-abuse).
+     * Uses > (greater than) not >= for the amount comparison.
+     *
+     * Joins with affiliate_order to check product_price.
+     */
+    @Query(value = """
+        SELECT COUNT(DISTINCT c.order_id)
+        FROM cashback c
+        INNER JOIN affiliate_order ao ON ao.id = c.order_id
+        WHERE c.user_id = :userId
+        AND c.status IN ('CONFIRMED', 'PAID')
+        AND ao.product_price > :minAmount
+        """, nativeQuery = true)
+    int countConfirmedOrdersByUserIdWithMinAmount(
+            @Param("userId") Long userId,
+            @Param("minAmount") BigDecimal minAmount);
+
+    /**
+     * Find all user IDs that have at least one qualifying order.
+     * Used by admin to batch re-process milestones.
+     */
+    @Query(value = """
+        SELECT DISTINCT c.user_id
+        FROM cashback c
+        INNER JOIN affiliate_order ao ON ao.id = c.order_id
+        WHERE c.status IN ('CONFIRMED', 'PAID')
+        AND ao.product_price > :minAmount
+        """, nativeQuery = true)
+    List<Long> findUsersWithQualifyingOrders(@Param("minAmount") BigDecimal minAmount);
 }

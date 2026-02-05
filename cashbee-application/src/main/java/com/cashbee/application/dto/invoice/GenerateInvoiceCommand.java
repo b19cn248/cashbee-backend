@@ -85,6 +85,32 @@ public class GenerateInvoiceCommand {
      */
     private List<PlatformOrderDetail> platformOrders;
 
+    // ===== Bonus Details =====
+
+    /**
+     * Number of milestone bonus rewards paid.
+     */
+    @Builder.Default
+    private Integer bonusOrders = 0;
+
+    /**
+     * Total milestone bonus amount.
+     */
+    @Builder.Default
+    private BigDecimal bonusAmount = BigDecimal.ZERO;
+
+    /**
+     * Number of referrer rewards paid.
+     */
+    @Builder.Default
+    private Integer referrerCommissionOrders = 0;
+
+    /**
+     * Total referrer commission amount.
+     */
+    @Builder.Default
+    private BigDecimal referrerCommissionAmount = BigDecimal.ZERO;
+
     /**
      * Detail for orders from a specific platform.
      */

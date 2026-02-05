@@ -4,6 +4,7 @@ import com.cashbee.application.dto.invoice.GenerateInvoiceCommand;
 import com.cashbee.application.dto.invoice.PaymentInvoiceResponse;
 import com.cashbee.application.usecase.invoice.GeneratePaymentInvoiceUseCase;
 import com.cashbee.application.usecase.invoice.SendInvoiceEmailUseCase;
+import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
 import com.cashbee.common.exception.BusinessException;
 import com.cashbee.common.exception.NotFoundException;
 import com.cashbee.domain.enums.BatchItemStatus;
@@ -18,11 +19,15 @@ import com.cashbee.domain.model.Cashback;
 import com.cashbee.domain.model.Transaction;
 import com.cashbee.domain.model.User;
 import com.cashbee.domain.model.UserWallet;
+import com.cashbee.domain.model.ReferralReward;
+import com.cashbee.domain.model.ReferrerCommission;
 import com.cashbee.domain.repository.AffiliatePlatformRepository;
 import com.cashbee.domain.repository.BatchCashbackSnapshotRepository;
 import com.cashbee.domain.repository.BatchTransferExportRepository;
 import com.cashbee.domain.repository.BatchTransferItemRepository;
 import com.cashbee.domain.repository.CashbackRepository;
+import com.cashbee.domain.repository.ReferralRewardRepository;
+import com.cashbee.domain.repository.ReferrerCommissionRepository;
 import com.cashbee.domain.repository.TransactionRepository;
 import com.cashbee.domain.repository.UserRepository;
 import com.cashbee.domain.repository.UserWalletRepository;
@@ -76,10 +81,13 @@ public class CompleteBatchTransferUseCase {
     private final UserWalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
     private final CashbackRepository cashbackRepository;
+    private final ReferralRewardRepository referralRewardRepository;
+    private final ReferrerCommissionRepository referrerCommissionRepository;
     private final UserRepository userRepository;
     private final AffiliatePlatformRepository platformRepository;
     private final GeneratePaymentInvoiceUseCase generatePaymentInvoiceUseCase;
     private final SendInvoiceEmailUseCase sendInvoiceEmailUseCase;
+    private final RecalculateWalletUseCase recalculateWalletUseCase;
 
     // Feature flag for email sending - disabled for performance optimization
     private static final boolean EMAIL_SENDING_ENABLED = false;
@@ -127,6 +135,23 @@ public class CompleteBatchTransferUseCase {
 
         // 7. Bulk save all changes
         bulkSaveChanges(result, context);
+
+        // 7.5 FIX: Recalculate wallets after marking all sources as PAID
+        // This ensures balance reflects actual unpaid amount (should be 0 after payment)
+        // Why this is needed:
+        // - Batch item amount is a SNAPSHOT taken when batch was created
+        // - Commission/bonus may have been added AFTER batch creation
+        // - After bulkSaveChanges(): all cashback/rewards/commissions are marked as PAID
+        // - RecalculateWallet queries source of truth and sets balance correctly
+        Set<Long> userIdsToRecalculate = result.getSuccessfulItems().stream()
+                .map(BatchTransferItem::getUserId)
+                .collect(Collectors.toSet());
+
+        if (!userIdsToRecalculate.isEmpty()) {
+            log.info("CompleteBatchTransferUseCase: Recalculating wallets for {} users after payment",
+                    userIdsToRecalculate.size());
+            recalculateWalletUseCase.executeForUsers(userIdsToRecalculate);
+        }
 
         // 8. Generate invoices for successful items (optimized batch query)
         generateInvoicesOptimized(result.getSuccessfulItems(), batch.getId(), context);
@@ -206,10 +231,29 @@ public class CompleteBatchTransferUseCase {
         Map<Long, String> platformCodeById = platforms.stream()
                 .collect(Collectors.toMap(AffiliatePlatform::getId, AffiliatePlatform::getCode));
 
-        log.debug("CompleteBatchTransferUseCase: Context prepared - {} wallets, {} users with snapshots",
-                walletsById.size(), snapshotCashbackIdsByUser.size());
+        // Load unpaid referral rewards for all users in this batch
+        Map<Long, List<ReferralReward>> unpaidRewardsByUser = new HashMap<>();
+        for (Long userId : userIds) {
+            List<ReferralReward> unpaidRewards = referralRewardRepository.findUnpaidByUserId(userId);
+            if (!unpaidRewards.isEmpty()) {
+                unpaidRewardsByUser.put(userId, unpaidRewards);
+            }
+        }
 
-        return new BatchProcessingContext(walletsById, snapshotCashbackIdsByUser, platformCodeById);
+        // Load unpaid referrer commissions for all users in this batch
+        // (referrer = user who receives commission from their referees' orders)
+        Map<Long, List<ReferrerCommission>> unpaidCommissionsByReferrer = new HashMap<>();
+        for (Long userId : userIds) {
+            List<ReferrerCommission> unpaidCommissions = referrerCommissionRepository.findUnpaidByReferrerId(userId);
+            if (!unpaidCommissions.isEmpty()) {
+                unpaidCommissionsByReferrer.put(userId, unpaidCommissions);
+            }
+        }
+
+        log.debug("CompleteBatchTransferUseCase: Context prepared - {} wallets, {} users with snapshots, {} users with unpaid rewards, {} users with unpaid commissions",
+                walletsById.size(), snapshotCashbackIdsByUser.size(), unpaidRewardsByUser.size(), unpaidCommissionsByReferrer.size());
+
+        return new BatchProcessingContext(walletsById, snapshotCashbackIdsByUser, platformCodeById, unpaidRewardsByUser, unpaidCommissionsByReferrer);
     }
 
     /**
@@ -226,6 +270,8 @@ public class CompleteBatchTransferUseCase {
         List<Transaction> transactionsToSave = new ArrayList<>();
         List<UserWallet> walletsToSave = new ArrayList<>();
         Map<Long, List<Long>> cashbackIdsToUpdate = new HashMap<>();
+        List<Long> rewardIdsToMarkAsPaid = new ArrayList<>();
+        List<Long> commissionIdsToMarkAsPaid = new ArrayList<>();
 
         for (BatchTransferItem item : items) {
             try {
@@ -239,6 +285,20 @@ public class CompleteBatchTransferUseCase {
                 }
                 if (itemResult.getCashbackIdsToUpdate() != null && !itemResult.getCashbackIdsToUpdate().isEmpty()) {
                     cashbackIdsToUpdate.put(item.getUserId(), itemResult.getCashbackIdsToUpdate());
+                }
+
+                // Collect reward IDs to mark as paid for this user
+                List<ReferralReward> unpaidRewards = context.getUnpaidRewardsByUser()
+                        .getOrDefault(item.getUserId(), List.of());
+                for (ReferralReward reward : unpaidRewards) {
+                    rewardIdsToMarkAsPaid.add(reward.getId());
+                }
+
+                // Collect commission IDs to mark as paid for this user (as referrer)
+                List<ReferrerCommission> unpaidCommissions = context.getUnpaidCommissionsByReferrer()
+                        .getOrDefault(item.getUserId(), List.of());
+                for (ReferrerCommission commission : unpaidCommissions) {
+                    commissionIdsToMarkAsPaid.add(commission.getId());
                 }
 
                 successfulItems.add(item);
@@ -257,7 +317,9 @@ public class CompleteBatchTransferUseCase {
                 failedItems,
                 transactionsToSave,
                 walletsToSave,
-                cashbackIdsToUpdate
+                cashbackIdsToUpdate,
+                rewardIdsToMarkAsPaid,
+                commissionIdsToMarkAsPaid
         );
     }
 
@@ -328,10 +390,12 @@ public class CompleteBatchTransferUseCase {
      * Bulk save all changes to database.
      */
     private void bulkSaveChanges(BatchProcessingResult result, BatchProcessingContext context) {
-        log.debug("CompleteBatchTransferUseCase: Bulk saving changes - {} transactions, {} wallets, {} cashback updates",
+        log.debug("CompleteBatchTransferUseCase: Bulk saving changes - {} transactions, {} wallets, {} cashback updates, {} rewards to mark paid, {} commissions to mark paid",
                 result.getTransactionsToSave().size(),
                 result.getWalletsToSave().size(),
-                result.getCashbackIdsToUpdate().size());
+                result.getCashbackIdsToUpdate().size(),
+                result.getRewardIdsToMarkAsPaid().size(),
+                result.getCommissionIdsToMarkAsPaid().size());
 
         // Bulk save wallets
         if (!result.getWalletsToSave().isEmpty()) {
@@ -378,6 +442,36 @@ public class CompleteBatchTransferUseCase {
                 }
             }
         }
+
+        // Mark referral rewards as paid by this batch
+        if (!result.getRewardIdsToMarkAsPaid().isEmpty()) {
+            Long batchId = result.getSuccessfulItems().isEmpty() ? null
+                    : result.getSuccessfulItems().get(0).getBatchId();
+
+            if (batchId != null) {
+                int updatedRewards = referralRewardRepository.markAsPaidByBatch(
+                        result.getRewardIdsToMarkAsPaid(),
+                        batchId
+                );
+                log.info("CompleteBatchTransferUseCase: Marked {} referral rewards as PAID by batch {}",
+                        updatedRewards, batchId);
+            }
+        }
+
+        // Mark referrer commissions as paid by this batch
+        if (!result.getCommissionIdsToMarkAsPaid().isEmpty()) {
+            Long batchId = result.getSuccessfulItems().isEmpty() ? null
+                    : result.getSuccessfulItems().get(0).getBatchId();
+
+            if (batchId != null) {
+                int updatedCommissions = referrerCommissionRepository.markAsPaidByBatch(
+                        result.getCommissionIdsToMarkAsPaid(),
+                        batchId
+                );
+                log.info("CompleteBatchTransferUseCase: Marked {} referrer commissions as PAID by batch {}",
+                        updatedCommissions, batchId);
+            }
+        }
     }
 
     /**
@@ -412,6 +506,13 @@ public class CompleteBatchTransferUseCase {
 
     /**
      * Generate invoice for a single item using pre-loaded cashback data.
+     *
+     * IMPORTANT: Invoice được tạo cho user có BẤT KỲ loại tiền nào:
+     * - Cashback từ đơn hàng của chính mình
+     * - Bonus từ milestone (thưởng mốc)
+     * - Commission từ việc giới thiệu (hoa hồng 5% từ đơn hàng của referee)
+     *
+     * User có thể chỉ có bonus + commission mà không có cashback (ví dụ: chỉ giới thiệu người khác).
      */
     private void generateInvoiceForItemOptimized(
             BatchTransferItem item,
@@ -419,13 +520,59 @@ public class CompleteBatchTransferUseCase {
             List<Cashback> paidCashbacks,
             BatchProcessingContext context) {
 
-        if (paidCashbacks.isEmpty()) {
-            log.warn("CompleteBatchTransferUseCase: No paid cashbacks found for user {} in batch {}",
+        // === STEP 1: Tính bonus từ referral_reward table ===
+        List<ReferralReward> userUnpaidRewards = context.getUnpaidRewardsByUser()
+                .getOrDefault(item.getUserId(), List.of());
+
+        int bonusOrders = 0;
+        BigDecimal bonusAmount = BigDecimal.ZERO;
+        int referrerCommissionOrders = 0;
+        BigDecimal referrerCommissionAmount = BigDecimal.ZERO;
+
+        for (ReferralReward reward : userUnpaidRewards) {
+            if (reward.getAmount() != null && reward.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+                String rewardType = reward.getRewardType() != null ? reward.getRewardType().name() : "";
+                if ("MILESTONE_BONUS".equals(rewardType)) {
+                    bonusOrders++;
+                    bonusAmount = bonusAmount.add(reward.getAmount());
+                } else if ("REFERRER_BONUS".equals(rewardType) || "REFERRER_COMMISSION".equals(rewardType)) {
+                    referrerCommissionOrders++;
+                    referrerCommissionAmount = referrerCommissionAmount.add(reward.getAmount());
+                }
+            }
+        }
+
+        // === STEP 2: Tính commission từ referrer_commission table (5% từ đơn hàng của referee) ===
+        List<ReferrerCommission> userUnpaidCommissions = context.getUnpaidCommissionsByReferrer()
+                .getOrDefault(item.getUserId(), List.of());
+
+        for (ReferrerCommission commission : userUnpaidCommissions) {
+            if (commission.getCommissionAmount() != null && commission.getCommissionAmount().compareTo(BigDecimal.ZERO) > 0) {
+                referrerCommissionOrders++;
+                referrerCommissionAmount = referrerCommissionAmount.add(commission.getCommissionAmount());
+            }
+        }
+
+        // === STEP 3: Tính cashback từ đơn hàng ===
+        BigDecimal totalCashbackAmount = paidCashbacks.stream()
+                .map(Cashback::getCashbackAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // === STEP 4: Kiểm tra - chỉ skip nếu KHÔNG có bất kỳ loại tiền nào ===
+        boolean hasCashback = totalCashbackAmount.compareTo(BigDecimal.ZERO) > 0;
+        boolean hasBonus = bonusAmount.compareTo(BigDecimal.ZERO) > 0;
+        boolean hasCommission = referrerCommissionAmount.compareTo(BigDecimal.ZERO) > 0;
+
+        if (!hasCashback && !hasBonus && !hasCommission) {
+            log.warn("CompleteBatchTransferUseCase: No payment (cashback/bonus/commission) found for user {} in batch {}, skipping invoice",
                     item.getUserId(), batchId);
             return;
         }
 
-        // Aggregate cashbacks by platform
+        log.info("CompleteBatchTransferUseCase: User {} has cashback={}, bonus={}, commission={} in batch {}",
+                item.getUserId(), totalCashbackAmount, bonusAmount, referrerCommissionAmount, batchId);
+
+        // === STEP 5: Aggregate cashbacks by platform (nếu có) ===
         Map<Long, List<Cashback>> cashbacksByPlatform = new HashMap<>();
         for (Cashback cashback : paidCashbacks) {
             Long platformId = cashback.getPlatformId() != null ? cashback.getPlatformId() : 0L;
@@ -455,7 +602,7 @@ public class CompleteBatchTransferUseCase {
                     .build());
         }
 
-        // Build and execute generate invoice command
+        // === STEP 6: Build and execute generate invoice command ===
         GenerateInvoiceCommand command = GenerateInvoiceCommand.builder()
                 .userId(item.getUserId())
                 .batchId(batchId)
@@ -466,6 +613,11 @@ public class CompleteBatchTransferUseCase {
                 .totalOrders((int) paidCashbacks.stream().map(Cashback::getOrderId).distinct().count())
                 .transferTime(item.getCompletedAt() != null ? item.getCompletedAt() : LocalDateTime.now())
                 .platformOrders(platformDetails)
+                // Bonus breakdown
+                .bonusOrders(bonusOrders)
+                .bonusAmount(bonusAmount)
+                .referrerCommissionOrders(referrerCommissionOrders)
+                .referrerCommissionAmount(referrerCommissionAmount)
                 .build();
 
         PaymentInvoiceResponse invoiceResponse = generatePaymentInvoiceUseCase.execute(command);
@@ -544,14 +696,20 @@ public class CompleteBatchTransferUseCase {
         private final Map<Long, UserWallet> walletsById;
         private final Map<Long, List<Long>> snapshotCashbackIdsByUser;
         private final Map<Long, String> platformCodeById;
+        private final Map<Long, List<ReferralReward>> unpaidRewardsByUser;
+        private final Map<Long, List<ReferrerCommission>> unpaidCommissionsByReferrer;
 
         public BatchProcessingContext(
                 Map<Long, UserWallet> walletsById,
                 Map<Long, List<Long>> snapshotCashbackIdsByUser,
-                Map<Long, String> platformCodeById) {
+                Map<Long, String> platformCodeById,
+                Map<Long, List<ReferralReward>> unpaidRewardsByUser,
+                Map<Long, List<ReferrerCommission>> unpaidCommissionsByReferrer) {
             this.walletsById = walletsById;
             this.snapshotCashbackIdsByUser = snapshotCashbackIdsByUser;
             this.platformCodeById = platformCodeById;
+            this.unpaidRewardsByUser = unpaidRewardsByUser;
+            this.unpaidCommissionsByReferrer = unpaidCommissionsByReferrer;
         }
 
         public Map<Long, UserWallet> getWalletsById() {
@@ -565,6 +723,14 @@ public class CompleteBatchTransferUseCase {
         public Map<Long, String> getPlatformCodeById() {
             return platformCodeById;
         }
+
+        public Map<Long, List<ReferralReward>> getUnpaidRewardsByUser() {
+            return unpaidRewardsByUser;
+        }
+
+        public Map<Long, List<ReferrerCommission>> getUnpaidCommissionsByReferrer() {
+            return unpaidCommissionsByReferrer;
+        }
     }
 
     /**
@@ -576,18 +742,24 @@ public class CompleteBatchTransferUseCase {
         private final List<Transaction> transactionsToSave;
         private final List<UserWallet> walletsToSave;
         private final Map<Long, List<Long>> cashbackIdsToUpdate;
+        private final List<Long> rewardIdsToMarkAsPaid;
+        private final List<Long> commissionIdsToMarkAsPaid;
 
         public BatchProcessingResult(
                 List<BatchTransferItem> successfulItems,
                 List<BatchTransferItem> failedItems,
                 List<Transaction> transactionsToSave,
                 List<UserWallet> walletsToSave,
-                Map<Long, List<Long>> cashbackIdsToUpdate) {
+                Map<Long, List<Long>> cashbackIdsToUpdate,
+                List<Long> rewardIdsToMarkAsPaid,
+                List<Long> commissionIdsToMarkAsPaid) {
             this.successfulItems = successfulItems;
             this.failedItems = failedItems;
             this.transactionsToSave = transactionsToSave;
             this.walletsToSave = walletsToSave;
             this.cashbackIdsToUpdate = cashbackIdsToUpdate;
+            this.rewardIdsToMarkAsPaid = rewardIdsToMarkAsPaid;
+            this.commissionIdsToMarkAsPaid = commissionIdsToMarkAsPaid;
         }
 
         public List<BatchTransferItem> getSuccessfulItems() {
@@ -608,6 +780,14 @@ public class CompleteBatchTransferUseCase {
 
         public Map<Long, List<Long>> getCashbackIdsToUpdate() {
             return cashbackIdsToUpdate;
+        }
+
+        public List<Long> getRewardIdsToMarkAsPaid() {
+            return rewardIdsToMarkAsPaid;
+        }
+
+        public List<Long> getCommissionIdsToMarkAsPaid() {
+            return commissionIdsToMarkAsPaid;
         }
 
         public int getSuccessCount() {

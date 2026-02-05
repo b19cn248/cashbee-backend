@@ -3,6 +3,8 @@ package com.cashbee.application.usecase.wallet;
 import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.domain.model.UserWallet;
 import com.cashbee.domain.repository.CashbackRepository;
+import com.cashbee.domain.repository.ReferralRewardRepository;
+import com.cashbee.domain.repository.ReferrerCommissionRepository;
 import com.cashbee.domain.repository.UserWalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +44,8 @@ public class RecalculateWalletUseCase {
 
     private final CashbackRepository cashbackRepository;
     private final UserWalletRepository walletRepository;
+    private final ReferralRewardRepository referralRewardRepository;
+    private final ReferrerCommissionRepository referrerCommissionRepository;
 
     /**
      * Recalculate wallet balances for a specific user.
@@ -88,16 +92,36 @@ public class RecalculateWalletUseCase {
         BigDecimal oldPendingBalance = wallet.getPendingBalance();
         BigDecimal oldTotalEarned = wallet.getTotalEarned();
 
-        wallet.setBalance(balance);
+        // FIX: Calculate UNPAID bonus from source of truth (referral_reward and referrer_commission tables)
+        // Instead of using wallet.totalBonus (historical, never reset), we query:
+        // 1. Unpaid milestone bonus from referral_reward (where paid_batch_id IS NULL)
+        // 2. Unpaid referrer commission from referrer_commission (where paid_batch_id IS NULL)
+        // This prevents double-counting when bonus has already been paid via batch transfer.
+        BigDecimal unpaidMilestoneBonus = referralRewardRepository.sumUnpaidAmountByUserId(userId);
+        if (unpaidMilestoneBonus == null) {
+            unpaidMilestoneBonus = BigDecimal.ZERO;
+        }
+
+        BigDecimal unpaidReferrerCommission = referrerCommissionRepository.sumUnpaidCommissionByReferrerId(userId);
+        if (unpaidReferrerCommission == null) {
+            unpaidReferrerCommission = BigDecimal.ZERO;
+        }
+
+        BigDecimal totalUnpaidBonus = unpaidMilestoneBonus.add(unpaidReferrerCommission);
+
+        // New balance = cashback (CONFIRMED) + unpaid bonus (milestone + commission)
+        BigDecimal newBalance = balance.add(totalUnpaidBonus);
+
+        wallet.setBalance(newBalance);
         wallet.setPendingBalance(pendingBalance);
         wallet.setTotalEarned(totalEarned);
         wallet.scaleBalances();
 
         walletRepository.save(wallet);
 
-        log.info("Recalculated wallet for user {}: balance {} → {}, pendingBalance {} → {}, totalEarned {} → {}",
+        log.info("Recalculated wallet for user {}: balance {} → {} (cashback={}, unpaidBonus={} [milestone={}, commission={}]), pendingBalance {} → {}, totalEarned {} → {}",
             userId,
-            oldBalance, balance,
+            oldBalance, newBalance, balance, totalUnpaidBonus, unpaidMilestoneBonus, unpaidReferrerCommission,
             oldPendingBalance, pendingBalance,
             oldTotalEarned, totalEarned);
     }

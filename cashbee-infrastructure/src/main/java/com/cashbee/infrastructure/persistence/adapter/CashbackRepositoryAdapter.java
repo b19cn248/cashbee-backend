@@ -162,4 +162,20 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
         }
         return jpaRepository.findCashbacksWithOrderDetailsByBatchIdAndUserId(batchId, userId);
     }
+
+    @Override
+    public int countConfirmedOrdersByUserIdWithMinAmount(Long userId, java.math.BigDecimal minAmount) {
+        if (userId == null || minAmount == null) {
+            return 0;
+        }
+        return jpaRepository.countConfirmedOrdersByUserIdWithMinAmount(userId, minAmount);
+    }
+
+    @Override
+    public java.util.List<Long> findUsersWithQualifyingOrders(java.math.BigDecimal minAmount) {
+        if (minAmount == null) {
+            return List.of();
+        }
+        return jpaRepository.findUsersWithQualifyingOrders(minAmount);
+    }
 }

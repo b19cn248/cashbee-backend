@@ -4,6 +4,7 @@ import com.cashbee.domain.enums.ReferralRewardStatus;
 import com.cashbee.domain.enums.ReferralRewardType;
 import com.cashbee.domain.model.ReferralReward;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -106,4 +107,51 @@ public interface ReferralRewardRepository {
      * @return Number of rewards associated with the referrer
      */
     long countByReferrerId(Long referrerId);
+
+    /**
+     * Find all UNPAID (GRANTED but not yet transferred) rewards for a user.
+     * Unpaid means: status=GRANTED AND paidBatchId IS NULL
+     *
+     * @param userId User ID
+     * @return List of unpaid rewards
+     */
+    List<ReferralReward> findUnpaidByUserId(Long userId);
+
+    /**
+     * Sum the total unpaid bonus amount for a user.
+     * Used to include bonus in batch transfer calculation.
+     *
+     * @param userId User ID
+     * @return Total unpaid bonus amount (or 0 if none)
+     */
+    BigDecimal sumUnpaidAmountByUserId(Long userId);
+
+    /**
+     * Mark rewards as paid by a batch.
+     * Sets paidBatchId and paidAt for the given reward IDs.
+     *
+     * @param rewardIds List of reward IDs to mark as paid
+     * @param batchId   Batch ID that paid these rewards
+     * @return Number of rewards updated
+     */
+    int markAsPaidByBatch(List<Long> rewardIds, Long batchId);
+
+    /**
+     * Find all rewards paid by a specific batch.
+     * Used for invoice detail to show bonus breakdown.
+     *
+     * @param batchId Batch ID
+     * @return List of rewards paid by the batch
+     */
+    List<ReferralReward> findByPaidBatchId(Long batchId);
+
+    /**
+     * Find all rewards paid by a specific batch for a specific user.
+     * Used for invoice detail to show bonus breakdown.
+     *
+     * @param batchId Batch ID
+     * @param userId  User ID
+     * @return List of rewards paid by the batch for the user
+     */
+    List<ReferralReward> findByPaidBatchIdAndUserId(Long batchId, Long userId);
 }

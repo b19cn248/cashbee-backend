@@ -117,4 +117,20 @@ public interface MilestoneConfigRepository {
      * @return List of all configs
      */
     List<MilestoneConfig> findAll();
+
+    /**
+     * Find all ACTIVE milestone configs where orders_required <= maxOrders.
+     * Used for re-processing: find all milestones a user has already qualified for.
+     *
+     * <p>Example: User has 15 orders, this returns milestones at 1, 5, 10 orders
+     * (all milestones the user has already passed).
+     *
+     * @param milestoneType WITH_REFERRER or WITHOUT_REFERRER
+     * @param maxOrders     Maximum orders (user's current completed orders)
+     * @return List of milestone configs sorted by orders_required ASC
+     */
+    List<MilestoneConfig> findActiveByMilestoneTypeAndOrdersRequiredLessThanOrEqual(
+            MilestoneType milestoneType,
+            Integer maxOrders
+    );
 }

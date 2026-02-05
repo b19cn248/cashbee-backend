@@ -94,6 +94,18 @@ public class ReferralReward {
      */
     private LocalDateTime createdAt;
 
+    /**
+     * Reference to batch_transfer_export that paid this reward.
+     * NULL = unpaid (bonus in wallet but not transferred yet).
+     */
+    private Long paidBatchId;
+
+    /**
+     * Timestamp when reward was paid via batch transfer.
+     * NULL = unpaid.
+     */
+    private LocalDateTime paidAt;
+
     // ===== Business Logic Methods =====
 
     /**
@@ -130,6 +142,25 @@ public class ReferralReward {
     public void grant() {
         this.status = ReferralRewardStatus.GRANTED;
         this.grantedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Check if this reward has been paid via batch transfer.
+     *
+     * @return true if paidBatchId is set (reward has been paid)
+     */
+    public boolean isPaid() {
+        return this.paidBatchId != null;
+    }
+
+    /**
+     * Mark this reward as paid via batch transfer.
+     *
+     * @param batchId ID of the batch that paid this reward
+     */
+    public void markAsPaid(Long batchId) {
+        this.paidBatchId = batchId;
+        this.paidAt = LocalDateTime.now();
     }
 
     /**

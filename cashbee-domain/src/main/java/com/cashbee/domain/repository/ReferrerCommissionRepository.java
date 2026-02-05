@@ -154,4 +154,42 @@ public interface ReferrerCommissionRepository {
      * @return List of commissions between the two users
      */
     List<ReferrerCommission> findByReferrerIdAndRefereeId(Long referrerId, Long refereeId);
+
+    /**
+     * Find all UNPAID (CONFIRMED but not yet transferred in batch) commissions for a referrer.
+     * Unpaid means: status=CONFIRMED/PAID AND paidBatchId IS NULL
+     *
+     * @param referrerId Referrer user ID
+     * @return List of unpaid commissions
+     */
+    List<ReferrerCommission> findUnpaidByReferrerId(Long referrerId);
+
+    /**
+     * Sum the total unpaid commission amount for a referrer.
+     * Used to include commission in batch transfer calculation.
+     *
+     * @param referrerId Referrer user ID
+     * @return Total unpaid commission amount (or 0 if none)
+     */
+    BigDecimal sumUnpaidCommissionByReferrerId(Long referrerId);
+
+    /**
+     * Mark commissions as paid by a batch.
+     * Sets paidBatchId and paidAt for the given commission IDs.
+     *
+     * @param commissionIds List of commission IDs to mark as paid
+     * @param batchId       Batch ID that paid these commissions
+     * @return Number of commissions updated
+     */
+    int markAsPaidByBatch(List<Long> commissionIds, Long batchId);
+
+    /**
+     * Find all commissions paid by a specific batch for a specific referrer.
+     * Used for invoice detail to show referrer commission breakdown.
+     *
+     * @param batchId    Batch ID
+     * @param referrerId Referrer user ID
+     * @return List of commissions paid by the batch for the referrer
+     */
+    List<ReferrerCommission> findByPaidBatchIdAndReferrerId(Long batchId, Long referrerId);
 }

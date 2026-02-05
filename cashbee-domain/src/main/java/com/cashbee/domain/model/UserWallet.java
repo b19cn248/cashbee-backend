@@ -80,6 +80,15 @@ public class UserWallet {
     private BigDecimal totalWithdrawn = BigDecimal.ZERO;
 
     /**
+     * Total bonus received (historical sum).
+     * Tracks MILESTONE_BONUS, REFERRER_BONUS, REFERRER_COMMISSION.
+     * IMPORTANT: This is separate from totalEarned (which only tracks cashback).
+     * Used to preserve bonus when recalculating wallet from cashback data.
+     */
+    @Builder.Default
+    private BigDecimal totalBonus = BigDecimal.ZERO;
+
+    /**
      * Timestamp when entity was created.
      */
     private LocalDateTime createdAt;
@@ -187,6 +196,7 @@ public class UserWallet {
     /**
      * Add bonus/adjustment directly to available balance.
      * Used for manual adjustments, bonuses, or rewards.
+     * Also tracks the bonus in totalBonus for wallet recalculation.
      *
      * @param amount Amount to add (must be positive)
      * @throws IllegalArgumentException if amount is negative
@@ -194,6 +204,7 @@ public class UserWallet {
     public void addBonus(BigDecimal amount) {
         validatePositiveAmount(amount);
         this.balance = MoneyUtils.add(this.balance, amount);
+        this.totalBonus = MoneyUtils.add(this.totalBonus, amount);
     }
 
     /**
@@ -405,5 +416,6 @@ public class UserWallet {
         this.lockedBalance = MoneyUtils.scale(this.lockedBalance);
         this.totalEarned = MoneyUtils.scale(this.totalEarned);
         this.totalWithdrawn = MoneyUtils.scale(this.totalWithdrawn);
+        this.totalBonus = MoneyUtils.scale(this.totalBonus);
     }
 }

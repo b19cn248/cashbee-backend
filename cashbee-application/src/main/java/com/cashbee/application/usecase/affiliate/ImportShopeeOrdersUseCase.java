@@ -5,6 +5,7 @@ import com.cashbee.application.dto.affiliate.ImportOrdersRequest;
 import com.cashbee.application.dto.affiliate.ImportOrdersResponse;
 import com.cashbee.application.usecase.cashback.CalculateCashbackUseCase;
 import com.cashbee.application.usecase.referral.ProcessReferralOnOrderCompletedUseCase;
+import com.cashbee.application.usecase.referral.SyncAllUsersCompletedOrdersUseCase;
 import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
 import com.cashbee.application.util.affiliate.ShopeeCSVParser;
 import com.cashbee.application.util.affiliate.TrackingCodeGenerator;
@@ -77,6 +78,7 @@ public class ImportShopeeOrdersUseCase {
     private final CalculateCashbackUseCase calculateCashbackUseCase;
     private final RecalculateWalletUseCase recalculateWalletUseCase;
     private final ProcessReferralOnOrderCompletedUseCase processReferralUseCase;
+    private final SyncAllUsersCompletedOrdersUseCase syncCompletedOrdersUseCase;
     private final EntityManager entityManager;
 
     /**
@@ -209,7 +211,21 @@ public class ImportShopeeOrdersUseCase {
             log.info("UseCase: Wallet recalculation completed for {} users", affectedUserIds.size());
         }
 
-        // Step 6: Build response
+        // Step 6: Sync total_completed_orders for all affected users
+        // This ensures the user's milestone count is accurate after import
+        if (!affectedUserIds.isEmpty()) {
+            log.info("UseCase: Syncing total_completed_orders for {} affected users", affectedUserIds.size());
+            int syncedCount = 0;
+            for (Long userId : affectedUserIds) {
+                boolean synced = syncCompletedOrdersUseCase.executeForUser(userId);
+                if (synced) {
+                    syncedCount++;
+                }
+            }
+            log.info("UseCase: Synced total_completed_orders for {}/{} users", syncedCount, affectedUserIds.size());
+        }
+
+        // Step 7: Build response
         long durationSeconds = Duration.between(startTime, endTime).getSeconds();
 
         return ImportOrdersResponse.builder()

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -52,6 +53,13 @@ public class ProcessReferralMilestoneUseCase {
     private final UpdateReferrerTierUseCase updateReferrerTierUseCase;
 
     /**
+     * Minimum order amount to count towards milestone (anti-abuse).
+     * Orders with product_price <= this amount are excluded.
+     * Value: 100,000 VND
+     */
+    private static final BigDecimal MIN_ORDER_AMOUNT_FOR_MILESTONE = new BigDecimal("100000");
+
+    /**
      * Execute use case when an order is completed.
      *
      * @param userId ID of the user whose order was completed
@@ -69,8 +77,12 @@ public class ProcessReferralMilestoneUseCase {
 
         // 2. Recalculate completed orders from cashback table
         // Count distinct orders that have CONFIRMED or PAID cashback status
+        // AND product_price > 100,000 VND (anti-abuse filter)
         // This approach prevents double-counting during re-import scenarios
-        int completedOrders = cashbackRepository.countConfirmedOrdersByUserId(userId);
+        int completedOrders = cashbackRepository.countConfirmedOrdersByUserIdWithMinAmount(
+                userId,
+                MIN_ORDER_AMOUNT_FOR_MILESTONE
+        );
         int previousCount = user.getTotalCompletedOrders() != null ? user.getTotalCompletedOrders() : 0;
         user.setTotalCompletedOrders(completedOrders);
 
@@ -259,5 +271,82 @@ public class ProcessReferralMilestoneUseCase {
         int targetOrdinal = target.ordinal();
 
         return targetOrdinal > currentOrdinal;
+    }
+
+    /**
+     * Re-process ALL milestones for a user.
+     *
+     * <p>Unlike execute() which only checks the EXACT milestone matching completedOrders,
+     * this method finds ALL milestones the user has qualified for (orders_required <= completedOrders)
+     * and processes each one (skipping already granted).
+     *
+     * <p>Use this for:
+     * - Batch re-processing after milestone config changes
+     * - Fixing users who missed bonuses due to bugs
+     * - Post-migration bonus granting
+     *
+     * <p>Example: User has 15 orders (WITHOUT_REFERRER)
+     * - execute() would look for milestone 15 → NOT FOUND → no bonus
+     * - reprocessAllMilestones() finds milestone 1, 5 → grants if not already granted
+     *
+     * @param userId ID of the user to re-process
+     * @return Number of milestones processed (including already granted ones)
+     */
+    @Transactional
+    public int reprocessAllMilestones(Long userId) {
+        log.info("Re-processing ALL milestones for user: {}", userId);
+
+        // 1. Find the user
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            log.warn("User not found for milestone re-processing: {}", userId);
+            return 0;
+        }
+
+        // 2. Count qualifying orders (product_price > 100k)
+        int completedOrders = cashbackRepository.countConfirmedOrdersByUserIdWithMinAmount(
+                userId,
+                MIN_ORDER_AMOUNT_FOR_MILESTONE
+        );
+        user.setTotalCompletedOrders(completedOrders);
+
+        if (completedOrders == 0) {
+            log.debug("User {} has no qualifying orders, skipping", userId);
+            userRepository.save(user);
+            return 0;
+        }
+
+        // 3. Determine milestone type
+        MilestoneType milestoneType = user.hasReferrer()
+                ? MilestoneType.WITH_REFERRER
+                : MilestoneType.WITHOUT_REFERRER;
+
+        // 4. Find referrer if user was referred
+        User referrer = null;
+        if (user.hasReferrer()) {
+            referrer = userRepository.findByReferralCode(user.getReferredBy()).orElse(null);
+        }
+
+        // 5. Find ALL milestones where orders_required <= completedOrders
+        List<MilestoneConfig> qualifiedMilestones = milestoneConfigRepository
+                .findActiveByMilestoneTypeAndOrdersRequiredLessThanOrEqual(milestoneType, completedOrders);
+
+        log.debug("User {} ({}) has {} orders, found {} qualified milestones",
+                userId, milestoneType, completedOrders, qualifiedMilestones.size());
+
+        // 6. Process each milestone (processMilestone will skip if already granted)
+        int processedCount = 0;
+        for (MilestoneConfig config : qualifiedMilestones) {
+            processMilestone(user, referrer, config);
+            processedCount++;
+        }
+
+        // 7. Save user
+        userRepository.save(user);
+
+        log.info("Re-processed {} milestones for user: {}, orders: {}, type: {}",
+                processedCount, userId, completedOrders, milestoneType);
+
+        return processedCount;
     }
 }

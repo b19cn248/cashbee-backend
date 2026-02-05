@@ -100,6 +100,12 @@ public class ReferrerCommissionJpaEntity {
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
+    /**
+     * Batch ID that paid this commission.
+     */
+    @Column(name = "paid_batch_id")
+    private Long paidBatchId;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

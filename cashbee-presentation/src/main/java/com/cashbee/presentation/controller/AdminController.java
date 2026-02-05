@@ -12,7 +12,9 @@ import com.cashbee.application.usecase.user.GetUsersUseCase;
 import com.cashbee.application.usecase.wallet.RecalculateWalletUseCase;
 import com.cashbee.application.usecase.referral.SyncAllUsersCompletedOrdersUseCase;
 import com.cashbee.application.usecase.referral.GrantMissingReferrerCommissionsUseCase;
+import com.cashbee.application.usecase.referral.ProcessReferralMilestoneUseCase;
 import com.cashbee.domain.enums.ClickStatus;
+import com.cashbee.domain.repository.CashbackRepository;
 import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,7 +30,10 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 /**
  * REST Controller for Admin Dashboard.
@@ -55,6 +60,14 @@ public class AdminController {
     private final RecalculateWalletUseCase recalculateWalletUseCase;
     private final SyncAllUsersCompletedOrdersUseCase syncAllUsersCompletedOrdersUseCase;
     private final GrantMissingReferrerCommissionsUseCase grantMissingReferrerCommissionsUseCase;
+    private final ProcessReferralMilestoneUseCase processReferralMilestoneUseCase;
+    private final CashbackRepository cashbackRepository;
+
+    /**
+     * Minimum order amount for milestone processing (anti-abuse).
+     * Must match the constant in ProcessReferralMilestoneUseCase.
+     */
+    private static final BigDecimal MIN_ORDER_AMOUNT = new BigDecimal("100000");
 
     // ============================================================
     // SYSTEM STATISTICS
@@ -405,6 +418,81 @@ public class AdminController {
         log.info("API: [ADMIN] Retroactive fix completed: found={}, success={}, skipped={}, errors={}, totalPaid={}",
                 result.totalFound(), result.successCount(), result.skippedCount(),
                 result.errorCount(), result.totalAmountPaid());
+
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    // ============================================================
+    // MILESTONE RE-PROCESSING
+    // ============================================================
+
+    /**
+     * Re-process milestones for all users with qualifying orders.
+     *
+     * This endpoint finds all users who have at least one order with product_price > 100k
+     * and re-processes their milestones according to the new MVP configuration.
+     *
+     * Use this after:
+     * - Migration 050 (MVP referral milestones) to grant new bonuses
+     * - Any milestone configuration changes
+     *
+     * Example: POST /api/admin/referral/reprocess-milestones
+     *
+     * @return Summary of the re-processing operation
+     */
+    @PostMapping("/referral/reprocess-milestones")
+    @Operation(
+            summary = "[ADMIN] Re-process milestones for all qualifying users",
+            description = "Process milestones for all users with orders > 100k. Use after milestone config changes."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Re-processing completed successfully"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Admin access required"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<ApiResponse<Map<String, Object>>> reprocessMilestones() {
+        log.info("API: [ADMIN] Re-processing milestones for all qualifying users");
+
+        // Get all users with qualifying orders (> 100k, CONFIRMED/PAID)
+        List<Long> userIds = cashbackRepository.findUsersWithQualifyingOrders(MIN_ORDER_AMOUNT);
+
+        log.info("API: [ADMIN] Found {} users with qualifying orders", userIds.size());
+
+        int processed = 0;
+        int errors = 0;
+
+        for (Long userId : userIds) {
+            try {
+                // Use reprocessAllMilestones instead of execute
+                // execute() only checks EXACT milestone match
+                // reprocessAllMilestones() finds ALL qualified milestones (orders_required <= completedOrders)
+                processReferralMilestoneUseCase.reprocessAllMilestones(userId);
+
+                // FIX: Recalculate wallet to include referrer commission
+                // This ensures balance is calculated from source of truth:
+                // - CONFIRMED cashback
+                // - Unpaid milestone bonus (referral_reward)
+                // - Unpaid referrer commission (referrer_commission)
+                recalculateWalletUseCase.execute(userId);
+
+                processed++;
+            } catch (Exception e) {
+                log.error("Failed to process milestone for user {}: {}", userId, e.getMessage());
+                errors++;
+            }
+        }
+
+        Map<String, Object> result = Map.of(
+                "totalUsers", userIds.size(),
+                "processed", processed,
+                "errors", errors
+        );
+
+        log.info("API: [ADMIN] Milestone re-processing completed: totalUsers={}, processed={}, errors={}",
+                userIds.size(), processed, errors);
 
         return ResponseEntity.ok(ApiResponse.success(result));
     }

@@ -87,6 +87,20 @@ public class ReferralRewardJpaEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * Reference to batch_transfer_export that paid this reward.
+     * NULL = unpaid.
+     */
+    @Column(name = "paid_batch_id")
+    private Long paidBatchId;
+
+    /**
+     * Timestamp when reward was paid via batch transfer.
+     * NULL = unpaid.
+     */
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

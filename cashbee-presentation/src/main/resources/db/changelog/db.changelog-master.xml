@@ -111,4 +111,10 @@
     <!-- Anti-duplicate protection: UNIQUE constraint on referrer_commission.source_order_id -->
     <include file="db/changelog/049-add-unique-constraint-referrer-commission.xml"/>
 
+    <!-- MVP Referral: simplified milestones, min 100k order, VIP@50, SUPER@150, FIX bonus bug -->
+    <include file="db/changelog/050-mvp-referral-milestones.xml"/>
+
+    <!-- Invoice Bonus Tracking: paid status for referral_reward, bonus breakdown in invoice -->
+    <include file="db/changelog/051-invoice-bonus-tracking.xml"/>
+
 </databaseChangeLog>

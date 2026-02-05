@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -121,5 +122,48 @@ public class ReferralRewardRepositoryAdapter implements ReferralRewardRepository
     public long countByReferrerId(Long referrerId) {
         log.debug("Counting referral rewards by referrerId: {}", referrerId);
         return jpaRepository.countByReferrerId(referrerId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReferralReward> findUnpaidByUserId(Long userId) {
+        log.debug("Finding unpaid referral rewards for userId: {}", userId);
+        List<ReferralRewardJpaEntity> entities = jpaRepository.findUnpaidByUserId(userId);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal sumUnpaidAmountByUserId(Long userId) {
+        log.debug("Summing unpaid bonus amount for userId: {}", userId);
+        BigDecimal sum = jpaRepository.sumUnpaidAmountByUserId(userId);
+        return sum != null ? sum : BigDecimal.ZERO;
+    }
+
+    @Override
+    @Transactional
+    public int markAsPaidByBatch(List<Long> rewardIds, Long batchId) {
+        if (rewardIds == null || rewardIds.isEmpty()) {
+            log.debug("No reward IDs to mark as paid");
+            return 0;
+        }
+        log.debug("Marking {} rewards as paid by batch: {}", rewardIds.size(), batchId);
+        return jpaRepository.markAsPaidByBatch(rewardIds, batchId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReferralReward> findByPaidBatchId(Long batchId) {
+        log.debug("Finding referral rewards paid by batch: {}", batchId);
+        List<ReferralRewardJpaEntity> entities = jpaRepository.findByPaidBatchId(batchId);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReferralReward> findByPaidBatchIdAndUserId(Long batchId, Long userId) {
+        log.debug("Finding referral rewards paid by batch {} for user {}", batchId, userId);
+        List<ReferralRewardJpaEntity> entities = jpaRepository.findByPaidBatchIdAndUserId(batchId, userId);
+        return mapper.toDomainList(entities);
     }
 }

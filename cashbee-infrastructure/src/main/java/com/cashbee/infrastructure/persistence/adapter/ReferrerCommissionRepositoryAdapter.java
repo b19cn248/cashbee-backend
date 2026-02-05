@@ -173,4 +173,40 @@ public class ReferrerCommissionRepositoryAdapter implements ReferrerCommissionRe
                 jpaRepository.findByReferrerIdAndRefereeId(referrerId, refereeId);
         return mapper.toDomainList(entities);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReferrerCommission> findUnpaidByReferrerId(Long referrerId) {
+        log.debug("Finding unpaid commissions for referrerId: {}", referrerId);
+        List<ReferrerCommissionJpaEntity> entities = jpaRepository.findUnpaidByReferrerId(referrerId);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal sumUnpaidCommissionByReferrerId(Long referrerId) {
+        log.debug("Summing unpaid commission for referrerId: {}", referrerId);
+        BigDecimal sum = jpaRepository.sumUnpaidCommissionByReferrerId(referrerId);
+        return sum != null ? sum : BigDecimal.ZERO;
+    }
+
+    @Override
+    @Transactional
+    public int markAsPaidByBatch(List<Long> commissionIds, Long batchId) {
+        if (commissionIds == null || commissionIds.isEmpty()) {
+            log.debug("No commission IDs to mark as paid");
+            return 0;
+        }
+        log.debug("Marking {} commissions as paid by batch: {}", commissionIds.size(), batchId);
+        return jpaRepository.markAsPaidByBatch(commissionIds, batchId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReferrerCommission> findByPaidBatchIdAndReferrerId(Long batchId, Long referrerId) {
+        log.debug("Finding commissions paid by batch {} for referrer {}", batchId, referrerId);
+        List<ReferrerCommissionJpaEntity> entities =
+                jpaRepository.findByPaidBatchIdAndReferrerId(batchId, referrerId);
+        return mapper.toDomainList(entities);
+    }
 }

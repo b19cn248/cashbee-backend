@@ -176,6 +176,36 @@ public class PaymentInvoiceJpaEntity {
     @Builder.Default
     private BigDecimal otherAmount = BigDecimal.ZERO;
 
+    // ===== Bonus Summary (Milestone & Referrer) =====
+
+    /**
+     * Number of milestone bonus rewards paid.
+     */
+    @Column(name = "bonus_orders", nullable = false)
+    @Builder.Default
+    private Integer bonusOrders = 0;
+
+    /**
+     * Total milestone bonus amount (MILESTONE_BONUS type rewards).
+     */
+    @Column(name = "bonus_amount", nullable = false, precision = 19, scale = 2)
+    @Builder.Default
+    private BigDecimal bonusAmount = BigDecimal.ZERO;
+
+    /**
+     * Number of referrer rewards paid (REFERRER_BONUS, REFERRER_COMMISSION).
+     */
+    @Column(name = "referrer_commission_orders", nullable = false)
+    @Builder.Default
+    private Integer referrerCommissionOrders = 0;
+
+    /**
+     * Total referrer commission amount.
+     */
+    @Column(name = "referrer_commission_amount", nullable = false, precision = 19, scale = 2)
+    @Builder.Default
+    private BigDecimal referrerCommissionAmount = BigDecimal.ZERO;
+
     // ===== Additional Info =====
 
     @Column(name = "description", length = 500)

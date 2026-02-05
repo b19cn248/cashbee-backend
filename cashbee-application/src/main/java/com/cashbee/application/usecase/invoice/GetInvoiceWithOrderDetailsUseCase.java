@@ -3,9 +3,14 @@ package com.cashbee.application.usecase.invoice;
 import com.cashbee.application.dto.invoice.InvoiceDetailResponse;
 import com.cashbee.application.dto.invoice.InvoiceDetailResponse.*;
 import com.cashbee.common.exception.NotFoundException;
+import com.cashbee.domain.enums.ReferralRewardType;
 import com.cashbee.domain.model.PaymentInvoice;
+import com.cashbee.domain.model.ReferralReward;
+import com.cashbee.domain.model.ReferrerCommission;
 import com.cashbee.domain.repository.CashbackRepository;
 import com.cashbee.domain.repository.PaymentInvoiceRepository;
+import com.cashbee.domain.repository.ReferralRewardRepository;
+import com.cashbee.domain.repository.ReferrerCommissionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,6 +43,8 @@ public class GetInvoiceWithOrderDetailsUseCase {
 
     private final PaymentInvoiceRepository invoiceRepository;
     private final CashbackRepository cashbackRepository;
+    private final ReferralRewardRepository referralRewardRepository;
+    private final ReferrerCommissionRepository referrerCommissionRepository;
 
     /**
      * Get detailed invoice with order breakdown.
@@ -73,7 +80,24 @@ public class GetInvoiceWithOrderDetailsUseCase {
         // 4. Calculate summary
         InvoiceSummaryDetail summary = calculateSummary(orders, invoice);
 
-        // 5. Build response
+        // 5. Query bonus rewards paid by this batch for this user
+        List<ReferralReward> paidRewards = referralRewardRepository.findByPaidBatchIdAndUserId(
+                invoice.getBatchId(), userId);
+
+        log.debug("Found {} bonus rewards paid in batch {} for user {}",
+                paidRewards.size(), invoice.getBatchId(), userId);
+
+        // 5.5 Query referrer commissions paid by this batch for this user (as referrer)
+        List<ReferrerCommission> paidCommissions = referrerCommissionRepository.findByPaidBatchIdAndReferrerId(
+                invoice.getBatchId(), userId);
+
+        log.debug("Found {} referrer commissions paid in batch {} for user {}",
+                paidCommissions.size(), invoice.getBatchId(), userId);
+
+        // 6. Build bonus breakdown
+        BonusBreakdown bonusBreakdown = buildBonusBreakdown(paidRewards, paidCommissions);
+
+        // 7. Build response
         return InvoiceDetailResponse.builder()
                 .id(invoice.getId())
                 .invoiceNumber(invoice.getInvoiceNumber())
@@ -83,6 +107,7 @@ public class GetInvoiceWithOrderDetailsUseCase {
                 .summary(summary)
                 .bankInfo(buildBankInfo(invoice))
                 .orders(orders)
+                .bonusBreakdown(bonusBreakdown)
                 .calculation(buildCalculationInfo())
                 .build();
     }
@@ -249,6 +274,89 @@ public class GetInvoiceWithOrderDetailsUseCase {
                 .description("Tiền hoàn được tính dựa trên hoa hồng từ các nền tảng thương mại điện tử")
                 .formula("Tiền hoàn = Hoa hồng × Tỷ lệ hoàn (thường là 80%)")
                 .note("Tỷ lệ hoàn có thể khác nhau tùy theo sản phẩm và chương trình khuyến mãi")
+                .build();
+    }
+
+    /**
+     * Build bonus breakdown from paid referral rewards and referrer commissions.
+     * Includes both:
+     * - MILESTONE_BONUS from referral_reward table
+     * - Referrer commission (5% of referee's cashback) from referrer_commission table
+     */
+    private BonusBreakdown buildBonusBreakdown(List<ReferralReward> rewards, List<ReferrerCommission> commissions) {
+        // Count milestone bonuses from referral_reward table
+        int milestoneCount = 0;
+        BigDecimal milestoneAmount = BigDecimal.ZERO;
+        List<Integer> milestones = new ArrayList<>();
+
+        if (rewards != null) {
+            for (ReferralReward reward : rewards) {
+                if (reward.getAmount() == null || reward.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+
+                // All rewards in referral_reward with amount are milestone bonuses
+                if (reward.getRewardType() == ReferralRewardType.MILESTONE_BONUS) {
+                    milestoneCount++;
+                    milestoneAmount = milestoneAmount.add(reward.getAmount());
+                    if (reward.getMilestone() != null) {
+                        milestones.add(reward.getMilestone());
+                    }
+                }
+            }
+        }
+
+        // Count referrer commissions from referrer_commission table
+        int commissionCount = 0;
+        BigDecimal commissionAmount = BigDecimal.ZERO;
+
+        if (commissions != null) {
+            for (ReferrerCommission commission : commissions) {
+                if (commission.getCommissionAmount() != null && commission.getCommissionAmount().compareTo(BigDecimal.ZERO) > 0) {
+                    commissionCount++;
+                    commissionAmount = commissionAmount.add(commission.getCommissionAmount());
+                }
+            }
+        }
+
+        // Build milestone description
+        String milestoneDesc;
+        if (milestoneCount > 0) {
+            String milestonesStr = milestones.stream()
+                    .sorted()
+                    .map(m -> m + " đơn")
+                    .reduce((a, b) -> a + ", " + b)
+                    .orElse("");
+            milestoneDesc = String.format("Đạt %d mốc thưởng: %s", milestoneCount, milestonesStr);
+        } else {
+            milestoneDesc = "Chưa có thưởng mốc trong đợt thanh toán này";
+        }
+
+        // Build referrer commission description
+        String commissionDesc;
+        if (commissionCount > 0) {
+            commissionDesc = String.format("Hoa hồng từ %d đơn hàng của người được giới thiệu (5%% hoa hồng gốc)", commissionCount);
+        } else {
+            commissionDesc = "Chưa có hoa hồng giới thiệu trong đợt thanh toán này";
+        }
+
+        // Total bonus = milestone + commission
+        BigDecimal totalBonus = milestoneAmount.add(commissionAmount);
+
+        return BonusBreakdown.builder()
+                .totalBonusAmount(totalBonus)
+                .milestoneBonus(BonusDetail.builder()
+                        .label("Thưởng mốc")
+                        .count(milestoneCount)
+                        .amount(milestoneAmount)
+                        .description(milestoneDesc)
+                        .build())
+                .referrerCommission(BonusDetail.builder()
+                        .label("Hoa hồng giới thiệu")
+                        .count(commissionCount)
+                        .amount(commissionAmount)
+                        .description(commissionDesc)
+                        .build())
                 .build();
     }
 

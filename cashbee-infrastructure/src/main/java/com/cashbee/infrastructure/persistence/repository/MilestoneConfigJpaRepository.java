@@ -65,4 +65,21 @@ public interface MilestoneConfigJpaRepository extends JpaRepository<MilestoneCon
      * Check if milestone config exists for type and orders.
      */
     boolean existsByMilestoneTypeAndOrdersRequired(String milestoneType, Integer ordersRequired);
+
+    /**
+     * Find all active milestones where orders_required <= maxOrders.
+     * Used for re-processing: find all milestones a user has already qualified for.
+     *
+     * Returns milestones sorted by orders_required ASC so we process
+     * milestone 1 before milestone 5, etc.
+     */
+    @Query("SELECT m FROM MilestoneConfigJpaEntity m " +
+           "WHERE m.milestoneType = :milestoneType " +
+           "AND m.ordersRequired <= :maxOrders " +
+           "AND m.isActive = true " +
+           "ORDER BY m.ordersRequired ASC")
+    List<MilestoneConfigJpaEntity> findActiveByMilestoneTypeAndOrdersRequiredLessThanOrEqual(
+            @Param("milestoneType") String milestoneType,
+            @Param("maxOrders") Integer maxOrders
+    );
 }
