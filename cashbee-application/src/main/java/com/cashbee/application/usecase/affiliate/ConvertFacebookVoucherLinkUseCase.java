@@ -14,7 +14,7 @@ public class ConvertFacebookVoucherLinkUseCase {
 
     private final DaoshopeeClient daoshopeeClient;
 
-    private static final String FB_LINK = "https://www.facebook.com/groups/570967567029047/posts/2060163244776131/";
+    private static final String FB_LINK = "https://www.facebook.com/share/p/1AWrTdnWWQ/";
 
     public ConvertFacebookVoucherResponse execute(ConvertFacebookVoucherRequest request) {
         log.info("Converting Shopee URL for Facebook voucher - url: {}", request.getShopeeUrl());
