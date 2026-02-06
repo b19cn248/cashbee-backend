@@ -9,46 +9,42 @@ import java.nio.charset.StandardCharsets;
 /**
  * ShopeeFood-specific affiliate link builder.
  *
- * Builds affiliate links for ShopeeFood URLs using the endpoint:
- * https://shopeefood.vn/an_redir?origin_link={ENCODED_URL}&affiliate_id={ID}&sub_id={TRACKING}
+ * Builds affiliate links by appending tracking parameters directly to ShopeeFood URLs.
  *
- * This is similar to Shopee Mall's link builder but uses ShopeeFood's redirect service.
+ * Format: {ORIGINAL_URL}?affiliate_id={ID}&sub_id={TRACKING}
  *
- * Key differences from Shopee Mall:
- * - Base URL: shopeefood.vn/an_redir (vs s.shopee.vn/an_redir)
- * - Accepts shopeefood.vn URLs only
+ * This approach works more reliably than redirect-based methods.
  *
  * @author CashBee Team
  */
 @Component
 public class ShopeeFoodAffiliateLinkBuilder {
 
-    private static final String SHOPEEFOOD_REDIRECT_BASE = "https://shopeefood.vn/an_redir";
-
     /**
      * Build ShopeeFood affiliate link from original product/restaurant URL.
      *
-     * Format: https://shopeefood.vn/an_redir?origin_link={ENCODED_URL}&affiliate_id={ID}&sub_id={TRACKING}
+     * Appends affiliate tracking parameters directly to the original URL.
+     * Format: {ORIGINAL_URL}?affiliate_id={ID}&sub_id={TRACKING}
      *
-     * @param originalUrl Original ShopeeFood URL (will be URL-encoded)
+     * @param originalUrl Original ShopeeFood URL
      * @param affiliateId Publisher's affiliate ID
-     * @param trackingCode Unique tracking code
-     * @return Complete ShopeeFood affiliate URL
+     * @param trackingCode Unique tracking code (sub_id)
+     * @return Complete ShopeeFood affiliate URL with tracking parameters
      * @throws IllegalArgumentException if parameters are invalid
      */
     public String build(String originalUrl, String affiliateId, String trackingCode) {
         validateParameters(originalUrl, affiliateId, trackingCode);
 
-        // URL encode the entire original URL
-        String encodedUrl = urlEncode(originalUrl);
+        // Determine separator: ? if no existing query params, & if there are
+        String separator = originalUrl.contains("?") ? "&" : "?";
 
-        // Build the affiliate redirect URL
+        // Build affiliate URL by appending tracking parameters
         return String.format(
-            "%s?origin_link=%s&affiliate_id=%s&sub_id=%s",
-            SHOPEEFOOD_REDIRECT_BASE,
-            encodedUrl,
+            "%s%saffiliate_id=%s&sub_id=%s",
+            originalUrl,
+            separator,
             affiliateId,
-            trackingCode
+            urlEncode(trackingCode)
         );
     }
 
@@ -109,14 +105,5 @@ public class ShopeeFoodAffiliateLinkBuilder {
         }
 
         return url.startsWith("https://shopeefood.vn/") || url.startsWith("http://shopeefood.vn/");
-    }
-
-    /**
-     * Get the redirect service base URL (for testing purposes).
-     *
-     * @return ShopeeFood redirect base URL
-     */
-    public String getRedirectBase() {
-        return SHOPEEFOOD_REDIRECT_BASE;
     }
 }
