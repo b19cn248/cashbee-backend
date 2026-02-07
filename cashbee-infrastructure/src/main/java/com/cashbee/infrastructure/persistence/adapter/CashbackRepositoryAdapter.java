@@ -164,6 +164,17 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     }
 
     @Override
+    public List<Object[]> findCashbacksWithOrderDetailsByBatchIdOrPaidAt(
+            Long batchId, Long userId,
+            java.time.LocalDateTime windowStart, java.time.LocalDateTime windowEnd) {
+        if (batchId == null || userId == null) {
+            return List.of();
+        }
+        return jpaRepository.findCashbacksWithOrderDetailsByBatchIdOrPaidAt(
+                batchId, userId, windowStart, windowEnd);
+    }
+
+    @Override
     public int countConfirmedOrdersByUserIdWithMinAmount(Long userId, java.math.BigDecimal minAmount) {
         if (userId == null || minAmount == null) {
             return 0;

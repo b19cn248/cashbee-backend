@@ -218,6 +218,61 @@ public interface CashbackJpaRepository extends JpaRepository<CashbackJpaEntity, 
             @Param("userId") Long userId);
 
     /**
+     * Find cashbacks with order details for invoice display (with fallback).
+     *
+     * Improved version: also finds cashbacks where paid_batch_id is NULL
+     * but paid_at falls within a time window (for cashbacks that were paid
+     * by the batch but missed the snapshot-based update).
+     *
+     * @param batchId Batch ID that paid these cashbacks
+     * @param userId User ID
+     * @param windowStart Start of paid_at fallback window
+     * @param windowEnd End of paid_at fallback window
+     * @return List of projection arrays containing cashback + order + item + platform info
+     */
+    @Query(value = """
+        SELECT
+            c.id AS cashback_id,
+            c.cashback_amount,
+            c.commission_amount AS cashback_commission,
+            c.cashback_rate,
+            ao.id AS order_internal_id,
+            ao.order_id AS order_code,
+            ao.order_time,
+            ao.product_price AS order_product_price,
+            ao.commission_amount AS order_commission,
+            aoi.id AS item_id,
+            aoi.item_name,
+            aoi.shop_name,
+            aoi.quantity,
+            aoi.actual_amount AS item_price,
+            aoi.item_commission,
+            aoi.category_lv1,
+            aoi.img_url,
+            ap.id AS platform_id,
+            ap.name AS platform_name
+        FROM cashback c
+        INNER JOIN affiliate_order ao ON ao.id = c.order_id
+        LEFT JOIN affiliate_order_item aoi ON aoi.id = c.order_item_id
+        INNER JOIN affiliate_platform ap ON ap.id = c.platform_id
+        WHERE c.user_id = :userId
+          AND c.status = 'PAID'
+          AND (
+              c.paid_batch_id = :batchId
+              OR (
+                  c.paid_batch_id IS NULL
+                  AND c.paid_at BETWEEN :windowStart AND :windowEnd
+              )
+          )
+        ORDER BY ao.order_time DESC, aoi.id ASC
+        """, nativeQuery = true)
+    List<Object[]> findCashbacksWithOrderDetailsByBatchIdOrPaidAt(
+            @Param("batchId") Long batchId,
+            @Param("userId") Long userId,
+            @Param("windowStart") LocalDateTime windowStart,
+            @Param("windowEnd") LocalDateTime windowEnd);
+
+    /**
      * Count confirmed orders with minimum amount filter (anti-abuse).
      * Uses > (greater than) not >= for the amount comparison.
      *

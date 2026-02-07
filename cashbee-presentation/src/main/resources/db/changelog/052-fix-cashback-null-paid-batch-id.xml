@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Fix: PAID cashbacks with NULL paid_batch_id
+
+        Problem:
+        - 91 cashbacks have status=PAID but paid_batch_id=NULL
+        - Root cause: non-snapshotted cashbacks were marked PAID via wallet deduction
+          but updateStatusByCashbackIdsWithBatchId() only updated snapshotted IDs
+        - This causes invoice detail API to miss orders/items
+
+        Fix:
+        - Match orphan cashbacks to correct batch via paid_at timestamp + user_id
+        - Add index on paid_at for the new fallback query
+    -->
+
+    <changeSet id="052-01-fix-null-paid-batch-id" author="cashbee">
+        <comment>
+            Fix PAID cashbacks with NULL paid_batch_id by matching to correct batch
+            via paid_at timestamp (within 5 min of batch completed_at) and user_id.
+        </comment>
+
+        <sql>
+            UPDATE cashback c
+            INNER JOIN (
+                SELECT
+                    c2.id AS cashback_id,
+                    bti.batch_id AS matched_batch_id
+                FROM cashback c2
+                INNER JOIN batch_transfer_item bti
+                    ON bti.user_id = c2.user_id
+                INNER JOIN batch_transfer_export bte
+                    ON bte.id = bti.batch_id
+                WHERE c2.status = 'PAID'
+                  AND c2.paid_batch_id IS NULL
+                  AND c2.paid_at IS NOT NULL
+                  AND bte.completed_at IS NOT NULL
+                  AND c2.paid_at BETWEEN DATE_SUB(bte.completed_at, INTERVAL 5 MINUTE)
+                                     AND DATE_ADD(bte.completed_at, INTERVAL 5 MINUTE)
+            ) matched ON matched.cashback_id = c.id
+            SET c.paid_batch_id = matched.matched_batch_id,
+                c.updated_at = NOW()
+        </sql>
+    </changeSet>
+
+    <changeSet id="052-02-add-paid-at-index" author="cashbee">
+        <comment>
+            Add index on cashback.paid_at for the fallback invoice detail query
+            that uses paid_at when paid_batch_id is NULL.
+        </comment>
+
+        <createIndex tableName="cashback" indexName="idx_cashback_paid_at">
+            <column name="paid_at"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

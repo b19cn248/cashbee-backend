@@ -443,6 +443,26 @@ public class CompleteBatchTransferUseCase {
             }
         }
 
+        // Catch-all: update any remaining CONFIRMED cashbacks with NULL paid_batch_id
+        // These are cashbacks that were confirmed AFTER the batch snapshot was taken
+        // but their balance was included in the wallet balance (and thus the transfer amount).
+        // The method has "AND paidBatchId IS NULL" so already-updated cashbacks are skipped.
+        for (BatchTransferItem item : result.getSuccessfulItems()) {
+            Long batchId = item.getBatchId();
+            if (batchId != null) {
+                int extraUpdated = cashbackRepository.updateStatusByUserIdAndStatusWithBatchId(
+                        item.getUserId(),
+                        CashbackStatus.CONFIRMED,
+                        CashbackStatus.PAID,
+                        batchId
+                );
+                if (extraUpdated > 0) {
+                    log.info("CompleteBatchTransferUseCase: Updated {} additional non-snapshotted cashbacks to PAID for user {}",
+                            extraUpdated, item.getUserId());
+                }
+            }
+        }
+
         // Mark referral rewards as paid by this batch
         if (!result.getRewardIdsToMarkAsPaid().isEmpty()) {
             Long batchId = result.getSuccessfulItems().isEmpty() ? null

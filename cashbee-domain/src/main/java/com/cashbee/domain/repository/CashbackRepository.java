@@ -236,6 +236,24 @@ public interface CashbackRepository {
     List<Object[]> findCashbacksWithOrderDetailsByBatchIdAndUserId(Long batchId, Long userId);
 
     /**
+     * Find cashbacks with full order and item details for invoice display (with fallback).
+     *
+     * Improved version that also matches cashbacks where paid_batch_id is NULL
+     * but paid_at falls within a time window around the batch completion time.
+     * This handles cases where non-snapshotted cashbacks were paid by the batch
+     * but their paid_batch_id was not properly set.
+     *
+     * @param batchId Batch ID that paid these cashbacks
+     * @param userId User ID
+     * @param windowStart Start of paid_at fallback window
+     * @param windowEnd End of paid_at fallback window
+     * @return List of projection arrays containing cashback + order + item info
+     */
+    List<Object[]> findCashbacksWithOrderDetailsByBatchIdOrPaidAt(
+            Long batchId, Long userId,
+            java.time.LocalDateTime windowStart, java.time.LocalDateTime windowEnd);
+
+    /**
      * Count distinct orders with CONFIRMED/PAID status and minimum order amount.
      * Used for milestone calculation with anti-abuse filter.
      *

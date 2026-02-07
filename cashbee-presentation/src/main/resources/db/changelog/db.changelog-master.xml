@@ -117,4 +117,7 @@
     <!-- Invoice Bonus Tracking: paid status for referral_reward, bonus breakdown in invoice -->
     <include file="db/changelog/051-invoice-bonus-tracking.xml"/>
 
+    <!-- Fix: Repair PAID cashbacks with NULL paid_batch_id + add paid_at index -->
+    <include file="db/changelog/052-fix-cashback-null-paid-batch-id.xml"/>
+
 </databaseChangeLog>

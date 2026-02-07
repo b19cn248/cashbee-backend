@@ -69,8 +69,24 @@ public class GetInvoiceWithOrderDetailsUseCase {
         }
 
         // 2. Query cashbacks with order details
-        List<Object[]> rawResults = cashbackRepository.findCashbacksWithOrderDetailsByBatchIdAndUserId(
-                invoice.getBatchId(), userId);
+        // Use time-windowed fallback to also find cashbacks where paid_batch_id is NULL
+        // but paid_at matches the batch completion time (handles non-snapshotted cashbacks)
+        LocalDateTime transferTime = invoice.getTransferTime();
+        LocalDateTime windowStart;
+        LocalDateTime windowEnd;
+
+        if (transferTime != null) {
+            windowStart = transferTime.minusMinutes(5);
+            windowEnd = transferTime.plusMinutes(5);
+        } else {
+            // Fallback: use invoice creation time
+            LocalDateTime createdAt = invoice.getCreatedAt();
+            windowStart = createdAt != null ? createdAt.minusMinutes(5) : LocalDateTime.of(2020, 1, 1, 0, 0);
+            windowEnd = createdAt != null ? createdAt.plusMinutes(5) : LocalDateTime.of(2099, 1, 1, 0, 0);
+        }
+
+        List<Object[]> rawResults = cashbackRepository.findCashbacksWithOrderDetailsByBatchIdOrPaidAt(
+                invoice.getBatchId(), userId, windowStart, windowEnd);
 
         log.debug("Found {} cashback records for invoice {}", rawResults.size(), invoiceId);
 
