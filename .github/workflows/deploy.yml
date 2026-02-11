@@ -43,7 +43,9 @@ jobs:
 
       # 3. Build + chạy tests
       - name: Build and test with Maven
-        run: ./mvnw clean package -B
+        run: |
+          chmod +x ./mvnw
+          ./mvnw clean package -B
 
       # 4. Lưu JAR file để job sau dùng
       - name: Upload JAR artifact
