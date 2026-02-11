@@ -34,8 +34,13 @@
         </sql>
     </changeSet>
 
-    <!-- Step 2: Add UNIQUE constraint -->
+    <!-- Step 2: Add UNIQUE constraint (skip if already exists from previous partial run) -->
     <changeSet id="053-02-add-unique-bank-account-index" author="cashbee">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists tableName="user_bank_account" indexName="uk_bank_account_code_number"/>
+            </not>
+        </preConditions>
         <comment>Add UNIQUE constraint on (bank_code, account_number) to prevent duplicate bank accounts</comment>
         <addUniqueConstraint
                 tableName="user_bank_account"
