@@ -9,48 +9,76 @@ import java.nio.charset.StandardCharsets;
 /**
  * Shopee-specific affiliate link builder.
  *
- * Builds affiliate links according to Shopee's official documentation:
- * https://help.shopee.vn/portal/10/article/172955
+ * Builds affiliate links by appending tracking parameters directly to product URLs.
  *
- * Format: https://s.shopee.vn/an_redir?origin_link={ENCODED_URL}&affiliate_id={ID}&sub_id={TRACKING}
+ * Format: {ORIGINAL_URL}?affiliate_id={ID}&sub_id={TRACKING}
  *
- * Key features:
- * - Uses Shopee redirect service (s.shopee.vn/an_redir)
- * - URL encodes the ENTIRE original product URL
- * - Supports sub_id with 5 hyphen-separated values for advanced tracking
+ * This approach works more reliably than the an_redir redirect method because:
+ * - Direct URL modification doesn't depend on Shopee's redirect service
+ * - Shopee recognizes affiliate parameters when added to any valid product URL
+ * - Works with both full URLs and shortened links
+ *
+ * Alternative format (deprecated, less reliable):
+ * https://s.shopee.vn/an_redir?origin_link={ENCODED_URL}&affiliate_id={ID}&sub_id={TRACKING}
  *
  * @author CashBee Team
  */
 @Component
 public class ShopeeAffiliateLinkBuilder {
 
-    private static final String SHOPEE_REDIRECT_BASE = "https://s.shopee.vn/an_redir";
-
     /**
      * Build Shopee affiliate link from original product URL.
      *
-     * According to Shopee documentation, the format is:
-     * https://s.shopee.vn/an_redir?origin_link={ENCODED_URL}&affiliate_id={ID}&sub_id={TRACKING}
+     * Appends affiliate tracking parameters directly to the original URL.
+     * Format: {ORIGINAL_URL}?affiliate_id={ID}&sub_id={TRACKING}
      *
-     * @param originalUrl Original Shopee product/shop URL (will be URL-encoded)
+     * If the URL already has query parameters, appends with &
+     * If the URL has no query parameters, appends with ?
+     *
+     * @param originalUrl Original Shopee product/shop URL
      * @param affiliateId Publisher's affiliate ID
-     * @param trackingCode Unique tracking code
-     * @return Complete Shopee affiliate URL
+     * @param trackingCode Unique tracking code (sub_id)
+     * @return Complete Shopee affiliate URL with tracking parameters
      * @throws IllegalArgumentException if parameters are invalid
      */
     public String build(String originalUrl, String affiliateId, String trackingCode) {
         validateParameters(originalUrl, affiliateId, trackingCode);
 
-        // URL encode the entire original URL
-        String encodedUrl = urlEncode(originalUrl);
+        // Determine separator: ? if no existing query params, & if there are
+        String separator = originalUrl.contains("?") ? "&" : "?";
 
-        // Build the affiliate redirect URL
+        // Build affiliate URL by appending tracking parameters
         return String.format(
-            "%s?origin_link=%s&affiliate_id=%s&sub_id=%s",
-            SHOPEE_REDIRECT_BASE,
-            encodedUrl,
+            "%s%saffiliate_id=%s&sub_id=%s",
+            originalUrl,
+            separator,
             affiliateId,
-            trackingCode
+            urlEncode(trackingCode)
+        );
+    }
+
+    /**
+     * Build Shopee affiliate link using the an_redir redirect format.
+     *
+     * Format: https://s.shopee.vn/an_redir?origin_link={ENCODED_URL}&affiliate_id={ID}&sub_id={TRACKING}
+     *
+     * This format uses Shopee's official redirect service and has been tested
+     * successfully with order tracking via CSV import.
+     *
+     * @param originalUrl Original Shopee product/shop URL
+     * @param affiliateId Publisher's affiliate ID
+     * @param trackingCode Unique tracking code (sub_id)
+     * @return Complete Shopee affiliate URL using an_redir format
+     * @throws IllegalArgumentException if parameters are invalid
+     */
+    public String buildWithAnRedir(String originalUrl, String affiliateId, String trackingCode) {
+        validateParameters(originalUrl, affiliateId, trackingCode);
+
+        return String.format(
+            "https://s.shopee.vn/an_redir?origin_link=%s&affiliate_id=%s&sub_id=%s",
+            urlEncode(originalUrl),
+            affiliateId,
+            urlEncode(trackingCode)
         );
     }
 
@@ -87,14 +115,14 @@ public class ShopeeAffiliateLinkBuilder {
         // Build sub_id with 5 hyphen-separated values
         String subId = buildSubId(subId1, subId2, subId3, subId4, subId5);
 
-        // URL encode the entire original URL
-        String encodedUrl = urlEncode(originalUrl);
+        // Determine separator: ? if no existing query params, & if there are
+        String separator = originalUrl.contains("?") ? "&" : "?";
 
-        // Build the affiliate redirect URL
+        // Build affiliate URL by appending tracking parameters
         return String.format(
-            "%s?origin_link=%s&affiliate_id=%s&sub_id=%s",
-            SHOPEE_REDIRECT_BASE,
-            encodedUrl,
+            "%s%saffiliate_id=%s&sub_id=%s",
+            originalUrl,
+            separator,
             affiliateId,
             urlEncode(subId)
         );
@@ -136,8 +164,8 @@ public class ShopeeAffiliateLinkBuilder {
             throw new IllegalArgumentException("Original URL is required");
         }
 
-        if (!originalUrl.startsWith("https://shopee.vn/") && !originalUrl.startsWith("http://shopee.vn/")) {
-            throw new IllegalArgumentException("URL must be a valid Shopee URL (shopee.vn)");
+        if (!isValidShopeeUrl(originalUrl)) {
+            throw new IllegalArgumentException("URL must be a valid Shopee URL (shopee.vn or s.shopee.vn)");
         }
 
         if (affiliateId == null || affiliateId.isBlank()) {
@@ -172,6 +200,11 @@ public class ShopeeAffiliateLinkBuilder {
     /**
      * Validate if a URL is a valid Shopee URL.
      *
+     * Accepts:
+     * - https://shopee.vn/... (standard product URLs)
+     * - http://shopee.vn/... (non-HTTPS version)
+     * - https://s.shopee.vn/... (shortened URLs)
+     *
      * @param url URL to validate
      * @return true if valid Shopee URL
      */
@@ -180,15 +213,9 @@ public class ShopeeAffiliateLinkBuilder {
             return false;
         }
 
-        return url.startsWith("https://shopee.vn/") || url.startsWith("http://shopee.vn/");
-    }
-
-    /**
-     * Extract the redirect service base URL (for testing purposes).
-     *
-     * @return Shopee redirect base URL
-     */
-    public String getRedirectBase() {
-        return SHOPEE_REDIRECT_BASE;
+        return url.startsWith("https://shopee.vn/")
+            || url.startsWith("http://shopee.vn/")
+            || url.startsWith("https://s.shopee.vn/")
+            || url.startsWith("http://s.shopee.vn/");
     }
 }

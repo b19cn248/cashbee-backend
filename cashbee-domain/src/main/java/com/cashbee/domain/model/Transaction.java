@@ -1,5 +1,6 @@
 package com.cashbee.domain.model;
 
+import com.cashbee.domain.enums.TransactionSourceType;
 import com.cashbee.domain.enums.TransactionStatus;
 import com.cashbee.domain.enums.TransactionType;
 import lombok.Builder;
@@ -90,6 +91,23 @@ public class Transaction {
      * Transaction status (SUCCESS, PENDING, FAILED, CANCELLED).
      */
     private final TransactionStatus status;
+
+    /**
+     * Source type indicating where this transaction originated from.
+     * Examples: ORDER (cashback), MILESTONE_BONUS, REFERRER_BONUS, PAYOUT, etc.
+     */
+    private final TransactionSourceType sourceType;
+
+    /**
+     * ID of the source record (FK to related table based on sourceType).
+     * Examples:
+     * - ORDER: cashback.id
+     * - MILESTONE_BONUS: referral_reward.id
+     * - REFERRER_BONUS: referral_reward.id
+     * - REFERRER_COMMISSION: referrer_commission.id
+     * - PAYOUT: payout_request.id or batch_transfer_item.id
+     */
+    private final Long sourceId;
 
     /**
      * When transaction was created.

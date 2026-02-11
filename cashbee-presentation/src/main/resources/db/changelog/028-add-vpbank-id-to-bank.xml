@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="028-add-vpbank-id-to-bank" author="cashbee">
+        <comment>Add vpbank_id column to bank table for VPBank batch transfer</comment>
+
+        <addColumn tableName="bank">
+            <column name="vpbank_id" type="INT" remarks="VPBank internal bank ID for batch transfer">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="028-seed-vpbank-id" author="cashbee">
+        <comment>Seed VPBank IDs for common banks (using bank table id as default)</comment>
+
+        <!-- Update vpbank_id = id for all banks as default -->
+        <sql>UPDATE bank SET vpbank_id = id WHERE vpbank_id IS NULL</sql>
+    </changeSet>
+
+</databaseChangeLog>

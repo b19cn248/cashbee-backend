@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 020: Create Batch Transfer Tables
+        Author: CashBee Team
+        Date: 2025-11-19
+        Description: Tạo 2 bảng cho tính năng xuất file Excel chuyển khoản lô:
+                     1. user_bank_account: Lưu thông tin ngân hàng của user
+                     2. batch_transfer_export: Lưu metadata batch export
+    -->
+
+    <!-- Table 1: user_bank_account -->
+    <changeSet id="020-01-create-user-bank-account-table" author="cashbee">
+        <comment>
+            Tạo bảng user_bank_account để lưu thông tin ngân hàng mặc định của user.
+            User phải điền thông tin này trước khi rút tiền.
+        </comment>
+
+        <createTable tableName="user_bank_account">
+            <!-- Primary Key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- User Reference (UNIQUE - mỗi user 1 bank account) -->
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <!-- Bank Account Info -->
+            <column name="account_number" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="account_name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="bank_name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="bank_code" type="VARCHAR(20)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Flags -->
+            <column name="is_default" type="TINYINT(1)" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="verified" type="TINYINT(1)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamps -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Foreign Key to user table -->
+        <addForeignKeyConstraint
+                baseTableName="user_bank_account"
+                baseColumnNames="user_id"
+                constraintName="fk_user_bank_account_user_id"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                onDelete="CASCADE"
+                onUpdate="CASCADE"/>
+
+        <!-- Indexes -->
+        <createIndex indexName="idx_user_bank_account_user_id" tableName="user_bank_account">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_user_bank_account_bank_code" tableName="user_bank_account">
+            <column name="bank_code"/>
+        </createIndex>
+
+        <createIndex indexName="idx_user_bank_account_verified" tableName="user_bank_account">
+            <column name="verified"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Table 2: batch_transfer_export -->
+    <changeSet id="020-02-create-batch-transfer-export-table" author="cashbee">
+        <comment>
+            Tạo bảng batch_transfer_export để lưu metadata của mỗi lần export file chuyển khoản lô.
+            Không lưu file thực tế (file sẽ generate realtime khi download).
+        </comment>
+
+        <createTable tableName="batch_transfer_export">
+            <!-- Primary Key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Batch Info -->
+            <column name="batch_code" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="file_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Statistics -->
+            <column name="total_users" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="total_amount" type="DECIMAL(15,2)" defaultValueNumeric="0.00">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Status & Type -->
+            <column name="status" type="VARCHAR(20)" defaultValue="COMPLETED">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="export_type" type="VARCHAR(20)" defaultValue="MANUAL">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Export Info -->
+            <column name="exported_by" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="remark_template" type="VARCHAR(500)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Timestamp -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Foreign Key to user table (optional, exported_by can be NULL for scheduled jobs) -->
+        <addForeignKeyConstraint
+                baseTableName="batch_transfer_export"
+                baseColumnNames="exported_by"
+                constraintName="fk_batch_transfer_export_exported_by"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                onDelete="SET NULL"
+                onUpdate="CASCADE"/>
+
+        <!-- Indexes -->
+        <createIndex indexName="idx_batch_transfer_export_batch_code" tableName="batch_transfer_export">
+            <column name="batch_code"/>
+        </createIndex>
+
+        <createIndex indexName="idx_batch_transfer_export_status" tableName="batch_transfer_export">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex indexName="idx_batch_transfer_export_export_type" tableName="batch_transfer_export">
+            <column name="export_type"/>
+        </createIndex>
+
+        <createIndex indexName="idx_batch_transfer_export_created_at" tableName="batch_transfer_export">
+            <column name="created_at"/>
+        </createIndex>
+
+        <createIndex indexName="idx_batch_transfer_export_exported_by" tableName="batch_transfer_export">
+            <column name="exported_by"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

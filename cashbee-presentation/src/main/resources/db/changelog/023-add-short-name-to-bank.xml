@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 023: Add short_name to Bank Table
+        Author: CashBee Team
+        Date: 2025-11-20
+        Description: Thêm trường short_name (tên viết tắt) vào bảng bank
+                     để hiển thị tên ngắn gọn cho user
+    -->
+
+    <!-- Step 1: Add short_name column -->
+    <changeSet id="023-01-add-short-name-column" author="cashbee">
+        <comment>Thêm column short_name vào bảng bank</comment>
+
+        <addColumn tableName="bank">
+            <column name="short_name" type="VARCHAR(100)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 2: Update short_name for all banks -->
+    <changeSet id="023-02-update-short-names" author="cashbee">
+        <comment>Cập nhật short_name cho tất cả 60 ngân hàng</comment>
+
+        <!-- Vietnamese Banks -->
+        <update tableName="bank">
+            <column name="short_name" value="VPBank"/>
+            <where>bank_code = 'VPBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="MHB"/>
+            <where>bank_code = 'MHB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Agribank"/>
+            <where>bank_code = 'AGRIBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="BIDV"/>
+            <where>bank_code = 'BIDV'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="VietinBank"/>
+            <where>bank_code = 'VIETINBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Vietcombank"/>
+            <where>bank_code = 'VIETCOMBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="HDBank"/>
+            <where>bank_code = 'HDBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="ACB"/>
+            <where>bank_code = 'ACB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="DongA Bank"/>
+            <where>bank_code = 'DAB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Nam A Bank"/>
+            <where>bank_code = 'NAMABANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Bac A Bank"/>
+            <where>bank_code = 'BAB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="VietA Bank"/>
+            <where>bank_code = 'VAB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="SeABank"/>
+            <where>bank_code = 'SEABANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="OceanBank"/>
+            <where>bank_code = 'OJB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="ABBank"/>
+            <where>bank_code = 'ABBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="VietCapital Bank"/>
+            <where>bank_code = 'VIETCAPITALBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="MB Bank"/>
+            <where>bank_code = 'MB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="GPBank"/>
+            <where>bank_code = 'GPBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="PGBank"/>
+            <where>bank_code = 'PGBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Techcombank"/>
+            <where>bank_code = 'TCB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="MSB"/>
+            <where>bank_code = 'MSB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Eximbank"/>
+            <where>bank_code = 'EIB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="OCB"/>
+            <where>bank_code = 'OCB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="VIB"/>
+            <where>bank_code = 'VIB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="CB Bank"/>
+            <where>bank_code = 'CBBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="VietBank"/>
+            <where>bank_code = 'VIETBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="PVcomBank"/>
+            <where>bank_code = 'PVCOMBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="LPBank"/>
+            <where>bank_code = 'LPBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="TPBank"/>
+            <where>bank_code = 'TPB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="BaoViet Bank"/>
+            <where>bank_code = 'BVB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Kienlongbank"/>
+            <where>bank_code = 'KIENLONGBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Sacombank"/>
+            <where>bank_code = 'SACOMBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="SCB"/>
+            <where>bank_code = 'SCB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="SHB"/>
+            <where>bank_code = 'SHB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="SaigonBank"/>
+            <where>bank_code = 'SAIGONBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="VID Public Bank"/>
+            <where>bank_code = 'VID'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Indovina Bank"/>
+            <where>bank_code = 'IVB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="VRB"/>
+            <where>bank_code = 'VRB'</where>
+        </update>
+
+        <!-- Foreign Banks -->
+        <update tableName="bank">
+            <column name="short_name" value="Standard Chartered"/>
+            <where>bank_code = 'STANDARDCHARTERED'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="HSBC"/>
+            <where>bank_code = 'HSBC'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Woori Bank"/>
+            <where>bank_code = 'WRB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Hong Leong Bank"/>
+            <where>bank_code = 'HLB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Co-opBank"/>
+            <where>bank_code = 'COOPBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Shinhan Bank"/>
+            <where>bank_code = 'SHINHAN'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="DBS Bank"/>
+            <where>bank_code = 'DBS'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="IBK"/>
+            <where>bank_code = 'IBK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Kookmin Bank (HN)"/>
+            <where>bank_code = 'KOOKMIN'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="UOB"/>
+            <where>bank_code = 'UOB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="NCB"/>
+            <where>bank_code = 'NCB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="CIMB"/>
+            <where>bank_code = 'CIMB'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Nonghyup Bank"/>
+            <where>bank_code = 'NONGHYUP'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="UBank"/>
+            <where>bank_code = 'UBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="CAKE"/>
+            <where>bank_code = 'CAKE'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="Kookmin Bank (HCM)"/>
+            <where>bank_code = 'KOOKMINHCM'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="KBank"/>
+            <where>bank_code = 'KBANK'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="UMEE"/>
+            <where>bank_code = 'UMEE'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="KEB Hana (HN)"/>
+            <where>bank_code = 'KEBHANAHN'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="KEB Hana (HCM)"/>
+            <where>bank_code = 'KEBHANAHCM'</where>
+        </update>
+
+        <update tableName="bank">
+            <column name="short_name" value="VBSP"/>
+            <where>bank_code = 'VBSP'</where>
+        </update>
+    </changeSet>
+
+    <!-- Step 3: Make short_name NOT NULL after data population -->
+    <changeSet id="023-03-make-short-name-not-null" author="cashbee">
+        <comment>Set short_name as NOT NULL sau khi đã update data</comment>
+
+        <addNotNullConstraint
+                tableName="bank"
+                columnName="short_name"
+                columnDataType="VARCHAR(100)"/>
+    </changeSet>
+
+</databaseChangeLog>

@@ -61,6 +61,15 @@ public class UserWalletJpaEntity {
     @Builder.Default
     private BigDecimal totalWithdrawn = BigDecimal.ZERO;
 
+    /**
+     * Total bonus received (historical sum).
+     * Tracks MILESTONE_BONUS, REFERRER_BONUS, REFERRER_COMMISSION.
+     * Used to preserve bonus when recalculating wallet from cashback data.
+     */
+    @Column(name = "total_bonus", nullable = false, precision = 15, scale = 2)
+    @Builder.Default
+    private BigDecimal totalBonus = BigDecimal.ZERO;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -107,6 +116,9 @@ public class UserWalletJpaEntity {
         }
         if (this.totalWithdrawn == null) {
             this.totalWithdrawn = BigDecimal.ZERO;
+        }
+        if (this.totalBonus == null) {
+            this.totalBonus = BigDecimal.ZERO;
         }
     }
 }

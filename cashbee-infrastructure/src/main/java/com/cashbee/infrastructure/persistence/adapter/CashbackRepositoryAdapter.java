@@ -9,6 +9,7 @@ import com.cashbee.infrastructure.persistence.repository.CashbackJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -46,6 +47,13 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     }
 
     @Override
+    public List<Cashback> findAllByOrderId(Long orderId) {
+        return jpaRepository.findAllByOrderId(orderId).stream()
+            .map(mapper::toDomain)
+            .collect(Collectors.toList());
+    }
+
+    @Override
     public List<Cashback> findByUserId(Long userId) {
         return jpaRepository.findByUserId(userId).stream()
             .map(mapper::toDomain)
@@ -67,5 +75,118 @@ public class CashbackRepositoryAdapter implements CashbackRepository {
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
+    }
+
+    @Override
+    public Optional<Cashback> findByOrderItemId(Long orderItemId) {
+        return jpaRepository.findByOrderItemId(orderItemId)
+            .map(mapper::toDomain);
+    }
+
+    @Override
+    public boolean existsByOrderItemId(Long orderItemId) {
+        return jpaRepository.existsByOrderItemId(orderItemId);
+    }
+
+    @Override
+    public BigDecimal sumCashbackAmountByUserIdAndStatus(Long userId, CashbackStatus status) {
+        return jpaRepository.sumCashbackAmountByUserIdAndStatus(userId, status);
+    }
+
+    @Override
+    public BigDecimal sumCashbackAmountByUserIdAndStatusIn(Long userId, List<CashbackStatus> statuses) {
+        return jpaRepository.sumCashbackAmountByUserIdAndStatusIn(userId, statuses);
+    }
+
+    @Override
+    @Deprecated
+    public int updateStatusByUserIdAndStatus(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus) {
+        return jpaRepository.updateStatusByUserIdAndStatus(userId, oldStatus, newStatus);
+    }
+
+    @Override
+    public int updateStatusByUserIdAndStatusWithBatchId(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId) {
+        return jpaRepository.updateStatusByUserIdAndStatusWithBatchId(userId, oldStatus, newStatus, batchId);
+    }
+
+    @Override
+    public int updateStatusByUserIdAndStatusWithBatchIdBeforeDate(
+            Long userId,
+            CashbackStatus oldStatus,
+            CashbackStatus newStatus,
+            Long batchId,
+            java.time.LocalDateTime batchCreatedAt) {
+        return jpaRepository.updateStatusByUserIdAndStatusWithBatchIdBeforeDate(
+                userId, oldStatus, newStatus, batchId, batchCreatedAt);
+    }
+
+    @Override
+    public List<Cashback> findByPaidBatchId(Long batchId) {
+        return jpaRepository.findByPaidBatchId(batchId).stream()
+            .map(mapper::toDomain)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Cashback> findByPaidBatchIdAndUserId(Long batchId, Long userId) {
+        return jpaRepository.findByPaidBatchIdAndUserId(batchId, userId).stream()
+            .map(mapper::toDomain)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public BigDecimal sumUnpaidConfirmedCashbackByUserId(Long userId) {
+        return jpaRepository.sumUnpaidConfirmedCashbackByUserId(userId);
+    }
+
+    @Override
+    public int updateStatusByCashbackIdsWithBatchId(List<Long> cashbackIds, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId) {
+        if (cashbackIds == null || cashbackIds.isEmpty()) {
+            return 0;
+        }
+        return jpaRepository.updateStatusByCashbackIdsWithBatchId(cashbackIds, oldStatus, newStatus, batchId);
+    }
+
+    @Override
+    public int countConfirmedOrdersByUserId(Long userId) {
+        if (userId == null) {
+            return 0;
+        }
+        return jpaRepository.countConfirmedOrdersByUserId(userId);
+    }
+
+    @Override
+    public List<Object[]> findCashbacksWithOrderDetailsByBatchIdAndUserId(Long batchId, Long userId) {
+        if (batchId == null || userId == null) {
+            return List.of();
+        }
+        return jpaRepository.findCashbacksWithOrderDetailsByBatchIdAndUserId(batchId, userId);
+    }
+
+    @Override
+    public List<Object[]> findCashbacksWithOrderDetailsByBatchIdOrPaidAt(
+            Long batchId, Long userId,
+            java.time.LocalDateTime windowStart, java.time.LocalDateTime windowEnd) {
+        if (batchId == null || userId == null) {
+            return List.of();
+        }
+        return jpaRepository.findCashbacksWithOrderDetailsByBatchIdOrPaidAt(
+                batchId, userId, windowStart, windowEnd);
+    }
+
+    @Override
+    public int countConfirmedOrdersByUserIdWithMinAmount(Long userId, java.math.BigDecimal minAmount) {
+        if (userId == null || minAmount == null) {
+            return 0;
+        }
+        return jpaRepository.countConfirmedOrdersByUserIdWithMinAmount(userId, minAmount);
+    }
+
+    @Override
+    public java.util.List<Long> findUsersWithQualifyingOrders(java.math.BigDecimal minAmount) {
+        if (minAmount == null) {
+            return List.of();
+        }
+        return jpaRepository.findUsersWithQualifyingOrders(minAmount);
     }
 }

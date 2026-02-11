@@ -111,6 +111,18 @@ public class AffiliateOrder {
     private Long importBatchId;
 
     /**
+     * Whether this order was matched using fallback (context-based) matching.
+     *
+     * TRUE = Order matched by context (itemId + shopId + time window) because Sub_id1 was missing
+     * FALSE/NULL = Order matched by tracking code (Sub_id1) - normal flow
+     *
+     * This flag helps track orders that may need review as they were matched
+     * by heuristics rather than explicit tracking codes.
+     */
+    @Builder.Default
+    private Boolean fallbackMatch = false;
+
+    /**
      * Timestamp when entity was created.
      */
     private LocalDateTime createdAt;

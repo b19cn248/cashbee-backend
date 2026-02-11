@@ -1,8 +1,10 @@
 package com.cashbee.application.usecase.user;
 
+import com.cashbee.application.dto.referral.ReferralValidationResult;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.dto.user.UserSyncCommand;
 import com.cashbee.application.port.UserDtoMapper;
+import com.cashbee.application.service.ReferralCodeValidator;
 import com.cashbee.common.util.StringUtils;
 import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.domain.model.User;
@@ -42,6 +44,7 @@ public class SyncUserFromKeycloakUseCase {
     private final UserRepository userRepository;
     private final UserWalletRepository walletRepository;
     private final UserDtoMapper userMapper;
+    private final ReferralCodeValidator referralCodeValidator;
 
     /**
      * Sync user from Keycloak to local database.
@@ -92,10 +95,18 @@ public class SyncUserFromKeycloakUseCase {
         // Generate unique referral code
         String referralCode = generateUniqueReferralCode();
 
-        // Validate referrer if referral code is provided
+        // Validate referrer if referral code is provided (throws exception if invalid)
         String referredBy = null;
         if (command.getReferredBy() != null && !command.getReferredBy().isBlank()) {
-            referredBy = validateAndGetReferralCode(command.getReferredBy());
+            // Use validateOrThrow to throw exception if referral code is invalid
+            // Pass null for currentUserId since user doesn't exist yet
+            ReferralValidationResult result = referralCodeValidator.validateOrThrow(
+                    command.getReferredBy(),
+                    null  // User chưa có ID
+            );
+            referredBy = result.getNormalizedCode();
+            log.info("Valid referral code for new user: code={}, referrerId={}",
+                    referredBy, result.getReferrerId());
         }
 
         // Create user
@@ -133,21 +144,6 @@ public class SyncUserFromKeycloakUseCase {
             log.warn("Referral code collision: {} - retrying ({}/{})", code, i + 1, maxRetries);
         }
         throw new RuntimeException("Failed to generate unique referral code after " + maxRetries + " attempts");
-    }
-
-    /**
-     * Validate referral code and return it if valid.
-     * Returns null if invalid (don't fail registration for invalid referral code).
-     */
-    private String validateAndGetReferralCode(String referralCode) {
-        Optional<User> referrer = userRepository.findByReferralCode(referralCode);
-        if (referrer.isPresent()) {
-            log.info("Valid referral code: {} from user: {}", referralCode, referrer.get().getId());
-            return referralCode;
-        } else {
-            log.warn("Invalid referral code provided: {} - ignoring", referralCode);
-            return null;
-        }
     }
 
     /**

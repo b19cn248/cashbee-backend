@@ -1,0 +1,117 @@
+package com.cashbee.application.dto.affiliate;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+
+/**
+ * Response DTO containing estimated cashback information.
+ *
+ * Returns product details and estimated cashback amount that user
+ * will receive when purchasing through CashBee.
+ *
+ * Cashback Calculation:
+ * - commissionRate = sellerCommissionRate + shopeeCommissionRate
+ * - estimatedCashback = commissionRate * price
+ * - cashbackRate = commissionRate * 100 (%)
+ *
+ * @author CashBee Team
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class EstimateCashbackResponse {
+
+    /**
+     * Product name from Shopee.
+     */
+    private String productName;
+
+    /**
+     * Shop name on Shopee.
+     */
+    private String shopName;
+
+    /**
+     * Product price in VND.
+     */
+    private BigDecimal price;
+
+    /**
+     * Product image URL.
+     */
+    private String imageUrl;
+
+    /**
+     * Original Shopee product link.
+     */
+    private String productLink;
+
+    /**
+     * Number of sales (số lượt bán).
+     */
+    private Integer sales;
+
+    /**
+     * Seller commission rate as percentage.
+     * Example: 10.0 means 10% from seller.
+     * Can be null if data source doesn't provide separate rates.
+     */
+    private BigDecimal sellerCommissionRate;
+
+    /**
+     * Shopee commission rate as percentage.
+     * Example: 5.0 means 5% from Shopee.
+     * Can be null if data source doesn't provide separate rates.
+     */
+    private BigDecimal shopeeCommissionRate;
+
+    /**
+     * Commission amount from seller (in VND).
+     * Formula: price * sellerCommissionRate (no cap).
+     */
+    private BigDecimal sellerCommission;
+
+    /**
+     * Commission amount from Shopee (in VND).
+     * Formula: min(price * shopeeCommissionRate, 50000) - capped at 50k.
+     */
+    private BigDecimal shopeeCommission;
+
+    /**
+     * Commission from ChietKhau.Pro (for reference).
+     * This is what ChietKhau.Pro pays their users (~52% of Shopee commission).
+     */
+    private BigDecimal chietKhauCommission;
+
+    /**
+     * Estimated cashback amount user will receive from CashBee (in VND).
+     * Formula: sellerCommission + shopeeCommission
+     */
+    private BigDecimal estimatedCashback;
+
+    /**
+     * Cashback rate as percentage of product price.
+     * Example: 15.0 means 15% cashback.
+     */
+    private BigDecimal cashbackRate;
+
+    /**
+     * Whether the commission is capped by Shopee.
+     */
+    private Boolean isCapped;
+
+    /**
+     * Maximum commission cap from Shopee (if applicable).
+     */
+    private BigDecimal maxCap;
+
+    /**
+     * Friendly message to display to user.
+     */
+    private String message;
+}

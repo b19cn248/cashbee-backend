@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="027-add-vietinbank-code-to-bank" author="cashbee">
+        <comment>Add vietinbank_code column to bank table for VietinBank batch transfer integration</comment>
+
+        <addColumn tableName="bank">
+            <column name="vietinbank_code" type="VARCHAR(20)" remarks="Ma ngan hang theo chuan VietinBank (8 chu so)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="027-seed-vietinbank-codes" author="cashbee">
+        <comment>Update vietinbank_code for existing banks based on VietinBank API</comment>
+
+        <!-- VietinBank - special case: use "VietinBank" instead of code -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="VietinBank"/>
+            <where>bank_code = 'VIETINBANK'</where>
+        </update>
+
+        <!-- VPBank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01309001"/>
+            <where>bank_code = 'VPBANK'</where>
+        </update>
+
+        <!-- BIDV -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01202001"/>
+            <where>bank_code = 'BIDV'</where>
+        </update>
+
+        <!-- Vietcombank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01203001"/>
+            <where>bank_code = 'VIETCOMBANK'</where>
+        </update>
+
+        <!-- Agribank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01204001"/>
+            <where>bank_code = 'AGRIBANK'</where>
+        </update>
+
+        <!-- Techcombank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01310001"/>
+            <where>bank_code = 'TECHCOMBANK'</where>
+        </update>
+
+        <!-- MB Bank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01311001"/>
+            <where>bank_code = 'MBBANK'</where>
+        </update>
+
+        <!-- ACB -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79307001"/>
+            <where>bank_code = 'ACB'</where>
+        </update>
+
+        <!-- Sacombank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79303001"/>
+            <where>bank_code = 'SACOMBANK'</where>
+        </update>
+
+        <!-- TPBank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01358001"/>
+            <where>bank_code = 'TPBANK'</where>
+        </update>
+
+        <!-- SHB -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01348002"/>
+            <where>bank_code = 'SHB'</where>
+        </update>
+
+        <!-- HDBank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79321001"/>
+            <where>bank_code = 'HDBANK'</where>
+        </update>
+
+        <!-- VIB -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79314013"/>
+            <where>bank_code = 'VIB'</where>
+        </update>
+
+        <!-- Eximbank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79305001"/>
+            <where>bank_code = 'EXIMBANK'</where>
+        </update>
+
+        <!-- SeABank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01317001"/>
+            <where>bank_code = 'SEABANK'</where>
+        </update>
+
+        <!-- OCB -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79333001"/>
+            <where>bank_code = 'OCB'</where>
+        </update>
+
+        <!-- NCB -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01352002"/>
+            <where>bank_code = 'NCB'</where>
+        </update>
+
+        <!-- PVcomBank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01360002"/>
+            <where>bank_code = 'PVCOMBANK'</where>
+        </update>
+
+        <!-- LPBank (LienVietPostBank) -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01357001"/>
+            <where>bank_code = 'LPBANK'</where>
+        </update>
+
+        <!-- BaoViet Bank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01359001"/>
+            <where>bank_code = 'BAOVIETBANK'</where>
+        </update>
+
+        <!-- SCB -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79334001"/>
+            <where>bank_code = 'SCB'</where>
+        </update>
+
+        <!-- VietABank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01355002"/>
+            <where>bank_code = 'VIETABANK'</where>
+        </update>
+
+        <!-- NamABank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79306001"/>
+            <where>bank_code = 'NAMABANK'</where>
+        </update>
+
+        <!-- Saigonbank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79308001"/>
+            <where>bank_code = 'SAIGONBANK'</where>
+        </update>
+
+        <!-- MaritimeBank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01302001"/>
+            <where>bank_code = 'MARITIMEBANK'</where>
+        </update>
+
+        <!-- BacABank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="40313001"/>
+            <where>bank_code = 'BACABANK'</where>
+        </update>
+
+        <!-- KienLongBank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="91353001"/>
+            <where>bank_code = 'KIENLONGBANK'</where>
+        </update>
+
+        <!-- ABBank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01323002"/>
+            <where>bank_code = 'ABBANK'</where>
+        </update>
+
+        <!-- VietBank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79356001"/>
+            <where>bank_code = 'VIETBANK'</where>
+        </update>
+
+        <!-- Shinhan Bank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79616001"/>
+            <where>bank_code = 'SHINHANBANK'</where>
+        </update>
+
+        <!-- Woori Bank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01663001"/>
+            <where>bank_code = 'WOORIBANK'</where>
+        </update>
+
+        <!-- HSBC -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79617001"/>
+            <where>bank_code = 'HSBC'</where>
+        </update>
+
+        <!-- Standard Chartered -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01604001"/>
+            <where>bank_code = 'STANDARDCHARTERED'</where>
+        </update>
+
+        <!-- CIMB -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01661001"/>
+            <where>bank_code = 'CIMB'</where>
+        </update>
+
+        <!-- UOB -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="79665001"/>
+            <where>bank_code = 'UOB'</where>
+        </update>
+
+        <!-- Co-opBank -->
+        <update tableName="bank">
+            <column name="vietinbank_code" value="01901001"/>
+            <where>bank_code = 'COOPBANK'</where>
+        </update>
+    </changeSet>
+
+</databaseChangeLog>

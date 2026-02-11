@@ -22,11 +22,18 @@ public interface UserDtoMapper {
 
     /**
      * Convert User domain model to UserResponse DTO.
+     * Bank account fields (accountNumber, accountName, bankCode, bankName)
+     * are ignored here and will be populated separately from UserBankAccount.
      *
      * @param user Domain model
      * @return Response DTO
      */
     @Mapping(target = "status", source = "status", qualifiedByName = "statusToString")
+    @Mapping(target = "userLevel", source = "userLevel", qualifiedByName = "userLevelToString")
+    @Mapping(target = "accountNumber", ignore = true)
+    @Mapping(target = "accountName", ignore = true)
+    @Mapping(target = "bankCode", ignore = true)
+    @Mapping(target = "bankName", ignore = true)
     UserResponse toResponse(User user);
 
     /**
@@ -46,5 +53,16 @@ public interface UserDtoMapper {
     @Named("statusToString")
     default String statusToString(com.cashbee.domain.enums.UserStatus status) {
         return status != null ? status.name() : null;
+    }
+
+    /**
+     * Convert UserLevel enum to String for DTO.
+     *
+     * @param userLevel UserLevel enum
+     * @return String representation
+     */
+    @Named("userLevelToString")
+    default String userLevelToString(com.cashbee.domain.enums.UserLevel userLevel) {
+        return userLevel != null ? userLevel.name() : null;
     }
 }

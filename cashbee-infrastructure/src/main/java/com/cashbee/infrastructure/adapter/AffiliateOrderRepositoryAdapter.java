@@ -1,5 +1,6 @@
 package com.cashbee.infrastructure.adapter;
 
+import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.AffiliateOrder;
 import com.cashbee.domain.repository.AffiliateOrderRepository;
@@ -70,10 +71,18 @@ public class AffiliateOrderRepositoryAdapter implements AffiliateOrderRepository
     }
 
     @Override
+    @Deprecated
     public List<AffiliateOrder> findByUserIdAndStatus(Long userId, OrderStatus status) {
         return jpaRepository.findByUserIdAndOrderStatus(userId, status).stream()
             .map(mapper::toDomain)
             .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<AffiliateOrder> findByUserIdAndStatus(Long userId, OrderStatus status, Pageable pageable) {
+        Page<com.cashbee.infrastructure.entity.AffiliateOrderJpaEntity> entityPage =
+            jpaRepository.findByUserIdAndOrderStatus(userId, status, pageable);
+        return entityPage.map(mapper::toDomain);
     }
 
     @Override
@@ -110,5 +119,12 @@ public class AffiliateOrderRepositoryAdapter implements AffiliateOrderRepository
     @Override
     public long countByUserId(Long userId) {
         return jpaRepository.countByUserId(userId);
+    }
+
+    @Override
+    public Page<AffiliateOrder> findByUserIdAndCashbackStatus(Long userId, CashbackStatus cashbackStatus, Pageable pageable) {
+        Page<com.cashbee.infrastructure.entity.AffiliateOrderJpaEntity> entityPage =
+            jpaRepository.findByUserIdAndCashbackStatus(userId, cashbackStatus, pageable);
+        return entityPage.map(mapper::toDomain);
     }
 }

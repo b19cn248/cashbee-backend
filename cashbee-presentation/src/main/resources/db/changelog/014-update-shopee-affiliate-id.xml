@@ -10,7 +10,7 @@
 
         <!-- Update Shopee with affiliate ID and template -->
         <update tableName="affiliate_platform">
-            <column name="affiliate_id" value="17392760312"/>
+            <column name="affiliate_id" value="17378110312"/>
             <column name="link_template" value="https://shopee.vn/universal-link/{product_id}?af_siteid=0&amp;pid={affiliate_id}&amp;af_sub1={tracking_code}"/>
             <column name="tracking_enabled" value="1"/>
             <where>code='shopee'</where>

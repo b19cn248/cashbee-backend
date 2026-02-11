@@ -37,7 +37,13 @@ import java.util.function.Consumer;
 @Slf4j
 public class ShopeeCSVParser {
 
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm");
+    // Support multiple datetime formats from Shopee CSV
+    private static final DateTimeFormatter[] DATE_TIME_FORMATTERS = {
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),  // Format 1: 2025-11-06 18:08:18
+        DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm"),     // Format 2: 11/06/2025 18:08
+        DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"),  // Format 3: 06/11/2025 18:08:18
+        DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")      // Format 4: 06/11/2025 18:08
+    };
 
     // CSV column names from Shopee (Vietnamese)
     // Using column names instead of indices for robustness
@@ -335,19 +341,26 @@ public class ShopeeCSVParser {
     }
 
     /**
-     * Parse date time string.
+     * Parse date time string using multiple format attempts.
+     * Tries multiple datetime formats to handle different CSV export formats from Shopee.
      */
     private LocalDateTime parseDateTime(String value) {
         if (value == null || value.isEmpty()) {
             return null;
         }
 
-        try {
-            return LocalDateTime.parse(value, DATE_TIME_FORMATTER);
-        } catch (DateTimeParseException e) {
-            log.debug("Failed to parse datetime: {}", value);
-            return null;
+        // Try each formatter until one succeeds
+        for (DateTimeFormatter formatter : DATE_TIME_FORMATTERS) {
+            try {
+                return LocalDateTime.parse(value, formatter);
+            } catch (DateTimeParseException e) {
+                // Continue to next formatter
+            }
         }
+
+        // If all formatters fail, log and return null
+        log.debug("Failed to parse datetime '{}' with all known formats", value);
+        return null;
     }
 
     /**
@@ -626,21 +639,47 @@ public class ShopeeCSVParser {
          * Check if order is cancelled.
          */
         public boolean isCancelled() {
-            // "Đã hủy" means cancelled in Vietnamese
+            // "Đã hủy" or "Đã huỷ" means cancelled in Vietnamese
+            // Note: Vietnamese has 2 ways to write "hủy":
+            //   - "hủy" (h + ủ + y) - dấu hỏi trên chữ u
+            //   - "huỷ" (hu + ỷ) - dấu hỏi trên chữ y
+            // Both are valid and used interchangeably
             return orderStatus != null &&
-                (orderStatus.contains("Đã hủy") || orderStatus.equalsIgnoreCase("Cancelled"));
+                (orderStatus.contains("Đã hủy") ||
+                 orderStatus.contains("Đã huỷ") ||
+                 orderStatus.equalsIgnoreCase("Cancelled"));
+        }
+
+        /**
+         * Check if order is unpaid (Chưa thanh toán).
+         * Unpaid orders should be skipped because:
+         * - Customer hasn't paid yet → no actual transaction
+         * - No commission will be earned until payment is made
+         * - Order may be cancelled if not paid within deadline
+         */
+        public boolean isUnpaid() {
+            return orderStatus != null &&
+                (orderStatus.contains("Chưa thanh toán") ||
+                 orderStatus.equalsIgnoreCase("Unpaid") ||
+                 orderStatus.equalsIgnoreCase("Not Paid"));
+        }
+
+        /**
+         * Check if order is in a processable state.
+         * Returns true for: Pending, Completed
+         * Returns false for: Cancelled, Unpaid
+         */
+        public boolean isProcessable() {
+            return !isCancelled() && !isUnpaid();
         }
 
         /**
          * Get the commission amount to use for cashback calculation.
-         * Priority: totalOrderCommission > totalProductCommission > 0
+         * Uses netAffiliateCommission (column 37: Hoa hồng ròng tiếp thị liên kết).
          */
         public BigDecimal getCommissionForCashback() {
-            if (totalOrderCommission != null && totalOrderCommission.compareTo(BigDecimal.ZERO) > 0) {
-                return totalOrderCommission;
-            }
-            if (totalProductCommission != null && totalProductCommission.compareTo(BigDecimal.ZERO) > 0) {
-                return totalProductCommission;
+            if (netAffiliateCommission != null && netAffiliateCommission.compareTo(BigDecimal.ZERO) > 0) {
+                return netAffiliateCommission;
             }
             return BigDecimal.ZERO;
         }

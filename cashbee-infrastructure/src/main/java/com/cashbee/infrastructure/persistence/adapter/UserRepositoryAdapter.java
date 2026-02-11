@@ -1,5 +1,6 @@
 package com.cashbee.infrastructure.persistence.adapter;
 
+import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.domain.model.User;
 import com.cashbee.domain.repository.UserRepository;
 import com.cashbee.infrastructure.persistence.entity.UserJpaEntity;
@@ -7,6 +8,8 @@ import com.cashbee.infrastructure.persistence.mapper.UserPersistenceMapper;
 import com.cashbee.infrastructure.persistence.repository.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -133,6 +136,27 @@ public class UserRepositoryAdapter implements UserRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public boolean existsByReferralCode(String referralCode) {
+        log.debug("Checking if user exists by referralCode: {}", referralCode);
+        return jpaRepository.existsByReferralCode(referralCode);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByPhone(String phone) {
+        log.debug("Checking if user exists by phone: {}", phone);
+        return jpaRepository.existsByPhone(phone);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByReferredBy(String referredBy) {
+        log.debug("Checking if user exists by referredBy: {}", referredBy);
+        return jpaRepository.existsByReferredBy(referredBy);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<User> findByReferredBy(String referralCode) {
         log.debug("Finding users referred by: {}", referralCode);
         List<UserJpaEntity> entities = jpaRepository.findByReferredBy(referralCode);
@@ -145,6 +169,44 @@ public class UserRepositoryAdapter implements UserRepository {
         log.debug("Finding all active users");
         List<UserJpaEntity> entities = jpaRepository.findAllActive();
         return mapper.toDomainList(entities);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findAllById(List<Long> ids) {
+        log.debug("Finding users by ids: count={}", ids.size());
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<UserJpaEntity> entities = jpaRepository.findAllById(ids);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<User> findAll(Pageable pageable) {
+        log.debug("Finding all active users with pagination: page={}, size={}",
+                pageable.getPageNumber(), pageable.getPageSize());
+        Page<UserJpaEntity> entityPage = jpaRepository.findAllActive(pageable);
+        return entityPage.map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<User> findByStatus(UserStatus status, Pageable pageable) {
+        log.debug("Finding users by status: status={}, page={}, size={}",
+                status, pageable.getPageNumber(), pageable.getPageSize());
+        Page<UserJpaEntity> entityPage = jpaRepository.findByStatusActive(status.name(), pageable);
+        return entityPage.map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<User> searchByEmailOrUsername(String keyword, Pageable pageable) {
+        log.debug("Searching users by keyword: keyword={}, page={}, size={}",
+                keyword, pageable.getPageNumber(), pageable.getPageSize());
+        Page<UserJpaEntity> entityPage = jpaRepository.searchByEmailOrUsername(keyword, pageable);
+        return entityPage.map(mapper::toDomain);
     }
 
     @Override
@@ -171,5 +233,21 @@ public class UserRepositoryAdapter implements UserRepository {
     public long countByStatus(String status) {
         log.debug("Counting users by status: {}", status);
         return jpaRepository.countByStatus(status);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<User> findUsersWithOrdersInDateRange(
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            Pageable pageable) {
+        log.debug("Finding users with orders in date range: fromDate={}, toDate={}, page={}, size={}",
+                fromDate, toDate, pageable.getPageNumber(), pageable.getPageSize());
+
+        Page<UserJpaEntity> entityPage = jpaRepository.findUsersWithOrdersInDateRange(
+                fromDate, toDate, pageable);
+
+        log.debug("Found {} users with orders in date range", entityPage.getTotalElements());
+        return entityPage.map(mapper::toDomain);
     }
 }

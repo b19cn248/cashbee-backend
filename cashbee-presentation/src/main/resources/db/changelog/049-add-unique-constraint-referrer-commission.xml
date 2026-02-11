@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="049-add-unique-constraint-referrer-commission" author="cashbee-team">
+        <comment>
+            Add UNIQUE constraint to referrer_commission.source_order_id.
+            This prevents duplicate commission entries for the same order.
+            Critical for anti-duplicate protection layer 1.
+
+            MySQL requires an index for FK columns, so we must:
+            1. Drop FK constraint first
+            2. Drop the old non-unique index
+            3. Add UNIQUE constraint (creates unique index)
+            4. Re-add FK constraint (uses the unique index)
+        </comment>
+
+        <!-- Step 1: Drop the FK constraint first (it depends on the index) -->
+        <dropForeignKeyConstraint
+            baseTableName="referrer_commission"
+            constraintName="fk_referrer_comm_order"/>
+
+        <!-- Step 2: Drop the existing non-unique index -->
+        <dropIndex tableName="referrer_commission" indexName="idx_referrer_comm_source_order"/>
+
+        <!-- Step 3: Create unique constraint (which also creates a unique index) -->
+        <addUniqueConstraint
+            tableName="referrer_commission"
+            columnNames="source_order_id"
+            constraintName="uk_referrer_comm_source_order"/>
+
+        <!-- Step 4: Re-add the FK constraint (will use the unique index) -->
+        <addForeignKeyConstraint
+            baseTableName="referrer_commission"
+            baseColumnNames="source_order_id"
+            constraintName="fk_referrer_comm_order"
+            referencedTableName="affiliate_order"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <rollback>
+            <!-- Reverse order for rollback -->
+            <dropForeignKeyConstraint baseTableName="referrer_commission" constraintName="fk_referrer_comm_order"/>
+            <dropUniqueConstraint tableName="referrer_commission" constraintName="uk_referrer_comm_source_order"/>
+            <createIndex tableName="referrer_commission" indexName="idx_referrer_comm_source_order">
+                <column name="source_order_id"/>
+            </createIndex>
+            <addForeignKeyConstraint
+                baseTableName="referrer_commission"
+                baseColumnNames="source_order_id"
+                constraintName="fk_referrer_comm_order"
+                referencedTableName="affiliate_order"
+                referencedColumnNames="id"
+                onDelete="CASCADE"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

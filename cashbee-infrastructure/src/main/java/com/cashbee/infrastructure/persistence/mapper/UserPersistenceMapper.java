@@ -1,5 +1,6 @@
 package com.cashbee.infrastructure.persistence.mapper;
 
+import com.cashbee.domain.enums.UserLevel;
 import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.domain.model.User;
 import com.cashbee.infrastructure.persistence.entity.UserJpaEntity;
@@ -31,6 +32,7 @@ public interface UserPersistenceMapper {
      * @return JPA entity
      */
     @Mapping(target = "status", source = "status", qualifiedByName = "statusToString")
+    @Mapping(target = "userLevel", source = "userLevel", qualifiedByName = "userLevelToString")
     UserJpaEntity toEntity(User user);
 
     /**
@@ -40,6 +42,7 @@ public interface UserPersistenceMapper {
      * @return Domain model
      */
     @Mapping(target = "status", source = "status", qualifiedByName = "stringToStatus")
+    @Mapping(target = "userLevel", source = "userLevel", qualifiedByName = "stringToUserLevel")
     User toDomain(UserJpaEntity entity);
 
     /**
@@ -68,6 +71,7 @@ public interface UserPersistenceMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "status", source = "status", qualifiedByName = "statusToString")
+    @Mapping(target = "userLevel", source = "userLevel", qualifiedByName = "userLevelToString")
     void updateEntityFromDomain(User user, @MappingTarget UserJpaEntity entity);
 
     /**
@@ -90,5 +94,27 @@ public interface UserPersistenceMapper {
     @Named("stringToStatus")
     default UserStatus stringToStatus(String status) {
         return status != null ? UserStatus.valueOf(status) : null;
+    }
+
+    /**
+     * Convert UserLevel enum to String for database storage.
+     *
+     * @param level UserLevel enum
+     * @return String representation
+     */
+    @Named("userLevelToString")
+    default String userLevelToString(UserLevel level) {
+        return level != null ? level.name() : "NORMAL";
+    }
+
+    /**
+     * Convert String from database to UserLevel enum.
+     *
+     * @param level String from database
+     * @return UserLevel enum
+     */
+    @Named("stringToUserLevel")
+    default UserLevel stringToUserLevel(String level) {
+        return level != null ? UserLevel.valueOf(level) : UserLevel.NORMAL;
     }
 }

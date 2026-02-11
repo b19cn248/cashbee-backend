@@ -1,5 +1,6 @@
 package com.cashbee.domain.repository;
 
+import com.cashbee.domain.enums.CashbackStatus;
 import com.cashbee.domain.enums.OrderStatus;
 import com.cashbee.domain.model.AffiliateOrder;
 import org.springframework.data.domain.Page;
@@ -58,9 +59,22 @@ public interface AffiliateOrderRepository {
     Page<AffiliateOrder> findByUserId(Long userId, Pageable pageable);
 
     /**
-     * Find orders by user and status.
+     * Find orders by user and status (WITHOUT pagination).
+     * @deprecated Use findByUserIdAndStatus(userId, status, pageable) for better performance
      */
+    @Deprecated
     List<AffiliateOrder> findByUserIdAndStatus(Long userId, OrderStatus status);
+
+    /**
+     * Find orders by user and status with PAGINATION.
+     * This is the RECOMMENDED method for filtering user orders by status.
+     *
+     * @param userId User ID
+     * @param status Order status to filter
+     * @param pageable Pagination parameters
+     * @return Paginated orders
+     */
+    Page<AffiliateOrder> findByUserIdAndStatus(Long userId, OrderStatus status, Pageable pageable);
 
     /**
      * Find orders by platform.
@@ -91,4 +105,21 @@ public interface AffiliateOrderRepository {
      * Count total orders for user.
      */
     long countByUserId(Long userId);
+
+    /**
+     * Find orders by user and cashback status with PAGINATION.
+     * This method joins with cashback table to filter by cashback status
+     * instead of order status.
+     *
+     * Use cases:
+     * - PAID: Orders where cashback has been transferred to user
+     * - CONFIRMED: Orders where cashback is confirmed but not yet paid
+     * - PENDING: Orders where cashback is pending confirmation
+     *
+     * @param userId User ID
+     * @param cashbackStatus Cashback status to filter
+     * @param pageable Pagination parameters
+     * @return Paginated orders matching the cashback status
+     */
+    Page<AffiliateOrder> findByUserIdAndCashbackStatus(Long userId, CashbackStatus cashbackStatus, Pageable pageable);
 }

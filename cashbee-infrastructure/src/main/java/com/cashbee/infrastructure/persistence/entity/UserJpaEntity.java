@@ -61,11 +61,40 @@ public class UserJpaEntity {
     @Column(name = "referred_by", length = 20)
     private String referredBy;
 
+    @Column(name = "user_level", nullable = false, length = 20)
+    private String userLevel;
+
+    /**
+     * Referrer tier for commission rate differentiation.
+     * BRONZE (5%), SILVER (7%), GOLD (10%).
+     */
+    @Column(name = "referrer_tier", nullable = false, length = 20)
+    private String referrerTier;
+
+    /**
+     * Total number of activated referrals this user has.
+     * Used to determine referrer tier level.
+     */
+    @Column(name = "total_activated_referrals", nullable = false)
+    private Integer totalActivatedReferrals;
+
+    @Column(name = "total_completed_orders", nullable = false)
+    private Integer totalCompletedOrders;
+
+    @Column(name = "referral_activated_at")
+    private LocalDateTime referralActivatedAt;
+
+    @Column(name = "referral_expires_at")
+    private LocalDateTime referralExpiresAt;
+
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
+
+    @Column(name = "has_ever_logged_in", nullable = false, columnDefinition = "TINYINT(1)")
+    private Boolean hasEverLoggedIn;
 
     @Column(name = "last_sync_at")
     private LocalDateTime lastSyncAt;
@@ -83,6 +112,21 @@ public class UserJpaEntity {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        if (this.userLevel == null) {
+            this.userLevel = "NORMAL";
+        }
+        if (this.referrerTier == null) {
+            this.referrerTier = "BRONZE";
+        }
+        if (this.totalActivatedReferrals == null) {
+            this.totalActivatedReferrals = 0;
+        }
+        if (this.totalCompletedOrders == null) {
+            this.totalCompletedOrders = 0;
+        }
+        if (this.hasEverLoggedIn == null) {
+            this.hasEverLoggedIn = false;
+        }
     }
 
     @PreUpdate

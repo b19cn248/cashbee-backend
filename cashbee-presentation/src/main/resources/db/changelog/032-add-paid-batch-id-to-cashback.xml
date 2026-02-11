@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 032: Add paid_batch_id to cashback table
+        Author: CashBee Team
+        Date: 2025-12-03
+
+        Purpose:
+        - Track which batch paid each cashback
+        - Enable traceability: batchCode -> cashbacks -> orders
+        - Fix bug: currently ALL CONFIRMED cashbacks are marked PAID,
+          even those created after the batch was generated
+
+        New column:
+        - paid_batch_id: FK to batch_transfer_export, nullable
+          - NULL = not paid yet OR paid before this feature
+          - value = batch that paid this cashback
+    -->
+
+    <!-- Step 1: Add paid_batch_id column to cashback table -->
+    <changeSet id="032-01-add-paid-batch-id-column" author="cashbee">
+        <comment>
+            Add paid_batch_id column to track which batch paid each cashback.
+            This enables traceability from batchCode to specific cashbacks/orders.
+        </comment>
+
+        <addColumn tableName="cashback">
+            <column name="paid_batch_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 2: Add foreign key constraint -->
+    <changeSet id="032-02-add-paid-batch-id-fk" author="cashbee">
+        <comment>Add foreign key from cashback.paid_batch_id to batch_transfer_export.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="cashback"
+                baseColumnNames="paid_batch_id"
+                constraintName="fk_cashback_paid_batch"
+                referencedTableName="batch_transfer_export"
+                referencedColumnNames="id"
+                onDelete="SET NULL"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+    <!-- Step 3: Add index for query performance -->
+    <changeSet id="032-03-add-paid-batch-id-index" author="cashbee">
+        <comment>Add index on paid_batch_id for efficient queries by batch</comment>
+
+        <createIndex tableName="cashback" indexName="idx_cashback_paid_batch_id">
+            <column name="paid_batch_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 4: Add composite index for common query pattern -->
+    <changeSet id="032-04-add-user-status-paid-batch-index" author="cashbee">
+        <comment>
+            Add composite index for query:
+            WHERE user_id = ? AND status = ? AND paid_batch_id IS NULL
+        </comment>
+
+        <createIndex tableName="cashback" indexName="idx_cashback_user_status_paid_batch">
+            <column name="user_id"/>
+            <column name="status"/>
+            <column name="paid_batch_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

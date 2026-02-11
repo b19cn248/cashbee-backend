@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="031-1" author="cashbee">
+        <comment>Add is_fallback_match column to affiliate_order table.
+            This flag indicates if the order was matched using fallback (context-based)
+            matching instead of the normal tracking code (Sub_id1) matching.</comment>
+
+        <addColumn tableName="affiliate_order">
+            <column name="is_fallback_match" type="TINYINT(1)" defaultValue="0">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <createIndex tableName="affiliate_order" indexName="idx_order_fallback_match">
+            <column name="is_fallback_match"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="031-2" author="cashbee">
+        <comment>Add composite index for fallback matching query on affiliate_click.
+            This index optimizes the query used to find possible click matches by context.
+            Query pattern: WHERE platform_id = ? AND item_id = ? AND shop_id = ?
+                          AND created_at BETWEEN ? AND ? AND order_matched = false</comment>
+
+        <createIndex tableName="affiliate_click" indexName="idx_click_fallback_match">
+            <column name="platform_id"/>
+            <column name="item_id"/>
+            <column name="shop_id"/>
+            <column name="created_at"/>
+            <column name="order_matched"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

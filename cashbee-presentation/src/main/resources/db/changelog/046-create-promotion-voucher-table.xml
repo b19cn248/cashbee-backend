@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Promotion Voucher table for storing voucher codes from Telegram channels -->
+    <changeSet id="046-create-promotion-voucher-table" author="cashbee">
+        <comment>Create promotion_voucher table for storing voucher/promotion codes</comment>
+
+        <createTable tableName="promotion_voucher">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Core voucher info -->
+            <column name="code" type="VARCHAR(50)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="title" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Discount info -->
+            <column name="discount_type" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="discount_value" type="DECIMAL(15,2)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="max_discount" type="DECIMAL(15,2)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="min_order_value" type="DECIMAL(15,2)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Links -->
+            <column name="original_link" type="VARCHAR(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="affiliate_link" type="VARCHAR(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="voucher_save_link" type="VARCHAR(500)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Categorization -->
+            <column name="category" type="VARCHAR(50)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="platform" type="VARCHAR(30)" defaultValue="SHOPEE">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Time constraints -->
+            <column name="valid_from" type="DATETIME">
+                <constraints nullable="true"/>
+            </column>
+            <column name="valid_until" type="DATETIME">
+                <constraints nullable="true"/>
+            </column>
+            <column name="valid_time_slot" type="VARCHAR(50)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Status & tracking -->
+            <column name="status" type="VARCHAR(20)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="view_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="click_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamps -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for performance -->
+        <createIndex tableName="promotion_voucher" indexName="idx_voucher_code">
+            <column name="code"/>
+        </createIndex>
+
+        <createIndex tableName="promotion_voucher" indexName="idx_voucher_status">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex tableName="promotion_voucher" indexName="idx_voucher_category">
+            <column name="category"/>
+        </createIndex>
+
+        <createIndex tableName="promotion_voucher" indexName="idx_voucher_platform">
+            <column name="platform"/>
+        </createIndex>
+
+        <createIndex tableName="promotion_voucher" indexName="idx_voucher_valid_until">
+            <column name="valid_until"/>
+        </createIndex>
+
+        <createIndex tableName="promotion_voucher" indexName="idx_voucher_created_at">
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Migration: Update Milestone & Referral System
+
+        Changes:
+        1. Add referral_expires_at to user table (5 months commission period)
+        2. Add source_type, source_id to transactions for tracking
+        3. Create milestone_config table for flexible configuration
+        4. Seed default milestone configurations
+
+        New Milestone Rules:
+        - WITH_REFERRER: 5 orders (10k+20k for referrer), 10 orders (20k), 80 (VIP), 300 (SUPER)
+        - WITHOUT_REFERRER: 80 orders (VIP), 300 orders (SUPER)
+    -->
+
+    <!-- 1. Add referral_expires_at to user table -->
+    <changeSet id="044-add-referral-expires-at-to-user" author="cashbee-team">
+        <comment>Add referral_expires_at column for 5-month commission period tracking</comment>
+
+        <addColumn tableName="user">
+            <column name="referral_expires_at" type="DATETIME">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <createIndex tableName="user" indexName="idx_user_referral_expires_at">
+            <column name="referral_expires_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex tableName="user" indexName="idx_user_referral_expires_at"/>
+            <dropColumn tableName="user" columnName="referral_expires_at"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 2. Add source tracking columns to transactions -->
+    <changeSet id="044-add-source-tracking-to-transactions" author="cashbee-team">
+        <comment>Add source_type and source_id for tracking transaction origins</comment>
+
+        <addColumn tableName="transactions">
+            <!-- Source type: ORDER, REFERRAL_REWARD, REFERRER_COMMISSION, MILESTONE_BONUS -->
+            <column name="source_type" type="VARCHAR(30)">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Reference ID to the source record -->
+            <column name="source_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <createIndex tableName="transactions" indexName="idx_transaction_source">
+            <column name="source_type"/>
+            <column name="source_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex tableName="transactions" indexName="idx_transaction_source"/>
+            <dropColumn tableName="transactions" columnName="source_type"/>
+            <dropColumn tableName="transactions" columnName="source_id"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 3. Create milestone_config table -->
+    <changeSet id="044-create-milestone-config-table" author="cashbee-team">
+        <comment>Create milestone_config table for flexible milestone configuration</comment>
+
+        <createTable tableName="milestone_config">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Type: WITH_REFERRER or WITHOUT_REFERRER -->
+            <column name="milestone_type" type="VARCHAR(30)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Number of orders required to reach this milestone -->
+            <column name="orders_required" type="INT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Bonus amount for referee (user who completes orders) -->
+            <column name="referee_bonus" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Bonus amount for referrer (user who shared the code) -->
+            <column name="referrer_bonus" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- New tier upgrade: NULL, VIP, SUPER -->
+            <column name="new_tier" type="VARCHAR(20)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Commission duration in months (only for activation milestone) -->
+            <column name="commission_months" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Whether this milestone activates referral commission -->
+            <column name="activates_referral" type="TINYINT(1)" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Description for display -->
+            <column name="description" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Is this configuration active -->
+            <column name="is_active" type="TINYINT(1)" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes -->
+        <createIndex tableName="milestone_config" indexName="idx_milestone_type">
+            <column name="milestone_type"/>
+        </createIndex>
+
+        <createIndex tableName="milestone_config" indexName="idx_milestone_orders">
+            <column name="orders_required"/>
+        </createIndex>
+
+        <createIndex tableName="milestone_config" indexName="idx_milestone_active">
+            <column name="is_active"/>
+        </createIndex>
+
+        <!-- Unique constraint: one milestone per type and order count -->
+        <addUniqueConstraint
+            tableName="milestone_config"
+            columnNames="milestone_type, orders_required"
+            constraintName="uk_milestone_type_orders"/>
+
+        <rollback>
+            <dropTable tableName="milestone_config"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 4. Seed default milestone configurations -->
+    <changeSet id="044-seed-milestone-config" author="cashbee-team">
+        <comment>Seed default milestone configurations for WITH_REFERRER and WITHOUT_REFERRER</comment>
+
+        <!-- WITH_REFERRER milestones -->
+
+        <!-- 5 orders: Referee +10k, Referrer +20k, Activate referral for 5 months -->
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" valueNumeric="5"/>
+            <column name="referee_bonus" valueNumeric="10000"/>
+            <column name="referrer_bonus" valueNumeric="20000"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" valueNumeric="5"/>
+            <column name="activates_referral" valueBoolean="true"/>
+            <column name="description" value="Referral activation: B +10k, A +20k, A receives 5% commission for 5 months"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <!-- 10 orders: Referee +20k -->
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" valueNumeric="10"/>
+            <column name="referee_bonus" valueNumeric="20000"/>
+            <column name="referrer_bonus" valueNumeric="0"/>
+            <column name="new_tier" value=""/>
+            <column name="commission_months" valueNumeric="0"/>
+            <column name="activates_referral" valueBoolean="false"/>
+            <column name="description" value="Second bonus: B +20k"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <!-- 80 orders: Upgrade to VIP -->
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" valueNumeric="80"/>
+            <column name="referee_bonus" valueNumeric="0"/>
+            <column name="referrer_bonus" valueNumeric="0"/>
+            <column name="new_tier" value="VIP"/>
+            <column name="commission_months" valueNumeric="0"/>
+            <column name="activates_referral" valueBoolean="false"/>
+            <column name="description" value="VIP upgrade: 83% cashback"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <!-- 300 orders: Upgrade to SUPER -->
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITH_REFERRER"/>
+            <column name="orders_required" valueNumeric="300"/>
+            <column name="referee_bonus" valueNumeric="0"/>
+            <column name="referrer_bonus" valueNumeric="0"/>
+            <column name="new_tier" value="SUPER"/>
+            <column name="commission_months" valueNumeric="0"/>
+            <column name="activates_referral" valueBoolean="false"/>
+            <column name="description" value="SUPER upgrade: 85% cashback"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <!-- WITHOUT_REFERRER milestones -->
+
+        <!-- 80 orders: Upgrade to VIP -->
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITHOUT_REFERRER"/>
+            <column name="orders_required" valueNumeric="80"/>
+            <column name="referee_bonus" valueNumeric="0"/>
+            <column name="referrer_bonus" valueNumeric="0"/>
+            <column name="new_tier" value="VIP"/>
+            <column name="commission_months" valueNumeric="0"/>
+            <column name="activates_referral" valueBoolean="false"/>
+            <column name="description" value="VIP upgrade: 83% cashback (no referrer)"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <!-- 300 orders: Upgrade to SUPER -->
+        <insert tableName="milestone_config">
+            <column name="milestone_type" value="WITHOUT_REFERRER"/>
+            <column name="orders_required" valueNumeric="300"/>
+            <column name="referee_bonus" valueNumeric="0"/>
+            <column name="referrer_bonus" valueNumeric="0"/>
+            <column name="new_tier" value="SUPER"/>
+            <column name="commission_months" valueNumeric="0"/>
+            <column name="activates_referral" valueBoolean="false"/>
+            <column name="description" value="SUPER upgrade: 85% cashback (no referrer)"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <rollback>
+            <delete tableName="milestone_config"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

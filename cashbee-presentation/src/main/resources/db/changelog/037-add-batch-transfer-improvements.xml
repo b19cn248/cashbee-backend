@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 037: Add Batch Transfer Improvements
+        Author: CashBee Team
+        Date: 2025-12-23
+        Description: Cải thiện batch transfer flow:
+                     1. Thêm audit trail fields (completed_by, completed_at)
+                     2. Thêm statistics fields (success_count, failed_count)
+                     3. Thêm error tracking field (error_message)
+                     4. Thêm actual_amount_deducted để track số tiền thực tế đã trừ
+    -->
+
+    <!-- Add audit and statistics fields to batch_transfer_export -->
+    <changeSet id="037-01-add-audit-fields-to-batch-export" author="cashbee">
+        <comment>
+            Thêm audit trail và statistics fields vào batch_transfer_export:
+            - completed_by: Admin ID đã complete batch
+            - completed_at: Thời điểm complete
+            - success_count: Số item thành công
+            - failed_count: Số item thất bại
+        </comment>
+
+        <addColumn tableName="batch_transfer_export">
+            <column name="completed_by" type="BIGINT" afterColumn="exported_by">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <addColumn tableName="batch_transfer_export">
+            <column name="completed_at" type="DATETIME" afterColumn="completed_by">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <addColumn tableName="batch_transfer_export">
+            <column name="success_count" type="INT" defaultValueNumeric="0" afterColumn="completed_at">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <addColumn tableName="batch_transfer_export">
+            <column name="failed_count" type="INT" defaultValueNumeric="0" afterColumn="success_count">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <!-- Foreign Key for completed_by to user table -->
+        <addForeignKeyConstraint
+                baseTableName="batch_transfer_export"
+                baseColumnNames="completed_by"
+                constraintName="fk_batch_transfer_export_completed_by"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                onDelete="SET NULL"
+                onUpdate="CASCADE"/>
+
+        <!-- Index for completed_by -->
+        <createIndex indexName="idx_batch_transfer_export_completed_by" tableName="batch_transfer_export">
+            <column name="completed_by"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Add error tracking fields to batch_transfer_item -->
+    <changeSet id="037-02-add-error-fields-to-batch-item" author="cashbee">
+        <comment>
+            Thêm error tracking và actual amount fields vào batch_transfer_item:
+            - error_message: Lý do thất bại (nếu có)
+            - actual_amount_deducted: Số tiền thực tế đã trừ (có thể khác với amount snapshot)
+        </comment>
+
+        <addColumn tableName="batch_transfer_item">
+            <column name="error_message" type="VARCHAR(1000)" afterColumn="status">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <addColumn tableName="batch_transfer_item">
+            <column name="actual_amount_deducted" type="DECIMAL(15,2)" afterColumn="error_message">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

@@ -39,6 +39,15 @@ public interface CashbackRepository {
     Optional<Cashback> findByOrderId(Long orderId);
 
     /**
+     * Find all cashbacks by order ID.
+     * Used when an order may have multiple items with separate cashbacks.
+     *
+     * @param orderId Order ID
+     * @return List of cashbacks for the order
+     */
+    List<Cashback> findAllByOrderId(Long orderId);
+
+    /**
      * Find all cashbacks for a user.
      *
      * @param userId User ID
@@ -69,4 +78,201 @@ public interface CashbackRepository {
      * @param id Cashback ID
      */
     void deleteById(Long id);
+
+    /**
+     * Find cashback by order item ID.
+     *
+     * @param orderItemId Order item ID
+     * @return Optional cashback
+     */
+    Optional<Cashback> findByOrderItemId(Long orderItemId);
+
+    /**
+     * Check if cashback exists for an order item.
+     *
+     * @param orderItemId Order item ID
+     * @return true if cashback exists
+     */
+    boolean existsByOrderItemId(Long orderItemId);
+
+    /**
+     * Sum cashback amount by user ID and status.
+     *
+     * @param userId User ID
+     * @param status Cashback status
+     * @return Sum of cashback amounts
+     */
+    java.math.BigDecimal sumCashbackAmountByUserIdAndStatus(Long userId, CashbackStatus status);
+
+    /**
+     * Sum cashback amount by user ID and statuses.
+     *
+     * @param userId User ID
+     * @param statuses List of statuses
+     * @return Sum of cashback amounts
+     */
+    java.math.BigDecimal sumCashbackAmountByUserIdAndStatusIn(Long userId, List<CashbackStatus> statuses);
+
+    /**
+     * Update status for all cashbacks of a user with specific status.
+     * Used when batch transfer completes: CONFIRMED → PAID
+     *
+     * @param userId User ID
+     * @param oldStatus Current status to match
+     * @param newStatus New status to set
+     * @return Number of records updated
+     * @deprecated Use {@link #updateStatusByUserIdAndStatusWithBatchId} instead for proper batch tracking
+     */
+    @Deprecated
+    int updateStatusByUserIdAndStatus(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus);
+
+    /**
+     * Update status for unpaid cashbacks of a user with specific status.
+     * Only updates cashbacks where paid_batch_id IS NULL (not yet paid).
+     * Also records which batch paid these cashbacks for traceability.
+     *
+     * Used when batch transfer completes: CONFIRMED → PAID
+     *
+     * @param userId User ID
+     * @param oldStatus Current status to match (typically CONFIRMED)
+     * @param newStatus New status to set (typically PAID)
+     * @param batchId Batch ID that is paying these cashbacks
+     * @return Number of records updated
+     */
+    int updateStatusByUserIdAndStatusWithBatchId(Long userId, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId);
+
+    /**
+     * Update status for unpaid cashbacks of a user that were CONFIRMED before batch creation.
+     *
+     * FIX: Only updates cashbacks where:
+     * 1. paidBatchId IS NULL (not yet paid)
+     * 2. confirmedAt <= batchCreatedAt (was CONFIRMED before batch was created)
+     *
+     * This prevents newly CONFIRMED cashbacks (after batch creation) from being marked as PAID.
+     *
+     * @param userId User ID
+     * @param oldStatus Current status to match (typically CONFIRMED)
+     * @param newStatus New status to set (typically PAID)
+     * @param batchId Batch ID that is paying these cashbacks
+     * @param batchCreatedAt Batch creation timestamp - only cashbacks confirmed before this are updated
+     * @return Number of records updated
+     */
+    int updateStatusByUserIdAndStatusWithBatchIdBeforeDate(
+            Long userId,
+            CashbackStatus oldStatus,
+            CashbackStatus newStatus,
+            Long batchId,
+            java.time.LocalDateTime batchCreatedAt);
+
+    /**
+     * Find all cashbacks paid by a specific batch.
+     * Used for traceability: batchCode → cashbacks → orders
+     *
+     * @param batchId Batch ID
+     * @return List of cashbacks paid by this batch
+     */
+    List<Cashback> findByPaidBatchId(Long batchId);
+
+    /**
+     * Sum cashback amount for unpaid CONFIRMED cashbacks of a user.
+     * Used for validation: batch_transfer_item.amount should match this sum.
+     *
+     * @param userId User ID
+     * @return Sum of unpaid CONFIRMED cashback amounts
+     */
+    java.math.BigDecimal sumUnpaidConfirmedCashbackByUserId(Long userId);
+
+    /**
+     * Update status for specific cashbacks by their IDs (Approach B).
+     * Only updates cashbacks that are in the provided list AND match the old status.
+     * This ensures only cashbacks that were snapshot at batch creation are marked as PAID.
+     *
+     * @param cashbackIds List of cashback IDs to update (from batch_cashback_snapshot)
+     * @param oldStatus Current status to match (typically CONFIRMED)
+     * @param newStatus New status to set (typically PAID)
+     * @param batchId Batch ID that is paying these cashbacks
+     * @return Number of records updated
+     */
+    int updateStatusByCashbackIdsWithBatchId(List<Long> cashbackIds, CashbackStatus oldStatus, CashbackStatus newStatus, Long batchId);
+
+    /**
+     * Count distinct orders that have cashback with CONFIRMED or PAID status for a user.
+     * Used to calculate total_completed_orders accurately.
+     *
+     * This method counts unique order IDs (not cashback records) because:
+     * - One order may have multiple items → multiple cashback records
+     * - We want to count completed ORDERS, not cashback items
+     *
+     * @param userId User ID
+     * @return Count of distinct orders with confirmed/paid cashback
+     */
+    int countConfirmedOrdersByUserId(Long userId);
+
+    /**
+     * Find all cashbacks paid by a specific batch for a specific user.
+     * Used for generating payment invoice with platform breakdown.
+     *
+     * @param batchId Batch ID
+     * @param userId User ID
+     * @return List of cashbacks paid in this batch for this user
+     */
+    List<Cashback> findByPaidBatchIdAndUserId(Long batchId, Long userId);
+
+    /**
+     * Find cashbacks with full order and item details for invoice display.
+     *
+     * This method performs a JOIN across:
+     * - cashback
+     * - affiliate_order
+     * - affiliate_order_item
+     * - affiliate_platform
+     *
+     * Used for displaying detailed invoice breakdown to users.
+     *
+     * @param batchId Batch ID that paid these cashbacks
+     * @param userId User ID
+     * @return List of projection arrays containing cashback + order + item info
+     */
+    List<Object[]> findCashbacksWithOrderDetailsByBatchIdAndUserId(Long batchId, Long userId);
+
+    /**
+     * Find cashbacks with full order and item details for invoice display (with fallback).
+     *
+     * Improved version that also matches cashbacks where paid_batch_id is NULL
+     * but paid_at falls within a time window around the batch completion time.
+     * This handles cases where non-snapshotted cashbacks were paid by the batch
+     * but their paid_batch_id was not properly set.
+     *
+     * @param batchId Batch ID that paid these cashbacks
+     * @param userId User ID
+     * @param windowStart Start of paid_at fallback window
+     * @param windowEnd End of paid_at fallback window
+     * @return List of projection arrays containing cashback + order + item info
+     */
+    List<Object[]> findCashbacksWithOrderDetailsByBatchIdOrPaidAt(
+            Long batchId, Long userId,
+            java.time.LocalDateTime windowStart, java.time.LocalDateTime windowEnd);
+
+    /**
+     * Count distinct orders with CONFIRMED/PAID status and minimum order amount.
+     * Used for milestone calculation with anti-abuse filter.
+     *
+     * This method counts unique order IDs where:
+     * - Cashback status is CONFIRMED or PAID
+     * - Order product_price is GREATER THAN minAmount (exclusive, uses > not >=)
+     *
+     * @param userId User ID
+     * @param minAmount Minimum product_price (exclusive, uses > not >=)
+     * @return Count of qualifying orders
+     */
+    int countConfirmedOrdersByUserIdWithMinAmount(Long userId, java.math.BigDecimal minAmount);
+
+    /**
+     * Find all user IDs that have qualifying orders (for batch re-processing).
+     * Used by admin to re-process milestones for all users with orders > minAmount.
+     *
+     * @param minAmount Minimum product_price threshold
+     * @return List of distinct user IDs with qualifying orders
+     */
+    java.util.List<Long> findUsersWithQualifyingOrders(java.math.BigDecimal minAmount);
 }

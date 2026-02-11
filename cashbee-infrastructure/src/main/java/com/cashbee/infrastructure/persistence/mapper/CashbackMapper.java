@@ -27,6 +27,7 @@ public class CashbackMapper {
             .id(domain.getId())
             .userId(domain.getUserId())
             .orderId(domain.getOrderId())
+            .orderItemId(domain.getOrderItemId())
             .platformId(domain.getPlatformId())
             .commissionAmount(domain.getCommissionAmount())
             .cashbackAmount(domain.getCashbackAmount())
@@ -39,6 +40,7 @@ public class CashbackMapper {
             .paidAt(domain.getPaidAt())
             .cancelledAt(domain.getCancelledAt())
             .updatedAt(domain.getUpdatedAt())
+            .paidBatchId(domain.getPaidBatchId())
             .build();
     }
 
@@ -57,6 +59,7 @@ public class CashbackMapper {
             .id(entity.getId())
             .userId(entity.getUserId())
             .orderId(entity.getOrderId())
+            .orderItemId(entity.getOrderItemId())
             .platformId(entity.getPlatformId())
             .commissionAmount(entity.getCommissionAmount())
             .cashbackAmount(entity.getCashbackAmount())
@@ -69,6 +72,7 @@ public class CashbackMapper {
             .paidAt(entity.getPaidAt())
             .cancelledAt(entity.getCancelledAt())
             .updatedAt(entity.getUpdatedAt())
+            .paidBatchId(entity.getPaidBatchId())
             .build();
     }
 }

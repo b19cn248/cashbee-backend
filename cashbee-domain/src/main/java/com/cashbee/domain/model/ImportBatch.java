@@ -59,6 +59,12 @@ public class ImportBatch {
     private Integer skippedCount = 0;
 
     /**
+     * Number of existing rows updated (when re-uploading file).
+     */
+    @Builder.Default
+    private Integer updatedCount = 0;
+
+    /**
      * Current status of import.
      */
     @Builder.Default
@@ -136,6 +142,13 @@ public class ImportBatch {
      */
     public void incrementSkipped() {
         this.skippedCount++;
+    }
+
+    /**
+     * Increment updated count.
+     */
+    public void incrementUpdated() {
+        this.updatedCount++;
     }
 
     /**

@@ -38,6 +38,9 @@ public class CashbackJpaEntity {
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
+    @Column(name = "order_item_id")
+    private Long orderItemId;
+
     @Column(name = "platform_id", nullable = false)
     private Long platformId;
 
@@ -75,6 +78,13 @@ public class CashbackJpaEntity {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /**
+     * Batch that paid this cashback (FK to batch_transfer_export).
+     * NULL = not paid yet OR paid before batch tracking feature.
+     */
+    @Column(name = "paid_batch_id")
+    private Long paidBatchId;
 
     @PrePersist
     protected void onCreate() {

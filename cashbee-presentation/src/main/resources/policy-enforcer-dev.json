@@ -1,9 +1,9 @@
 {
-  "auth-server-url": "https://auth.nguocchieuvangle.io.vn/",
+  "auth-server-url": "https://auth.cashbee.com.vn/",
   "realm": "cashbee",
   "resource": "cashbee-backend",
   "credentials": {
-    "secret": "OuRhlczFR6yz6gNKSBapX028DKbjKl4y"
+    "secret": "YQbb2bIhxpsMpnfOA8U2hvkG5CqrXNJr"
   },
   "enforcement-mode": "PERMISSIVE",
   "http-method-as-scope": "true",
@@ -21,19 +21,35 @@
       "enforcement-mode": "DISABLED"
     },
     {
-      "path": "/api/payouts/*",
+      "path": "/api/users/sync",
       "enforcement-mode": "DISABLED"
     },
     {
-      "path": "/api/admin/platforms/*",
+      "path": "/api/auth/register/*",
       "enforcement-mode": "DISABLED"
     },
     {
-      "path": "/api/users/*",
+      "path": "/api/auth/verify-otp/*",
       "enforcement-mode": "DISABLED"
     },
     {
-      "path": "/api/*",
+      "path": "/api/auth/resend-otp/*",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/users/check-referral-code",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/users/check-email",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/users/check-phone",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/users/check-has-referrer",
       "enforcement-mode": "DISABLED"
     }
   ]

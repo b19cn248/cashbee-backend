@@ -80,6 +80,15 @@ public class UserWallet {
     private BigDecimal totalWithdrawn = BigDecimal.ZERO;
 
     /**
+     * Total bonus received (historical sum).
+     * Tracks MILESTONE_BONUS, REFERRER_BONUS, REFERRER_COMMISSION.
+     * IMPORTANT: This is separate from totalEarned (which only tracks cashback).
+     * Used to preserve bonus when recalculating wallet from cashback data.
+     */
+    @Builder.Default
+    private BigDecimal totalBonus = BigDecimal.ZERO;
+
+    /**
      * Timestamp when entity was created.
      */
     private LocalDateTime createdAt;
@@ -187,6 +196,7 @@ public class UserWallet {
     /**
      * Add bonus/adjustment directly to available balance.
      * Used for manual adjustments, bonuses, or rewards.
+     * Also tracks the bonus in totalBonus for wallet recalculation.
      *
      * @param amount Amount to add (must be positive)
      * @throws IllegalArgumentException if amount is negative
@@ -194,6 +204,7 @@ public class UserWallet {
     public void addBonus(BigDecimal amount) {
         validatePositiveAmount(amount);
         this.balance = MoneyUtils.add(this.balance, amount);
+        this.totalBonus = MoneyUtils.add(this.totalBonus, amount);
     }
 
     /**
@@ -227,6 +238,68 @@ public class UserWallet {
             );
         }
         this.pendingBalance = MoneyUtils.subtract(this.pendingBalance, amount);
+    }
+
+    /**
+     * Add confirmed cashback directly to balance.
+     * Used when importing already-completed orders from CSV.
+     * Unlike confirmPendingBalance(), this does NOT move from pendingBalance.
+     * It adds directly to balance and totalEarned.
+     *
+     * Flow: balance += amount, totalEarned += amount
+     *
+     * Use case: Import order đã hoàn thành (không cần qua pending)
+     *
+     * @param amount Cashback amount to add (must be positive)
+     * @throws IllegalArgumentException if amount is negative
+     */
+    public void addConfirmedCashbackDirectly(BigDecimal amount) {
+        validatePositiveAmount(amount);
+        this.balance = MoneyUtils.add(this.balance, amount);
+        this.totalEarned = MoneyUtils.add(this.totalEarned, amount);
+    }
+
+    /**
+     * Reverse pending cashback when pending order is cancelled.
+     * Subtracts from pendingBalance only.
+     *
+     * Flow: pendingBalance -= amount
+     *
+     * Use case: Order PENDING → CANCELLED
+     *
+     * @param amount Amount to reverse (must be positive and <= pendingBalance)
+     * @throws IllegalArgumentException if amount is invalid or insufficient pending balance
+     */
+    public void reversePendingCashback(BigDecimal amount) {
+        validatePositiveAmount(amount);
+        if (MoneyUtils.isGreaterThan(amount, this.pendingBalance)) {
+            throw new IllegalArgumentException(
+                String.format("Insufficient pending balance to reverse. Have: %s, Required: %s",
+                    this.pendingBalance, amount)
+            );
+        }
+        this.pendingBalance = MoneyUtils.subtract(this.pendingBalance, amount);
+    }
+
+    /**
+     * Reverse confirmed cashback when completed order is cancelled.
+     * Subtracts from both balance and totalEarned.
+     *
+     * Flow: balance -= amount, totalEarned -= amount
+     *
+     * Use case: Order COMPLETED → CANCELLED (refund scenario)
+     *
+     * @param amount Amount to reverse (must be positive and <= balance)
+     * @throws IllegalArgumentException if amount is invalid
+     * @throws InsufficientBalanceException if insufficient balance
+     */
+    public void reverseConfirmedCashback(BigDecimal amount) {
+        validatePositiveAmount(amount);
+        if (MoneyUtils.isGreaterThan(amount, this.balance)) {
+            throw InsufficientBalanceException.of(this.balance, amount);
+        }
+        this.balance = MoneyUtils.subtract(this.balance, amount);
+        this.totalEarned = MoneyUtils.subtract(this.totalEarned, amount);
     }
 
     // ===== Query Methods =====
@@ -343,5 +416,6 @@ public class UserWallet {
         this.lockedBalance = MoneyUtils.scale(this.lockedBalance);
         this.totalEarned = MoneyUtils.scale(this.totalEarned);
         this.totalWithdrawn = MoneyUtils.scale(this.totalWithdrawn);
+        this.totalBonus = MoneyUtils.scale(this.totalBonus);
     }
 }

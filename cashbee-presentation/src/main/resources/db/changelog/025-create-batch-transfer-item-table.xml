@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 025: Create Batch Transfer Item Table
+        Author: CashBee Team
+        Date: 2025-11-21
+        Description: Tạo bảng batch_transfer_item để lưu snapshot số tiền của từng user
+                     tại thời điểm tạo batch. Dùng để confirm thanh toán sau khi
+                     admin import file vào ngân hàng.
+    -->
+
+    <changeSet id="025-01-create-batch-transfer-item-table" author="cashbee">
+        <comment>
+            Tạo bảng batch_transfer_item để lưu chi tiết từng user trong batch.
+            Snapshot amount tại thời điểm tạo batch, không phải balance hiện tại.
+        </comment>
+
+        <createTable tableName="batch_transfer_item">
+            <!-- Primary Key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Batch Reference -->
+            <column name="batch_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- User Reference -->
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Wallet Reference -->
+            <column name="wallet_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Snapshot Data -->
+            <column name="amount" type="DECIMAL(15,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="account_number" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="account_name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="bank_name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Status: PENDING -> COMPLETED -->
+            <column name="status" type="VARCHAR(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamps -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="completed_at" type="DATETIME">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <!-- Foreign Keys -->
+        <addForeignKeyConstraint
+                baseTableName="batch_transfer_item"
+                baseColumnNames="batch_id"
+                constraintName="fk_batch_transfer_item_batch_id"
+                referencedTableName="batch_transfer_export"
+                referencedColumnNames="id"
+                onDelete="CASCADE"
+                onUpdate="CASCADE"/>
+
+        <addForeignKeyConstraint
+                baseTableName="batch_transfer_item"
+                baseColumnNames="user_id"
+                constraintName="fk_batch_transfer_item_user_id"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                onDelete="CASCADE"
+                onUpdate="CASCADE"/>
+
+        <addForeignKeyConstraint
+                baseTableName="batch_transfer_item"
+                baseColumnNames="wallet_id"
+                constraintName="fk_batch_transfer_item_wallet_id"
+                referencedTableName="user_wallet"
+                referencedColumnNames="id"
+                onDelete="CASCADE"
+                onUpdate="CASCADE"/>
+
+        <!-- Indexes -->
+        <createIndex indexName="idx_batch_transfer_item_batch_id" tableName="batch_transfer_item">
+            <column name="batch_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_batch_transfer_item_user_id" tableName="batch_transfer_item">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_batch_transfer_item_status" tableName="batch_transfer_item">
+            <column name="status"/>
+        </createIndex>
+
+        <!-- Unique constraint: mỗi user chỉ xuất hiện 1 lần trong 1 batch -->
+        <addUniqueConstraint
+                tableName="batch_transfer_item"
+                columnNames="batch_id, user_id"
+                constraintName="uk_batch_item_batch_user"/>
+    </changeSet>
+
+    <!-- Update batch_transfer_export status default to PENDING -->
+    <changeSet id="025-02-update-batch-export-status-default" author="cashbee">
+        <comment>Đổi default status từ COMPLETED sang PENDING</comment>
+
+        <modifyDataType tableName="batch_transfer_export" columnName="status" newDataType="VARCHAR(20)"/>
+
+        <addDefaultValue tableName="batch_transfer_export" columnName="status" defaultValue="PENDING"/>
+    </changeSet>
+
+</databaseChangeLog>

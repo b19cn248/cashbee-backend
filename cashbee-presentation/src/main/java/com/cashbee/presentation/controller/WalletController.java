@@ -18,7 +18,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -42,9 +43,10 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/wallets")
 @RequiredArgsConstructor
-@Slf4j
 @Tag(name = "Wallet Management", description = "Wallet management endpoints")
 public class WalletController {
+
+    private static final Logger log = LoggerFactory.getLogger(WalletController.class);
 
     private final GetUserWalletUseCase getUserWalletUseCase;
     private final AddPendingBalanceUseCase addPendingBalanceUseCase;

@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 045: Create Payment Invoice Tables
+        Author: CashBee Team
+        Date: 2026-01-04
+
+        Purpose:
+        - Create payment_invoice table to store invoice/receipt for each batch payment
+        - Create user_notification_preference table for user email preferences
+
+        Invoice Feature (Option B: Summary + Link):
+        - Stores summary of each payment with cashback breakdown by platform
+        - Sent via email (optional based on user preference)
+        - Viewable in-app with full detail
+
+        Traceability:
+        - Invoice -> Batch -> BatchItems -> Cashbacks -> Orders
+        - Each invoice has unique invoice_number for reference
+    -->
+
+    <!-- ==================== PAYMENT INVOICE TABLE ==================== -->
+
+    <!-- Step 1: Create payment_invoice table -->
+    <changeSet id="045-01-create-payment-invoice-table" author="cashbee">
+        <comment>
+            Create payment_invoice table to store invoice/receipt for batch payments.
+            Each batch completion generates one invoice per user.
+        </comment>
+
+        <createTable tableName="payment_invoice">
+            <!-- Primary key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Invoice identification -->
+            <column name="invoice_number" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <!-- Foreign keys -->
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="batch_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="batch_item_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="transaction_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Payment details -->
+            <column name="amount" type="DECIMAL(19,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="currency" type="VARCHAR(10)" defaultValue="VND">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="transfer_status" type="VARCHAR(30)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="transfer_time" type="DATETIME">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- User info snapshot (denormalized for historical accuracy) -->
+            <column name="user_full_name" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="user_email" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="user_phone" type="VARCHAR(20)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Bank info snapshot -->
+            <column name="bank_name" type="VARCHAR(100)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="bank_full_name" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="account_number" type="VARCHAR(50)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="account_name" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Cashback summary by platform (Option B: Summary approach) -->
+            <column name="total_orders" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="total_cashback_amount" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Platform breakdown - Shopee -->
+            <column name="shopee_orders" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="shopee_amount" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Platform breakdown - Lazada -->
+            <column name="lazada_orders" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="lazada_amount" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Platform breakdown - Tiki -->
+            <column name="tiki_orders" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="tiki_amount" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Platform breakdown - TikTok Shop -->
+            <column name="tiktok_orders" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="tiktok_amount" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Platform breakdown - Other platforms -->
+            <column name="other_orders" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="other_amount" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Additional info -->
+            <column name="description" type="VARCHAR(500)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="remark" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Email tracking -->
+            <column name="email_sent" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="email_sent_at" type="DATETIME">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="email_error" type="VARCHAR(500)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Timestamps -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- Step 2: Add foreign key to user -->
+    <changeSet id="045-02-add-user-fk" author="cashbee">
+        <comment>Add foreign key from payment_invoice.user_id to user.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="payment_invoice"
+                baseColumnNames="user_id"
+                constraintName="fk_payment_invoice_user"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                onDelete="CASCADE"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+    <!-- Step 3: Add foreign key to batch_transfer_export -->
+    <changeSet id="045-03-add-batch-fk" author="cashbee">
+        <comment>Add foreign key from payment_invoice.batch_id to batch_transfer_export.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="payment_invoice"
+                baseColumnNames="batch_id"
+                constraintName="fk_payment_invoice_batch"
+                referencedTableName="batch_transfer_export"
+                referencedColumnNames="id"
+                onDelete="CASCADE"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+    <!-- Step 4: Add foreign key to batch_transfer_item -->
+    <changeSet id="045-04-add-batch-item-fk" author="cashbee">
+        <comment>Add foreign key from payment_invoice.batch_item_id to batch_transfer_item.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="payment_invoice"
+                baseColumnNames="batch_item_id"
+                constraintName="fk_payment_invoice_batch_item"
+                referencedTableName="batch_transfer_item"
+                referencedColumnNames="id"
+                onDelete="SET NULL"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+    <!-- Step 5: Add foreign key to transactions -->
+    <changeSet id="045-05-add-transaction-fk" author="cashbee">
+        <comment>Add foreign key from payment_invoice.transaction_id to transactions.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="payment_invoice"
+                baseColumnNames="transaction_id"
+                constraintName="fk_payment_invoice_transaction"
+                referencedTableName="transactions"
+                referencedColumnNames="id"
+                onDelete="SET NULL"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+    <!-- Step 6: Add indexes for payment_invoice -->
+    <changeSet id="045-06-add-payment-invoice-indexes" author="cashbee">
+        <comment>Add indexes for efficient queries on payment_invoice</comment>
+
+        <!-- Index on user_id for user's invoice history -->
+        <createIndex tableName="payment_invoice" indexName="idx_payment_invoice_user">
+            <column name="user_id"/>
+        </createIndex>
+
+        <!-- Index on batch_id for batch's invoices -->
+        <createIndex tableName="payment_invoice" indexName="idx_payment_invoice_batch">
+            <column name="batch_id"/>
+        </createIndex>
+
+        <!-- Index on created_at for date range queries -->
+        <createIndex tableName="payment_invoice" indexName="idx_payment_invoice_created">
+            <column name="created_at"/>
+        </createIndex>
+
+        <!-- Composite index for user + created_at (common query pattern) -->
+        <createIndex tableName="payment_invoice" indexName="idx_payment_invoice_user_created">
+            <column name="user_id"/>
+            <column name="created_at"/>
+        </createIndex>
+
+        <!-- Index on email_sent for pending email queue -->
+        <createIndex tableName="payment_invoice" indexName="idx_payment_invoice_email_sent">
+            <column name="email_sent"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== USER NOTIFICATION PREFERENCE TABLE ==================== -->
+
+    <!-- Step 7: Create user_notification_preference table -->
+    <changeSet id="045-07-create-notification-preference-table" author="cashbee">
+        <comment>
+            Create user_notification_preference table for email/notification settings.
+            Allows users to control which emails they receive.
+        </comment>
+
+        <createTable tableName="user_notification_preference">
+            <!-- Primary key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Foreign key to user (one-to-one) -->
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <!-- Email preferences -->
+            <column name="email_payment_invoice" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="email_cashback_confirmed" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="email_order_matched" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="email_promotional" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Push notification preferences (for future mobile app) -->
+            <column name="push_payment_invoice" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="push_cashback_confirmed" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="push_order_matched" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="push_promotional" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamps -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- Step 8: Add foreign key to user -->
+    <changeSet id="045-08-add-notification-user-fk" author="cashbee">
+        <comment>Add foreign key from user_notification_preference.user_id to user.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="user_notification_preference"
+                baseColumnNames="user_id"
+                constraintName="fk_notification_preference_user"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                onDelete="CASCADE"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+</databaseChangeLog>

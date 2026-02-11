@@ -28,4 +28,99 @@
     <include file="db/changelog/016-create-cashback-table.xml"/>
     <include file="db/changelog/017-fix-wallet-null-balances.xml"/>
 
+    <!-- OTP Email Verification -->
+    <include file="db/changelog/018-create-otp-verification-table.xml"/>
+    <include file="db/changelog/019-fix-otp-verified-column-type.xml"/>
+
+    <!-- Batch Transfer Export -->
+    <include file="db/changelog/020-create-batch-transfer-tables.xml"/>
+
+    <!-- Bank Management -->
+    <include file="db/changelog/021-create-bank-table.xml"/>
+    <include file="db/changelog/022-seed-banks.xml"/>
+    <include file="db/changelog/023-add-short-name-to-bank.xml"/>
+
+    <!-- Refactor: Cashback per item -->
+    <include file="db/changelog/024-refactor-cashback-per-item.xml"/>
+
+    <!-- Batch Transfer Item for confirm payment -->
+    <include file="db/changelog/025-create-batch-transfer-item-table.xml"/>
+
+    <!-- Add model_id to order item for variant support -->
+    <include file="db/changelog/026-add-model-id-to-order-item.xml"/>
+
+    <!-- VietinBank integration - add vietinbank_code to bank table -->
+    <include file="db/changelog/027-add-vietinbank-code-to-bank.xml"/>
+
+    <!-- VPBank integration - add vpbank_id to bank table -->
+    <include file="db/changelog/028-add-vpbank-id-to-bank.xml"/>
+
+    <!-- Update vpbank_id mapping based on VPBank official template -->
+    <include file="db/changelog/029-update-vpbank-id-mapping.xml"/>
+
+    <!-- Add min_balance to batch_transfer_export for accurate download -->
+    <include file="db/changelog/030-add-min-balance-to-batch-export.xml"/>
+
+    <!-- Fallback matching support for orders without Sub_id1 -->
+    <include file="db/changelog/031-add-fallback-matching-support.xml"/>
+
+    <!-- Add paid_batch_id to cashback for batch traceability -->
+    <include file="db/changelog/032-add-paid-batch-id-to-cashback.xml"/>
+
+    <!-- Fix vpbank_id mapping based on official NAPAS 247 IBFT member list -->
+    <include file="db/changelog/033-fix-vpbank-id-mapping.xml"/>
+
+    <!-- Referral System -->
+    <include file="db/changelog/034-add-referral-fields-to-user.xml"/>
+    <include file="db/changelog/035-create-referral-reward-table.xml"/>
+    <include file="db/changelog/036-create-referrer-commission-table.xml"/>
+
+    <!-- Batch Transfer Improvements: audit trail, error tracking -->
+    <include file="db/changelog/037-add-batch-transfer-improvements.xml"/>
+
+    <!-- Fix: Add updated_count column to import_batch -->
+    <include file="db/changelog/038-add-updated-count-to-import-batch.xml"/>
+
+    <!-- Batch Cashback Snapshot for accurate batch completion -->
+    <include file="db/changelog/039-create-batch-cashback-snapshot-table.xml"/>
+
+    <!-- VPBank batch transfer format - add vpbank_code (9 digits) -->
+    <include file="db/changelog/041-add-vpbank-code-to-bank.xml"/>
+
+    <!-- Fix vpbank_code values after migration update -->
+    <include file="db/changelog/042-fix-vpbank-code-checksum.xml"/>
+
+    <!-- First login tracking for user onboarding -->
+    <include file="db/changelog/043-add-first-login-to-user.xml"/>
+
+    <!-- Milestone & Referral System Update -->
+    <include file="db/changelog/044-update-milestone-referral-system.xml"/>
+
+    <!-- Payment Invoice & Notification Preferences -->
+    <include file="db/changelog/045-create-payment-invoice-tables.xml"/>
+
+    <!-- Promotion Voucher Management -->
+    <include file="db/changelog/046-create-promotion-voucher-table.xml"/>
+
+    <!-- Referral System Optimization: new milestones, reduced activation threshold -->
+    <include file="db/changelog/047-optimize-referral-milestones.xml"/>
+
+    <!-- Referrer Tier System: tiered commission rates based on referral count -->
+    <include file="db/changelog/048-create-referrer-tier-system.xml"/>
+
+    <!-- Anti-duplicate protection: UNIQUE constraint on referrer_commission.source_order_id -->
+    <include file="db/changelog/049-add-unique-constraint-referrer-commission.xml"/>
+
+    <!-- MVP Referral: simplified milestones, min 100k order, VIP@50, SUPER@150, FIX bonus bug -->
+    <include file="db/changelog/050-mvp-referral-milestones.xml"/>
+
+    <!-- Invoice Bonus Tracking: paid status for referral_reward, bonus breakdown in invoice -->
+    <include file="db/changelog/051-invoice-bonus-tracking.xml"/>
+
+    <!-- Fix: Repair PAID cashbacks with NULL paid_batch_id + add paid_at index -->
+    <include file="db/changelog/052-fix-cashback-null-paid-batch-id.xml"/>
+
+    <!-- Anti-fraud: Prevent duplicate bank accounts across users -->
+    <include file="db/changelog/053-add-unique-bank-account-constraint.xml"/>
+
 </databaseChangeLog>

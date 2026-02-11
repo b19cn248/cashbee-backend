@@ -1,5 +1,6 @@
 package com.cashbee.domain.repository;
 
+import com.cashbee.domain.enums.TransactionSourceType;
 import com.cashbee.domain.model.Transaction;
 
 import java.time.LocalDateTime;
@@ -86,6 +87,15 @@ public interface TransactionRepository {
     long count();
 
     /**
+     * Save multiple transactions in bulk.
+     * Used for batch operations to reduce DB round-trips.
+     *
+     * @param transactions List of transactions to save
+     * @return List of saved transactions
+     */
+    List<Transaction> saveAll(List<Transaction> transactions);
+
+    /**
      * Delete transaction by ID.
      * Note: Normally transactions should NOT be deleted (audit trail).
      * This is here for admin corrections only.
@@ -93,4 +103,14 @@ public interface TransactionRepository {
      * @param id Transaction ID
      */
     void deleteById(Long id);
+
+    /**
+     * Check if transaction exists by source ID and source type.
+     * Used for anti-duplicate protection (Layer 3).
+     *
+     * @param sourceId   Source entity ID (e.g., referrer_commission.id)
+     * @param sourceType Source type (e.g., REFERRER_COMMISSION)
+     * @return true if transaction already exists
+     */
+    boolean existsBySourceIdAndSourceType(Long sourceId, TransactionSourceType sourceType);
 }

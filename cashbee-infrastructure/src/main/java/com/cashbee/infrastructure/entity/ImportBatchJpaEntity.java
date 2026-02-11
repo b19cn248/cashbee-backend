@@ -51,6 +51,10 @@ public class ImportBatchJpaEntity {
     @Builder.Default
     private Integer skippedCount = 0;
 
+    @Column(name = "updated_count", nullable = false)
+    @Builder.Default
+    private Integer updatedCount = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
     @Builder.Default

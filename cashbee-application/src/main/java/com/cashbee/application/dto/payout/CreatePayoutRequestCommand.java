@@ -9,9 +9,9 @@ import java.math.BigDecimal;
 
 /**
  * Command DTO for creating payout request.
- *
+ * <p>
  * Used when user requests withdrawal from their wallet.
- *
+ * <p>
  * Business Flow:
  * 1. User requests payout via API
  * 2. System validates balance

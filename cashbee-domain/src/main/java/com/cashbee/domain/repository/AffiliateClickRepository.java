@@ -75,4 +75,98 @@ public interface AffiliateClickRepository {
      * Delete click by ID.
      */
     void deleteById(Long id);
+
+    /**
+     * Find clicks that match the given item/shop within a time window.
+     * Used for fallback matching when Sub_id1 is missing from CSV import.
+     *
+     * Matching criteria:
+     * - Same platform (e.g., Shopee)
+     * - Same item ID (product that was clicked)
+     * - Same shop ID (store that was clicked)
+     * - Click created within windowMinutes before orderTime
+     * - Click not already matched with another order (orderMatched = false)
+     *
+     * @param platformId Platform ID (e.g., Shopee = 1)
+     * @param itemId Product item ID from order
+     * @param shopId Shop ID from order
+     * @param orderTime When the order was placed
+     * @param windowMinutes Time window to search backward (e.g., 7 days = 10080 minutes)
+     * @return List of possible matching clicks, sorted by createdAt DESC (most recent first)
+     */
+    List<AffiliateClick> findPossibleMatchesByContext(
+        Long platformId,
+        String itemId,
+        String shopId,
+        LocalDateTime orderTime,
+        int windowMinutes
+    );
+
+    /**
+     * Find clicks that match the given item/shop (NO time restriction).
+     * Simplified fallback matching when Sub_id1 is missing.
+     *
+     * Matching criteria:
+     * - Same platform (e.g., Shopee)
+     * - Same item ID (product that was clicked)
+     * - Same shop ID (store that was clicked)
+     * - Click not already matched with another order (orderMatched = false)
+     *
+     * Logic:
+     * - If exactly 1 match → auto-assign to that user
+     * - If multiple matches from SAME user → use most recent click
+     * - If multiple matches from DIFFERENT users → flag for admin review
+     *
+     * @param platformId Platform ID (e.g., Shopee = 1)
+     * @param itemId Product item ID from order
+     * @param shopId Shop ID from order
+     * @return List of possible matching clicks, sorted by createdAt DESC (most recent first)
+     */
+    List<AffiliateClick> findPossibleMatchesByItemAndShop(
+        Long platformId,
+        String itemId,
+        String shopId
+    );
+
+    /**
+     * Find all clicks with pagination and optional filters.
+     * Used by Admin to view all tracking links.
+     *
+     * @param userId Filter by user ID (optional, null = all users)
+     * @param platformId Filter by platform ID (optional, null = all platforms)
+     * @param status Filter by click status (optional, null = all statuses)
+     * @param orderMatched Filter by order matched flag (optional, null = both)
+     * @param search Search keyword for trackingCode or productName (optional)
+     * @param page Page number (0-indexed)
+     * @param size Page size
+     * @return List of clicks for the requested page
+     */
+    List<AffiliateClick> findAllWithFilters(
+        Long userId,
+        Long platformId,
+        ClickStatus status,
+        Boolean orderMatched,
+        String search,
+        int page,
+        int size
+    );
+
+    /**
+     * Count total clicks matching the filters.
+     * Used for pagination metadata.
+     *
+     * @param userId Filter by user ID (optional)
+     * @param platformId Filter by platform ID (optional)
+     * @param status Filter by click status (optional)
+     * @param orderMatched Filter by order matched flag (optional)
+     * @param search Search keyword (optional)
+     * @return Total count of matching clicks
+     */
+    long countWithFilters(
+        Long userId,
+        Long platformId,
+        ClickStatus status,
+        Boolean orderMatched,
+        String search
+    );
 }

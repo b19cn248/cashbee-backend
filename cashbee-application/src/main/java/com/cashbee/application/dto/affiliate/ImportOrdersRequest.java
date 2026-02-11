@@ -1,5 +1,6 @@
 package com.cashbee.application.dto.affiliate;
 
+import com.cashbee.domain.enums.UpdateMode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -49,12 +50,13 @@ public class ImportOrdersRequest {
     private Long importedBy;
 
     /**
-     * Whether to skip duplicate orders.
-     * If true, orders with existing order IDs will be skipped.
-     * If false, duplicate orders will cause error.
+     * Update mode for duplicate orders.
+     * SKIP: Skip duplicate orders (keep old data)
+     * UPDATE: Update existing orders with new data from CSV
+     * Default: UPDATE (to sync status changes from platform)
      */
     @Builder.Default
-    private Boolean skipDuplicates = true;
+    private UpdateMode updateMode = UpdateMode.UPDATE;
 
     /**
      * Whether to match orders with clicks automatically.

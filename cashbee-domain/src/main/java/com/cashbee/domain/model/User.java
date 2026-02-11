@@ -1,5 +1,6 @@
 package com.cashbee.domain.model;
 
+import com.cashbee.domain.enums.UserLevel;
 import com.cashbee.domain.enums.UserStatus;
 import lombok.*;
 
@@ -77,6 +78,49 @@ public class User {
     private String referredBy;
 
     /**
+     * User tier level for cashback rate differentiation.
+     * NORMAL (80%), VIP (83%), SUPER (85%).
+     */
+    @Builder.Default
+    private UserLevel userLevel = UserLevel.NORMAL;
+
+    /**
+     * Referrer tier for commission rate differentiation.
+     * BRONZE (5%), SILVER (7%), GOLD (10%).
+     * Determines commission rate when this user is a referrer.
+     */
+    @Builder.Default
+    private String referrerTier = "BRONZE";
+
+    /**
+     * Total number of activated referrals this user has.
+     * Used to determine referrer tier level.
+     */
+    @Builder.Default
+    private Integer totalActivatedReferrals = 0;
+
+    /**
+     * Total number of completed (PAID) orders.
+     * Used for milestone tracking and tier upgrades.
+     */
+    @Builder.Default
+    private Integer totalCompletedOrders = 0;
+
+    /**
+     * Timestamp when referee reaches activation milestone and referral is activated.
+     * From this point, referrer receives 5% commission.
+     * Null if not yet activated.
+     */
+    private LocalDateTime referralActivatedAt;
+
+    /**
+     * Timestamp when referral commission period expires.
+     * Set when referral is activated (activation time + commission months from config).
+     * Null if not yet activated.
+     */
+    private LocalDateTime referralExpiresAt;
+
+    /**
      * User account status.
      */
     @Builder.Default
@@ -86,6 +130,15 @@ public class User {
      * Last login timestamp.
      */
     private LocalDateTime lastLoginAt;
+
+    /**
+     * Whether user has ever logged into the system.
+     * Used to detect first-time login for onboarding flow.
+     * - FALSE: User has never logged in (first login)
+     * - TRUE: User has logged in at least once before
+     */
+    @Builder.Default
+    private Boolean hasEverLoggedIn = false;
 
     /**
      * Last sync timestamp from Keycloak.
@@ -194,6 +247,23 @@ public class User {
     }
 
     /**
+     * Check if this is the first time user logs into the system.
+     *
+     * @return true if user has never logged in before
+     */
+    public boolean isFirstLogin() {
+        return this.hasEverLoggedIn == null || !this.hasEverLoggedIn;
+    }
+
+    /**
+     * Mark user as having logged in.
+     * Should be called after first login is detected.
+     */
+    public void markAsLoggedIn() {
+        this.hasEverLoggedIn = true;
+    }
+
+    /**
      * Update last sync timestamp to now.
      */
     public void updateLastSync() {
@@ -248,6 +318,159 @@ public class User {
         }
         if (this.status == null) {
             throw new IllegalStateException("Status is required");
+        }
+    }
+
+    // ===== Referral System Methods =====
+
+    /**
+     * Increment the total completed orders count.
+     * Should be called when an order status changes to PAID.
+     *
+     * @deprecated Use {@link #setTotalCompletedOrders(int)} instead for accurate counting.
+     *             Increment can cause double-counting issues during re-import.
+     */
+    @Deprecated
+    public void incrementCompletedOrders() {
+        this.totalCompletedOrders = (this.totalCompletedOrders == null ? 0 : this.totalCompletedOrders) + 1;
+    }
+
+    /**
+     * Set the total completed orders count to a specific value.
+     * This should be used instead of incrementCompletedOrders() to ensure accuracy.
+     *
+     * The count should be calculated from database (e.g., count of orders with CONFIRMED/PAID cashback)
+     * rather than incrementing, to prevent double-counting during re-import scenarios.
+     *
+     * @param count the exact count of completed orders from database
+     */
+    public void setTotalCompletedOrders(int count) {
+        this.totalCompletedOrders = Math.max(0, count);
+    }
+
+    /**
+     * Check if the referral has been activated (reached 3 orders).
+     *
+     * @return true if referral is activated
+     */
+    public boolean isReferralActivated() {
+        return this.referralActivatedAt != null;
+    }
+
+    /**
+     * Activate the referral relationship with specified commission duration.
+     * Should be called when user reaches activation milestone.
+     * After activation, referrer will receive 5% commission for specified months.
+     *
+     * @param commissionMonths number of months for commission period
+     */
+    public void activateReferral(int commissionMonths) {
+        if (this.referralActivatedAt == null) {
+            this.referralActivatedAt = LocalDateTime.now();
+            this.referralExpiresAt = this.referralActivatedAt.plusMonths(commissionMonths);
+        }
+    }
+
+    /**
+     * Activate the referral relationship with default 5 months commission.
+     * Should be called when user reaches activation milestone.
+     */
+    public void activateReferral() {
+        activateReferral(5); // Default 5 months
+    }
+
+    /**
+     * Check if the referral commission period is still active.
+     * Valid until referralExpiresAt timestamp.
+     *
+     * @return true if within the commission period
+     */
+    public boolean isWithinReferralPeriod() {
+        if (!isReferralActivated()) {
+            return false;
+        }
+        if (this.referralExpiresAt == null) {
+            return false;
+        }
+        return LocalDateTime.now().isBefore(this.referralExpiresAt);
+    }
+
+    /**
+     * Upgrade user to a new tier level.
+     *
+     * @param newLevel the new tier level
+     */
+    public void upgradeTo(UserLevel newLevel) {
+        if (newLevel == null) {
+            throw new IllegalArgumentException("New level cannot be null");
+        }
+        this.userLevel = newLevel;
+    }
+
+    /**
+     * Check if user's tier can be upgraded based on completed orders.
+     *
+     * @return true if eligible for tier upgrade
+     */
+    public boolean isEligibleForTierUpgrade() {
+        if (this.totalCompletedOrders == null) {
+            return false;
+        }
+        // VIP at 40 orders, SUPER at 150 orders
+        if (this.userLevel == UserLevel.NORMAL && this.totalCompletedOrders >= 40) {
+            return true;
+        }
+        if (this.userLevel == UserLevel.VIP && this.totalCompletedOrders >= 150) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get the next tier level based on current completed orders.
+     *
+     * @return next tier level, or current level if not eligible
+     */
+    public UserLevel getNextTierLevel() {
+        if (this.totalCompletedOrders == null) {
+            return this.userLevel;
+        }
+        if (this.totalCompletedOrders >= 150) {
+            return UserLevel.SUPER;
+        }
+        if (this.totalCompletedOrders >= 40) {
+            return UserLevel.VIP;
+        }
+        return UserLevel.NORMAL;
+    }
+
+    // ===== Referrer Tier Methods =====
+
+    /**
+     * Increment the count of activated referrals.
+     * Should be called when a referee reaches activation milestone.
+     */
+    public void incrementActivatedReferrals() {
+        this.totalActivatedReferrals = (this.totalActivatedReferrals == null ? 0 : this.totalActivatedReferrals) + 1;
+    }
+
+    /**
+     * Get total activated referrals count.
+     *
+     * @return total activated referrals, 0 if null
+     */
+    public int getActivatedReferralsCount() {
+        return this.totalActivatedReferrals == null ? 0 : this.totalActivatedReferrals;
+    }
+
+    /**
+     * Update referrer tier.
+     *
+     * @param newTier the new tier name (BRONZE, SILVER, GOLD)
+     */
+    public void updateReferrerTier(String newTier) {
+        if (newTier != null && !newTier.isBlank()) {
+            this.referrerTier = newTier;
         }
     }
 }

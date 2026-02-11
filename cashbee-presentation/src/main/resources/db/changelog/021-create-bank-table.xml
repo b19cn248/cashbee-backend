@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 021: Create Bank Table
+        Author: CashBee Team
+        Date: 2025-11-20
+        Description: Tạo bảng bank để lưu danh sách ngân hàng hỗ trợ
+    -->
+
+    <changeSet id="021-create-bank-table" author="cashbee">
+        <comment>
+            Tạo bảng bank để lưu danh sách các ngân hàng hỗ trợ.
+            Bảng này được sử dụng để validate bank_code khi user cập nhật thông tin ngân hàng.
+        </comment>
+
+        <createTable tableName="bank">
+            <!-- Primary Key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Bank Information -->
+            <column name="bank_code" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="bank_name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Status -->
+            <column name="is_active" type="TINYINT(1)" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamps -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes -->
+        <createIndex indexName="idx_bank_bank_code" tableName="bank" unique="true">
+            <column name="bank_code"/>
+        </createIndex>
+
+        <createIndex indexName="idx_bank_is_active" tableName="bank">
+            <column name="is_active"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="bank"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

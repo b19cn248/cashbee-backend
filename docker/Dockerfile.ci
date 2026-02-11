@@ -1,0 +1,30 @@
+# Dockerfile cho CI/CD pipeline
+# Khác với docker/Dockerfile gốc: KHÔNG có build stage Maven
+# Vì JAR đã được build bởi GitHub Actions (job build-and-test)
+# => Image nhỏ hơn, build nhanh hơn
+
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# Tạo user non-root (bảo mật)
+RUN addgroup -g 1001 -S cashbee && \
+    adduser -u 1001 -S cashbee -G cashbee
+
+# Copy JAR đã build sẵn từ GitHub Actions
+COPY cashbee-presentation/target/*.jar app.jar
+
+# Tạo thư mục logs
+RUN mkdir -p /app/logs && \
+    chown -R cashbee:cashbee /app
+
+USER cashbee
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+
+ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/logs/heap-dump.hprof -XX:+ExitOnOutOfMemoryError"
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

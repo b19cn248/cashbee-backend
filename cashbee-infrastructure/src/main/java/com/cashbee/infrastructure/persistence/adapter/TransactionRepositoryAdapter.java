@@ -1,5 +1,6 @@
 package com.cashbee.infrastructure.persistence.adapter;
 
+import com.cashbee.domain.enums.TransactionSourceType;
 import com.cashbee.domain.model.Transaction;
 import com.cashbee.domain.repository.TransactionRepository;
 import com.cashbee.infrastructure.persistence.entity.TransactionJpaEntity;
@@ -123,9 +124,30 @@ public class TransactionRepositoryAdapter implements TransactionRepository {
     }
 
     @Override
+    public List<Transaction> saveAll(List<Transaction> transactions) {
+        log.debug("Bulk saving {} transactions", transactions.size());
+
+        List<TransactionJpaEntity> entities = mapper.toEntityList(transactions);
+        List<TransactionJpaEntity> savedEntities = jpaRepository.saveAll(entities);
+
+        log.debug("Bulk saved {} transactions", savedEntities.size());
+        return mapper.toDomainList(savedEntities);
+    }
+
+    @Override
     public void deleteById(Long id) {
         log.warn("Deleting transaction by ID: {} (should be rare for audit trail)", id);
         jpaRepository.deleteById(id);
         log.warn("Transaction deleted: id={}", id);
+    }
+
+    @Override
+    public boolean existsBySourceIdAndSourceType(Long sourceId, TransactionSourceType sourceType) {
+        log.debug("Checking if transaction exists: sourceId={}, sourceType={}", sourceId, sourceType);
+
+        boolean exists = jpaRepository.existsBySourceIdAndSourceType(sourceId, sourceType);
+        log.debug("Transaction exists: {} (sourceId={}, sourceType={})", exists, sourceId, sourceType);
+
+        return exists;
     }
 }

@@ -53,4 +53,17 @@ public interface AffiliateOrderItemRepository {
      * Count items for an order.
      */
     long countByOrderId(Long orderId);
+
+    /**
+     * Find item by order ID, item ID, and model ID (unique combination).
+     * Model ID distinguishes different variants (color/size) of the same item.
+     */
+    Optional<AffiliateOrderItem> findByOrderIdAndItemIdAndModelId(Long orderId, String itemId, String modelId);
+
+    /**
+     * Find item by order ID and item ID (may return multiple if same item has different models).
+     * @deprecated Use findByOrderIdAndItemIdAndModelId for unique lookup
+     */
+    @Deprecated
+    Optional<AffiliateOrderItem> findByOrderIdAndItemId(Long orderId, String itemId);
 }

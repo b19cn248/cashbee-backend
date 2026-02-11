@@ -1,5 +1,6 @@
 package com.cashbee.infrastructure.persistence.repository;
 
+import com.cashbee.domain.enums.TransactionSourceType;
 import com.cashbee.infrastructure.persistence.entity.TransactionJpaEntity;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -69,4 +70,14 @@ public interface TransactionJpaRepository extends JpaRepository<TransactionJpaEn
      * @return Total count
      */
     long countByUserId(Long userId);
+
+    /**
+     * Check if transaction exists by source ID and source type.
+     * Used for anti-duplicate protection (Layer 3).
+     *
+     * @param sourceId   Source entity ID (e.g., referrer_commission.id)
+     * @param sourceType Source type enum (e.g., REFERRER_COMMISSION)
+     * @return true if transaction already exists
+     */
+    boolean existsBySourceIdAndSourceType(Long sourceId, TransactionSourceType sourceType);
 }

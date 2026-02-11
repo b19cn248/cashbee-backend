@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="019-fix-otp-verified-column-type" author="claude">
+        <comment>Fix verified column type from BIT to TINYINT(1) to match Hibernate expectations</comment>
+
+        <!-- Modify verified column to use TINYINT(1) instead of BIT -->
+        <modifyDataType tableName="otp_verifications" columnName="verified" newDataType="TINYINT(1)"/>
+
+        <rollback>
+            <modifyDataType tableName="otp_verifications" columnName="verified" newDataType="BIT"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -268,13 +268,51 @@ public class KeycloakAdminService {
     // ============================================================
 
     /**
+     * Check if a realm role exists.
+     *
+     * @param roleName Role name to check
+     * @return true if role exists, false otherwise
+     */
+    public boolean roleExists(String roleName) {
+        log.debug("Checking if role exists: {}", roleName);
+
+        try {
+            getRealmResource()
+                    .roles()
+                    .get(roleName)
+                    .toRepresentation();
+            log.debug("Role {} exists", roleName);
+            return true;
+
+        } catch (Exception e) {
+            log.debug("Role {} does not exist", roleName);
+            return false;
+        }
+    }
+
+    /**
      * Assign a realm role to user.
+     * <p>
+     * IMPORTANT: This method will NOT fail if the role doesn't exist.
+     * Instead, it logs a warning and continues. This ensures that user
+     * registration doesn't fail due to missing roles in Keycloak configuration.
+     * <p>
+     * Best Practice: Ensure all required roles (USER, ADMIN) exist in Keycloak
+     * realm before using this application.
      *
      * @param keycloakId Keycloak user ID
      * @param role UserRole enum (USER or ADMIN)
      */
     public void assignRealmRole(String keycloakId, UserRole role) {
         log.info("Assigning role {} to user {}", role, keycloakId);
+
+        // Check if role exists first
+        if (!roleExists(role.name())) {
+            log.warn("Role {} does not exist in Keycloak realm. Skipping role assignment for user {}. " +
+                     "Please create the role in Keycloak: Realm Settings > Roles > Create Role '{}'",
+                     role, keycloakId, role.name());
+            return;
+        }
 
         try {
             // Get role representation from realm
@@ -293,8 +331,10 @@ public class KeycloakAdminService {
             log.info("Role {} assigned successfully to user {}", role, keycloakId);
 
         } catch (Exception e) {
-            log.error("Failed to assign role {} to user {}", role, keycloakId, e);
-            throw new RuntimeException("Failed to assign role", e);
+            log.error("Failed to assign role {} to user {}: {}. User created but without role.",
+                     role, keycloakId, e.getMessage());
+            // Don't throw exception - user creation should succeed even if role assignment fails
+            // This prevents orphaned users in Keycloak
         }
     }
 
@@ -435,6 +475,28 @@ public class KeycloakAdminService {
     }
 
     /**
+     * Enable a disabled user account.
+     * Used after OTP verification to activate newly registered users.
+     *
+     * @param keycloakId Keycloak user ID
+     */
+    public void enableUser(String keycloakId) {
+        log.info("Enabling user account: {}", keycloakId);
+        setUserEnabled(keycloakId, true);
+    }
+
+    /**
+     * Disable an enabled user account.
+     * Used for account suspension or security purposes.
+     *
+     * @param keycloakId Keycloak user ID
+     */
+    public void disableUser(String keycloakId) {
+        log.info("Disabling user account: {}", keycloakId);
+        setUserEnabled(keycloakId, false);
+    }
+
+    /**
      * Delete user from Keycloak.
      * WARNING: This is a permanent deletion.
      *
@@ -450,6 +512,115 @@ public class KeycloakAdminService {
         } catch (Exception e) {
             log.error("Failed to delete user {}", keycloakId, e);
             throw new RuntimeException("Failed to delete user", e);
+        }
+    }
+
+    // ============================================================
+    // USER ATTRIBUTES METHODS
+    // ============================================================
+
+    /**
+     * Update user custom attributes in Keycloak.
+     * Keycloak allows storing custom key-value pairs in user attributes.
+     * These attributes can be included in JWT tokens.
+     *
+     * Use case: Store bank account info (account_number, bank_code)
+     * so they're available in JWT without querying database.
+     *
+     * @param keycloakId Keycloak user ID
+     * @param attributeName Attribute name (e.g., "account_number", "bank_code")
+     * @param attributeValue Attribute value
+     */
+    public void updateUserAttribute(String keycloakId, String attributeName, String attributeValue) {
+        log.info("Updating user {} attribute: {}={}", keycloakId, attributeName, attributeValue);
+
+        try {
+            UserResource userResource = getUsersResource().get(keycloakId);
+            UserRepresentation user = userResource.toRepresentation();
+
+            // Get existing attributes or create new map
+            var attributes = user.getAttributes();
+            if (attributes == null) {
+                attributes = new java.util.HashMap<>();
+                user.setAttributes(attributes);
+            }
+
+            // Set attribute value (attributes are stored as List<String>)
+            attributes.put(attributeName, java.util.Collections.singletonList(attributeValue));
+
+            // Save changes
+            userResource.update(user);
+            log.info("User {} attribute {} updated successfully", keycloakId, attributeName);
+
+        } catch (Exception e) {
+            log.error("Failed to update user {} attribute {}", keycloakId, attributeName, e);
+            throw new RuntimeException("Failed to update user attribute", e);
+        }
+    }
+
+    /**
+     * Update multiple user attributes at once.
+     *
+     * @param keycloakId Keycloak user ID
+     * @param attributes Map of attribute name -> value
+     */
+    public void updateUserAttributes(String keycloakId, java.util.Map<String, String> attributes) {
+        log.info("Updating user {} with {} attributes", keycloakId, attributes.size());
+
+        try {
+            UserResource userResource = getUsersResource().get(keycloakId);
+            UserRepresentation user = userResource.toRepresentation();
+
+            // Get existing attributes or create new map
+            var userAttributes = user.getAttributes();
+            if (userAttributes == null) {
+                userAttributes = new java.util.HashMap<>();
+                user.setAttributes(userAttributes);
+            }
+
+            // Update all attributes
+            for (var entry : attributes.entrySet()) {
+                userAttributes.put(entry.getKey(),
+                        java.util.Collections.singletonList(entry.getValue()));
+            }
+
+            // Save changes
+            userResource.update(user);
+            log.info("User {} attributes updated successfully", keycloakId);
+
+        } catch (Exception e) {
+            log.error("Failed to update user {} attributes", keycloakId, e);
+            throw new RuntimeException("Failed to update user attributes", e);
+        }
+    }
+
+    /**
+     * Get user attribute value.
+     *
+     * @param keycloakId Keycloak user ID
+     * @param attributeName Attribute name
+     * @return Attribute value or null if not found
+     */
+    public String getUserAttribute(String keycloakId, String attributeName) {
+        log.debug("Getting user {} attribute: {}", keycloakId, attributeName);
+
+        try {
+            UserResource userResource = getUsersResource().get(keycloakId);
+            UserRepresentation user = userResource.toRepresentation();
+
+            var attributes = user.getAttributes();
+            if (attributes != null && attributes.containsKey(attributeName)) {
+                var values = attributes.get(attributeName);
+                if (values != null && !values.isEmpty()) {
+                    return values.get(0);
+                }
+            }
+
+            return null;
+
+        } catch (Exception e) {
+            log.error("Failed to get user {} attribute {}", keycloakId, attributeName, e);
+            throw new RuntimeException("Failed to get user attribute", e);
         }
     }
 }

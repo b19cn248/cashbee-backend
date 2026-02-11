@@ -20,7 +20,8 @@ import java.time.LocalDateTime;
     @Index(name = "idx_order_platform", columnList = "platform_id"),
     @Index(name = "idx_order_status", columnList = "order_status"),
     @Index(name = "idx_order_import_batch", columnList = "import_batch_id"),
-    @Index(name = "idx_order_time", columnList = "order_time")
+    @Index(name = "idx_order_time", columnList = "order_time"),
+    @Index(name = "idx_order_fallback_match", columnList = "is_fallback_match")
 })
 @Getter
 @Setter
@@ -78,6 +79,15 @@ public class AffiliateOrderJpaEntity {
 
     @Column(name = "import_batch_id")
     private Long importBatchId;
+
+    /**
+     * Whether this order was matched using fallback (context-based) matching.
+     * TRUE = Matched by context (itemId + shopId + time window) because Sub_id1 was missing
+     * FALSE = Matched by tracking code (Sub_id1) - normal flow
+     */
+    @Column(name = "is_fallback_match")
+    @Builder.Default
+    private Boolean fallbackMatch = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

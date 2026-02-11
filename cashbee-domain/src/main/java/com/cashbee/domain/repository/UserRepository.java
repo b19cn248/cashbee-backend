@@ -1,7 +1,11 @@
 package com.cashbee.domain.repository;
 
+import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.domain.model.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -100,6 +104,31 @@ public interface UserRepository {
     boolean existsByUsername(String username);
 
     /**
+     * Check if user exists by referral code.
+     *
+     * @param referralCode Referral code
+     * @return true if referral code exists
+     */
+    boolean existsByReferralCode(String referralCode);
+
+    /**
+     * Check if user exists by phone number.
+     *
+     * @param phone Phone number
+     * @return true if phone number exists
+     */
+    boolean existsByPhone(String phone);
+
+    /**
+     * Check if user exists by referredBy code.
+     * This checks if someone has already used this referral code when registering.
+     *
+     * @param referredBy Referral code used during registration
+     * @return true if someone has already used this referral code
+     */
+    boolean existsByReferredBy(String referredBy);
+
+    /**
      * Find all users referred by a specific referral code.
      *
      * @param referralCode Referral code
@@ -113,6 +142,42 @@ public interface UserRepository {
      * @return List of all active users
      */
     List<User> findAll();
+
+    /**
+     * Find users by list of IDs.
+     *
+     * @param ids List of user IDs
+     * @return List of users found
+     */
+    List<User> findAllById(List<Long> ids);
+
+    /**
+     * Find all users with PAGINATION (excluding deleted).
+     * This is the RECOMMENDED method for listing users!
+     * Prevents memory issues when there are many users.
+     *
+     * @param pageable Pagination parameters (page, size, sort)
+     * @return Paginated users
+     */
+    Page<User> findAll(Pageable pageable);
+
+    /**
+     * Find users by status with PAGINATION.
+     *
+     * @param status User status to filter
+     * @param pageable Pagination parameters
+     * @return Paginated users
+     */
+    Page<User> findByStatus(UserStatus status, Pageable pageable);
+
+    /**
+     * Search users by email or username with PAGINATION.
+     *
+     * @param keyword Search keyword (matches email or username)
+     * @param pageable Pagination parameters
+     * @return Paginated users matching the search
+     */
+    Page<User> searchByEmailOrUsername(String keyword, Pageable pageable);
 
     /**
      * Delete user (soft delete).
@@ -135,4 +200,26 @@ public interface UserRepository {
      * @return Number of users with given status
      */
     long countByStatus(String status);
+
+    /**
+     * Find users who have orders within a date range.
+     *
+     * This method queries users that have at least one order
+     * with orderTime between fromDate and toDate.
+     *
+     * Use cases:
+     * - Find users with orders today
+     * - Find users with orders in the last 7 days
+     * - Find users with orders in a specific date range
+     *
+     * @param fromDate Start of date range (inclusive), null for no lower bound
+     * @param toDate End of date range (inclusive), null for no upper bound
+     * @param pageable Pagination parameters
+     * @return Paginated users with orders in the date range
+     */
+    Page<User> findUsersWithOrdersInDateRange(
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            Pageable pageable
+    );
 }

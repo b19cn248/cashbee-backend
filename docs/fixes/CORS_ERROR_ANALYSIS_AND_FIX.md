@@ -100,7 +100,7 @@ public CorsFilter corsFilter() {
         "http://localhost:3007",
         "https://cashbee.nguocchieuvangle.io.vn/",
         "https://video.management.v1.openlearnhub.io.vn/",
-        "https://auth.nguocchieuvangle.io.vn/"
+        "https://auth.cashbee.com.vn/"
     ));
 
     // ✅ Allowed methods include GET
@@ -246,7 +246,7 @@ config.setAllowedOrigins(List.of(
     "https://cashbee.nguocchieuvangle.io.vn",  // ⚠️ REMOVE trailing slash!
     "https://your-production-frontend.com",    // Add production domain
     "https://video.management.v1.openlearnhub.io.vn",
-    "https://auth.nguocchieuvangle.io.vn"      // ⚠️ REMOVE trailing slash!
+    "https://auth.cashbee.com.vn"      // ⚠️ REMOVE trailing slash!
 ));
 ```
 

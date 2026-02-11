@@ -37,20 +37,25 @@ public class AddPendingBalanceUseCase {
 
     /**
      * Add pending balance to user wallet.
+     * If wallet doesn't exist, creates one automatically.
      *
      * @param command Command containing userId and amount
      * @return Updated wallet response
-     * @throws NotFoundException if wallet doesn't exist
      */
     @Transactional
     public WalletResponse execute(AddPendingBalanceCommand command) {
         log.info("Adding pending balance: userId={}, amount={}, description={}",
             command.getUserId(), command.getAmount(), command.getDescription());
 
-        // Get wallet
+        // Get or create wallet
         UserWallet wallet = walletRepository.findByUserId(command.getUserId())
-            .orElseThrow(() -> new NotFoundException("WALLET_NOT_FOUND",
-                "Wallet not found for user: " + command.getUserId()));
+            .orElseGet(() -> {
+                log.info("Wallet not found for user {}, creating new wallet", command.getUserId());
+                UserWallet newWallet = UserWallet.builder()
+                    .userId(command.getUserId())
+                    .build();
+                return walletRepository.save(newWallet);
+            });
 
         // Add pending balance using domain logic
         wallet.addPendingBalance(command.getAmount());

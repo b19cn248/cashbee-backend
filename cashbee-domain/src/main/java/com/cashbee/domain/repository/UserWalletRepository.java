@@ -171,10 +171,85 @@ public interface UserWalletRepository {
     }
 
     /**
+     * Find all wallets by IDs.
+     * Used for bulk loading in batch operations.
+     *
+     * @param ids List of wallet IDs
+     * @return List of wallets found
+     */
+    List<UserWallet> findAllById(List<Long> ids);
+
+    /**
+     * Save multiple wallets in bulk.
+     * Used for batch operations to reduce DB round-trips.
+     *
+     * @param wallets List of wallets to save
+     * @return List of saved wallets
+     */
+    List<UserWallet> saveAll(List<UserWallet> wallets);
+
+    /**
      * Delete wallet by user ID.
      * NOTE: Should rarely be used due to financial data integrity.
      *
      * @param userId User ID
      */
     void deleteByUserId(Long userId);
+
+    /**
+     * CRITICAL: Confirm pending balance directly in DB using JPQL.
+     * This bypasses JPA persistence context to avoid stale data issues.
+     *
+     * Transfers amount from pending_balance to balance:
+     * - Subtracts amount from pending_balance
+     * - Adds amount to balance
+     * - Adds amount to total_earned
+     *
+     * @param userId User ID
+     * @param amount Amount to confirm
+     * @return true if successful (1 row updated), false if insufficient pending balance
+     */
+    boolean confirmPendingBalanceDirectly(Long userId, BigDecimal amount);
+
+    /**
+     * Add amount to pending balance directly in DB.
+     * Used when creating new PENDING cashback.
+     *
+     * @param userId User ID
+     * @param amount Amount to add
+     * @return true if successful
+     */
+    boolean addPendingBalanceDirectly(Long userId, BigDecimal amount);
+
+    /**
+     * Add amount directly to balance and total_earned in DB.
+     * Used when creating new CONFIRMED cashback.
+     *
+     * @param userId User ID
+     * @param amount Amount to add
+     * @return true if successful
+     */
+    boolean addConfirmedBalanceDirectly(Long userId, BigDecimal amount);
+
+    /**
+     * Subtract amount from pending_balance directly in DB.
+     * Used when PENDING cashback is CANCELLED (order cancelled before completion).
+     *
+     * @param userId User ID
+     * @param amount Amount to subtract
+     * @return true if successful (sufficient pending balance), false otherwise
+     */
+    boolean subtractPendingBalanceDirectly(Long userId, BigDecimal amount);
+
+    /**
+     * Reverse confirmed balance directly in DB.
+     * Used when CONFIRMED/PAID cashback is CANCELLED (order cancelled after completion/refund).
+     * - Subtracts amount from balance
+     * - Subtracts amount from total_earned
+     *
+     * @param userId User ID
+     * @param amount Amount to reverse
+     * @return true if successful (sufficient balance), false otherwise
+     */
+    boolean reverseConfirmedBalanceDirectly(Long userId, BigDecimal amount);
 }

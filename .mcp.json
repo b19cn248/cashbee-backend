@@ -1,0 +1,58 @@
+{
+  "mcpServers": {
+    "ghost-mcp": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@fanyangmeng/ghost-mcp"
+      ],
+      "env": {
+        "GHOST_API_URL": "https://ghost.nguocchieuvangle.io.vn",
+        "GHOST_ADMIN_API_KEY": "690ad22447c9a6000184a1ec:b47482c5a7ae5f09fd61f80b07d83f248a7ba3a2507fb58789aa3550918ee39f",
+        "GHOST_API_VERSION": "v5.0"
+      }
+    },
+    "team_plane": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@makeplane/plane-mcp-server"
+      ],
+      "env": {
+        "PLANE_API_KEY": "plane_api_96b454194e4c4cc591ec7cbd85d4ff75",
+        "PLANE_API_HOST_URL": "https://plane.olhub.org/",
+        "PLANE_WORKSPACE_SLUG": "oplh"
+      }
+    },
+    "my_plane": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@makeplane/plane-mcp-server"
+      ],
+      "env": {
+        "PLANE_API_KEY": "plane_api_750800a035924e20b05207bb18c237e4",
+        "PLANE_API_HOST_URL": "https://plane.nguocchieuvangle.io.vn/",
+        "PLANE_WORKSPACE_SLUG": "ptit"
+      }
+    },
+    "cashbee_server_mysql": {
+      "command": "node",
+      "args": [
+        "D:\\mcp\\mcp-server-mysql\\dist\\index.js"
+      ],
+      "env": {
+        "MYSQL_HOST": "localhost",
+        "MYSQL_PORT": "3306",
+        "MYSQL_USER": "root",
+        "MYSQL_PASS": "root",
+        "MYSQL_DB": "cashbee",
+        "ALLOW_INSERT_OPERATION": "true",
+        "ALLOW_UPDATE_OPERATION": "true",
+        "ALLOW_DELETE_OPERATION": "true"
+      }
+    }
+  }
+}

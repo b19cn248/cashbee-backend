@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="018-create-otp-verification-table" author="claude">
+        <comment>Create otp_verifications table for email OTP verification during registration</comment>
+
+        <createTable tableName="otp_verifications">
+            <!-- Primary Key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- User Information -->
+            <column name="email" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- OTP Details -->
+            <column name="otp_code" type="VARCHAR(6)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="purpose" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Keycloak User Link (Approach 3: Store disabled Keycloak user ID) -->
+            <column name="keycloak_id" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Registration Data (JSON without password) -->
+            <column name="registration_data" type="JSON">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Timestamps -->
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="expires_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Verification Status -->
+            <column name="verified" type="TINYINT(1)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="verified_at" type="TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Attempt Tracking -->
+            <column name="attempt_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="max_attempts" type="INT" defaultValueNumeric="3">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Resend Tracking -->
+            <column name="resend_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="last_resend_at" type="TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for Performance -->
+        <createIndex indexName="idx_otp_email_purpose" tableName="otp_verifications">
+            <column name="email"/>
+            <column name="purpose"/>
+        </createIndex>
+
+        <createIndex indexName="idx_otp_keycloak_id" tableName="otp_verifications">
+            <column name="keycloak_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_otp_expires_at" tableName="otp_verifications">
+            <column name="expires_at"/>
+        </createIndex>
+
+        <createIndex indexName="idx_otp_verified" tableName="otp_verifications">
+            <column name="verified"/>
+        </createIndex>
+
+        <!-- Composite index for cleanup queries -->
+        <createIndex indexName="idx_otp_cleanup" tableName="otp_verifications">
+            <column name="verified"/>
+            <column name="expires_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="otp_verifications"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

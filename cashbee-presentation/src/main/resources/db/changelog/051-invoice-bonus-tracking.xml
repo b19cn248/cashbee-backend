@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 051: Invoice Bonus Tracking Enhancement
+        Author: CashBee Team
+        Date: 2026-01-30
+
+        Purpose:
+        - Track PAID status for referral rewards (bonus) when batch completes
+        - Add bonus breakdown columns to payment_invoice for detailed invoice
+        - Enable invoice to show: cashback vs milestone_bonus vs referrer_commission
+
+        Changes:
+        1. Add paid_batch_id, paid_at to referral_reward table
+        2. Add bonus_amount, referrer_commission_amount to payment_invoice table
+    -->
+
+    <!-- ==================== REFERRAL REWARD: PAID TRACKING ==================== -->
+
+    <!-- Step 1: Add paid_batch_id column to referral_reward -->
+    <changeSet id="051-01-add-paid-batch-id-to-referral-reward" author="cashbee">
+        <comment>
+            Add paid_batch_id to referral_reward to track which batch paid this bonus.
+            This enables:
+            - Prevent double-payment of the same bonus
+            - Traceability: bonus -> batch -> invoice
+        </comment>
+
+        <addColumn tableName="referral_reward">
+            <column name="paid_batch_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 2: Add paid_at column to referral_reward -->
+    <changeSet id="051-02-add-paid-at-to-referral-reward" author="cashbee">
+        <comment>
+            Add paid_at timestamp to referral_reward.
+            NULL = unpaid (bonus in wallet but not transferred)
+            Non-NULL = paid via batch transfer
+        </comment>
+
+        <addColumn tableName="referral_reward">
+            <column name="paid_at" type="DATETIME">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 3: Add index on paid_batch_id for efficient lookup -->
+    <changeSet id="051-03-add-paid-batch-id-index" author="cashbee">
+        <comment>Add index on paid_batch_id for batch completion queries</comment>
+
+        <createIndex tableName="referral_reward" indexName="idx_referral_reward_paid_batch">
+            <column name="paid_batch_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 4: Add foreign key to batch_transfer_export -->
+    <changeSet id="051-04-add-paid-batch-fk" author="cashbee">
+        <comment>Add foreign key from referral_reward.paid_batch_id to batch_transfer_export.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="referral_reward"
+                baseColumnNames="paid_batch_id"
+                constraintName="fk_referral_reward_paid_batch"
+                referencedTableName="batch_transfer_export"
+                referencedColumnNames="id"
+                onDelete="SET NULL"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+    <!-- ==================== PAYMENT INVOICE: BONUS BREAKDOWN ==================== -->
+
+    <!-- Step 5: Add bonus_amount column to payment_invoice -->
+    <changeSet id="051-05-add-bonus-amount-to-invoice" author="cashbee">
+        <comment>
+            Add bonus_amount to payment_invoice for MILESTONE_BONUS tracking.
+            This is the sum of all milestone bonuses paid in this batch for the user.
+        </comment>
+
+        <addColumn tableName="payment_invoice">
+            <column name="bonus_amount" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 6: Add referrer_commission_amount column to payment_invoice -->
+    <changeSet id="051-06-add-referrer-commission-to-invoice" author="cashbee">
+        <comment>
+            Add referrer_commission_amount to payment_invoice for referrer bonus tracking.
+            This is the sum of all REFERRER_BONUS and REFERRER_COMMISSION paid in this batch.
+        </comment>
+
+        <addColumn tableName="payment_invoice">
+            <column name="referrer_commission_amount" type="DECIMAL(19,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 7: Add bonus_orders column for count tracking -->
+    <changeSet id="051-07-add-bonus-orders-to-invoice" author="cashbee">
+        <comment>
+            Add bonus_orders to track number of milestone bonuses paid.
+            Useful for invoice display: "3 milestone bonuses: 75,000 VND"
+        </comment>
+
+        <addColumn tableName="payment_invoice">
+            <column name="bonus_orders" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 8: Add referrer_commission_orders column -->
+    <changeSet id="051-08-add-referrer-commission-orders-to-invoice" author="cashbee">
+        <comment>
+            Add referrer_commission_orders to track number of referrer rewards paid.
+            Useful for invoice display: "5 referrer commissions: 50,000 VND"
+        </comment>
+
+        <addColumn tableName="payment_invoice">
+            <column name="referrer_commission_orders" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- ==================== REFERRER COMMISSION: PAID TRACKING ==================== -->
+
+    <!-- Step 9: Add paid_batch_id column to referrer_commission -->
+    <changeSet id="051-09-add-paid-batch-id-to-referrer-commission" author="cashbee">
+        <comment>
+            Add paid_batch_id to referrer_commission to track which batch paid this commission.
+            This enables:
+            - Traceability: commission -> batch -> invoice
+            - Invoice detail API to show referrer commission breakdown
+        </comment>
+
+        <addColumn tableName="referrer_commission">
+            <column name="paid_batch_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 10: Add index on paid_batch_id for referrer_commission -->
+    <changeSet id="051-10-add-referrer-commission-paid-batch-index" author="cashbee">
+        <comment>Add index on paid_batch_id for batch completion queries</comment>
+
+        <createIndex tableName="referrer_commission" indexName="idx_referrer_comm_paid_batch">
+            <column name="paid_batch_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 11: Add foreign key from referrer_commission to batch_transfer_export -->
+    <changeSet id="051-11-add-referrer-commission-paid-batch-fk" author="cashbee">
+        <comment>Add foreign key from referrer_commission.paid_batch_id to batch_transfer_export.id</comment>
+
+        <addForeignKeyConstraint
+                baseTableName="referrer_commission"
+                baseColumnNames="paid_batch_id"
+                constraintName="fk_referrer_commission_paid_batch"
+                referencedTableName="batch_transfer_export"
+                referencedColumnNames="id"
+                onDelete="SET NULL"
+                onUpdate="CASCADE"/>
+    </changeSet>
+
+</databaseChangeLog>

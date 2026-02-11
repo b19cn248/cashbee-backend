@@ -65,6 +65,12 @@ public class UserResponse {
     private String status;
 
     /**
+     * User tier level (NORMAL, VIP, SUPER, DIAMOND).
+     * Determines cashback rate percentage.
+     */
+    private String userLevel;
+
+    /**
      * Account creation timestamp.
      */
     private LocalDateTime createdAt;
@@ -73,4 +79,30 @@ public class UserResponse {
      * Last update timestamp.
      */
     private LocalDateTime updatedAt;
+
+    /**
+     * Bank account number (if user has set up).
+     */
+    private String accountNumber;
+
+    /**
+     * Bank account holder name (if user has set up).
+     */
+    private String accountName;
+
+    /**
+     * Bank code (e.g., VPBANK, ACB).
+     */
+    private String bankCode;
+
+    /**
+     * Full bank name (e.g., "Ngân hàng TMCP Việt Nam Thịnh Vượng").
+     */
+    private String bankName;
+
+    /**
+     * Whether user has ever logged into the system.
+     * Used to detect first-time login for onboarding flow.
+     */
+    private Boolean hasEverLoggedIn;
 }

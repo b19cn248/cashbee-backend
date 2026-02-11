@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="036-create-referrer-commission-table" author="cashbee-team">
+        <comment>Create referrer_commission table to track 5% commission from referee orders</comment>
+
+        <createTable tableName="referrer_commission">
+            <!-- Primary Key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Referrer who receives the commission -->
+            <column name="referrer_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Referee whose order generated this commission -->
+            <column name="referee_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Source order that generated this commission -->
+            <column name="source_order_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Original commission from platform (e.g., Shopee) -->
+            <column name="original_commission" type="DECIMAL(19,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Commission rate: 5.00 (5%) -->
+            <column name="commission_rate" type="DECIMAL(5,2)" defaultValueNumeric="5.00">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Commission amount: 5% x original_commission -->
+            <column name="commission_amount" type="DECIMAL(19,2)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Status: PENDING, CONFIRMED, PAID -->
+            <column name="status" type="VARCHAR(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- When the commission was confirmed (order PAID) -->
+            <column name="confirmed_at" type="DATETIME"/>
+
+            <!-- When the commission was paid to referrer wallet -->
+            <column name="paid_at" type="DATETIME"/>
+
+            <!-- When the record was created -->
+            <column name="created_at" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Commission expires 3 months after referee activation -->
+            <column name="expires_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Indexes for efficient querying -->
+        <createIndex tableName="referrer_commission" indexName="idx_referrer_comm_referrer_id">
+            <column name="referrer_id"/>
+        </createIndex>
+
+        <createIndex tableName="referrer_commission" indexName="idx_referrer_comm_referee_id">
+            <column name="referee_id"/>
+        </createIndex>
+
+        <createIndex tableName="referrer_commission" indexName="idx_referrer_comm_source_order">
+            <column name="source_order_id"/>
+        </createIndex>
+
+        <createIndex tableName="referrer_commission" indexName="idx_referrer_comm_status">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex tableName="referrer_commission" indexName="idx_referrer_comm_expires_at">
+            <column name="expires_at"/>
+        </createIndex>
+
+        <!-- Foreign keys -->
+        <addForeignKeyConstraint
+            baseTableName="referrer_commission"
+            baseColumnNames="referrer_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_referrer_comm_referrer"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="referrer_commission"
+            baseColumnNames="referee_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_referrer_comm_referee"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="referrer_commission"
+            baseColumnNames="source_order_id"
+            referencedTableName="affiliate_order"
+            referencedColumnNames="id"
+            constraintName="fk_referrer_comm_order"
+            onDelete="CASCADE"/>
+
+        <rollback>
+            <dropTable tableName="referrer_commission"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

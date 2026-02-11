@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 022: Seed Banks Data
+        Author: CashBee Team
+        Date: 2025-11-20
+        Description: Insert danh sách 60+ ngân hàng Việt Nam vào bảng bank
+    -->
+
+    <changeSet id="022-seed-banks" author="cashbee">
+        <comment>Insert danh sách các ngân hàng hỗ trợ vào hệ thống</comment>
+
+        <!-- Vietnamese Banks -->
+        <insert tableName="bank">
+            <column name="bank_code" value="VPBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Việt Nam Thịnh Vượng (VPBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="MHB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Phát triển Nhà TPHCM (MHB)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="AGRIBANK"/>
+            <column name="bank_name" value="Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam (Agribank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="BIDV"/>
+            <column name="bank_name" value="Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="VIETINBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Công Thương Việt Nam (VietinBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="VIETCOMBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Ngoại Thương Việt Nam (Vietcombank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="HDBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Phát triển TPHCM (HDBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="ACB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Á Châu (ACB)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="DAB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Đông Á (DongA Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="NAMABANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Nam Á (Nam A Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="BAB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Bắc Á (Bac A Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="VAB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Việt Á (VietA Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="SEABANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Đông Nam Á (SeABank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="OJB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Đại Dương (OceanBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="ABBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP An Bình (ABBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="VIETCAPITALBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Bản Việt (VietCapital Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="MB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Quân Đội (MB Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="GPBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Dầu khí Toàn Cầu (GPBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="PGBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Xăng dầu Petrolimex (PGBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="TCB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Kỹ Thương Việt Nam (Techcombank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="MSB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Hàng Hải Việt Nam (MSB)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="EIB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Xuất Nhập Khẩu Việt Nam (Eximbank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="OCB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Phương Đông (OCB)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="VIB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Quốc Tế Việt Nam (VIB)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="CBBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Xây Dựng Việt Nam (CB Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="VIETBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Việt Nam Thương Tín (VietBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="PVCOMBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Đại Chúng Việt Nam (PVcomBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="LPBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Bưu Điện Liên Việt (LPBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="TPB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Tiên Phong (TPBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="BVB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Bảo Việt (BaoViet Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="KIENLONGBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Kiên Long (Kienlongbank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="SACOMBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Sài Gòn Thương Tín (Sacombank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="SCB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Sài Gòn (SCB)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="SHB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Sài Gòn - Hà Nội (SHB)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="SAIGONBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Sài Gòn Công Thương (SaigonBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="VID"/>
+            <column name="bank_name" value="Ngân hàng TMCP Việt Nam Thịnh Vượng (VID Public Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="IVB"/>
+            <column name="bank_name" value="Ngân hàng TNHH Indovina (Indovina Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="VRB"/>
+            <column name="bank_name" value="Ngân hàng Liên doanh Việt - Nga (VRB)"/>
+        </insert>
+
+        <!-- Foreign Banks in Vietnam -->
+        <insert tableName="bank">
+            <column name="bank_code" value="STANDARDCHARTERED"/>
+            <column name="bank_name" value="Ngân hàng TNHH Standard Chartered (Việt Nam)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="HSBC"/>
+            <column name="bank_name" value="Ngân hàng TNHH HSBC (Việt Nam)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="WRB"/>
+            <column name="bank_name" value="Ngân hàng TNHH Woori Việt Nam (Woori Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="HLB"/>
+            <column name="bank_name" value="Ngân hàng TNHH Hong Leong Việt Nam"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="COOPBANK"/>
+            <column name="bank_name" value="Ngân hàng Hợp tác xã Việt Nam (Co-opBank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="SHINHAN"/>
+            <column name="bank_name" value="Ngân hàng TNHH Shinhan Việt Nam"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="DBS"/>
+            <column name="bank_name" value="Ngân hàng DBS (CN Việt Nam)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="IBK"/>
+            <column name="bank_name" value="Ngân hàng Công nghiệp Hàn Quốc (IBK)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="KOOKMIN"/>
+            <column name="bank_name" value="Ngân hàng Kookmin - CN Hà Nội"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="UOB"/>
+            <column name="bank_name" value="Ngân hàng UOB Việt Nam (United Overseas Bank)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="NCB"/>
+            <column name="bank_name" value="Ngân hàng TMCP Quốc Dân (NCB)"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="CIMB"/>
+            <column name="bank_name" value="Ngân hàng TNHH CIMB Việt Nam"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="NONGHYUP"/>
+            <column name="bank_name" value="Ngân hàng Nonghyup - CN Hà Nội"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="UBANK"/>
+            <column name="bank_name" value="Ngân hàng TMCP Việt Nam Thịnh Vượng - UBank"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="CAKE"/>
+            <column name="bank_name" value="Ngân hàng số CAKE by VPBank"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="KOOKMINHCM"/>
+            <column name="bank_name" value="Ngân hàng Kookmin - CN Hồ Chí Minh"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="KBANK"/>
+            <column name="bank_name" value="Ngân hàng Kasikornbank - CN Hà Nội"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="UMEE"/>
+            <column name="bank_name" value="Ngân hàng số UMEE by VietinBank"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="KEBHANAHN"/>
+            <column name="bank_name" value="Ngân hàng KEB Hana - CN Hà Nội"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="KEBHANAHCM"/>
+            <column name="bank_name" value="Ngân hàng KEB Hana - CN Hồ Chí Minh"/>
+        </insert>
+
+        <insert tableName="bank">
+            <column name="bank_code" value="VBSP"/>
+            <column name="bank_name" value="Ngân hàng Chính sách Xã hội Việt Nam"/>
+        </insert>
+
+        <rollback>
+            <delete tableName="bank">
+                <where>1=1</where>
+            </delete>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
