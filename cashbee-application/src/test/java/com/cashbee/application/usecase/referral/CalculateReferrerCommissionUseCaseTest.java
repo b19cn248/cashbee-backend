@@ -5,7 +5,9 @@ import com.cashbee.domain.enums.UserLevel;
 import com.cashbee.domain.enums.UserStatus;
 import com.cashbee.domain.model.ReferrerCommission;
 import com.cashbee.domain.model.User;
+import com.cashbee.domain.model.ReferrerTierConfig;
 import com.cashbee.domain.repository.ReferrerCommissionRepository;
+import com.cashbee.domain.repository.ReferrerTierConfigRepository;
 import com.cashbee.domain.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
+
+import static org.mockito.ArgumentMatchers.anyInt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,6 +43,9 @@ class CalculateReferrerCommissionUseCaseTest {
 
     @Mock
     private ReferrerCommissionRepository referrerCommissionRepository;
+
+    @Mock
+    private ReferrerTierConfigRepository tierConfigRepository;
 
     @InjectMocks
     private CalculateReferrerCommissionUseCase useCase;
@@ -94,6 +101,8 @@ class CalculateReferrerCommissionUseCaseTest {
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(referrerCommissionRepository.existsBySourceOrderId(orderId)).thenReturn(false);
             when(referrerCommissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(tierConfigRepository.findTierByReferralCount(anyInt())).thenReturn(
+                    Optional.of(ReferrerTierConfig.builder().tierName("BRONZE").commissionRate(new BigDecimal("5.00")).build()));
 
             // When
             useCase.execute(1L, orderId, originalCommission);
@@ -123,6 +132,8 @@ class CalculateReferrerCommissionUseCaseTest {
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(referrerCommissionRepository.existsBySourceOrderId(orderId)).thenReturn(false);
             when(referrerCommissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(tierConfigRepository.findTierByReferralCount(anyInt())).thenReturn(
+                    Optional.of(ReferrerTierConfig.builder().tierName("BRONZE").commissionRate(new BigDecimal("5.00")).build()));
 
             // When
             useCase.execute(1L, orderId, originalCommission);
@@ -146,6 +157,8 @@ class CalculateReferrerCommissionUseCaseTest {
             when(userRepository.findByReferralCode("REFCODE1")).thenReturn(Optional.of(referrer));
             when(referrerCommissionRepository.existsBySourceOrderId(orderId)).thenReturn(false);
             when(referrerCommissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(tierConfigRepository.findTierByReferralCount(anyInt())).thenReturn(
+                    Optional.of(ReferrerTierConfig.builder().tierName("BRONZE").commissionRate(new BigDecimal("5.00")).build()));
 
             // When
             useCase.execute(1L, orderId, originalCommission);
