@@ -38,4 +38,16 @@ public interface UserBankAccountJpaRepository extends JpaRepository<UserBankAcco
      * @param userId User ID
      */
     void deleteByUserId(Long userId);
+
+    /**
+     * Check if bank account exists for another user.
+     * Used for duplicate bank account detection to prevent fraud.
+     * Spring Data JPA generates: WHERE bank_code = ? AND account_number = ? AND user_id != ?
+     *
+     * @param bankCode      Bank code
+     * @param accountNumber Account number
+     * @param userId        User ID to exclude
+     * @return true if another user has this bank account
+     */
+    boolean existsByBankCodeAndAccountNumberAndUserIdNot(String bankCode, String accountNumber, Long userId);
 }

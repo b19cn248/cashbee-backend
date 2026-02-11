@@ -64,4 +64,11 @@ public class UserBankAccountRepositoryAdapter implements UserBankAccountReposito
         log.debug("Repository: Deleting bank account for user {}", userId);
         jpaRepository.deleteByUserId(userId);
     }
+
+    @Override
+    public boolean existsByBankCodeAndAccountNumberAndUserIdNot(String bankCode, String accountNumber, Long excludeUserId) {
+        log.debug("Repository: Checking duplicate bank account: bankCode={}, excludeUserId={}",
+                bankCode, excludeUserId);
+        return jpaRepository.existsByBankCodeAndAccountNumberAndUserIdNot(bankCode, accountNumber, excludeUserId);
+    }
 }

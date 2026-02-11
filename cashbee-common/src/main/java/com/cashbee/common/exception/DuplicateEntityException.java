@@ -61,4 +61,22 @@ public class DuplicateEntityException extends BusinessException {
     public static DuplicateEntityException orderId(String orderId) {
         return of("Order", "orderId", orderId);
     }
+
+    /**
+     * Factory method for duplicate bank account.
+     * Thrown when the same bank account (bankCode + accountNumber) is already registered by another user.
+     *
+     * @param bankCode      Bank code (e.g., "VPBANK", "VCB")
+     * @param accountNumber Account number (will be partially masked in error message)
+     * @return DuplicateEntityException instance
+     */
+    public static DuplicateEntityException bankAccount(String bankCode, String accountNumber) {
+        String masked = accountNumber != null && accountNumber.length() > 4
+                ? "***" + accountNumber.substring(accountNumber.length() - 4)
+                : "***";
+        return new DuplicateEntityException(
+                "DUPLICATE_BANK_ACCOUNT",
+                String.format("Bank account already registered by another user: %s/%s", bankCode, masked)
+        );
+    }
 }

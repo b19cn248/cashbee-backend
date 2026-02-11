@@ -120,4 +120,7 @@
     <!-- Fix: Repair PAID cashbacks with NULL paid_batch_id + add paid_at index -->
     <include file="db/changelog/052-fix-cashback-null-paid-batch-id.xml"/>
 
+    <!-- Anti-fraud: Prevent duplicate bank accounts across users -->
+    <include file="db/changelog/053-add-unique-bank-account-constraint.xml"/>
+
 </databaseChangeLog>

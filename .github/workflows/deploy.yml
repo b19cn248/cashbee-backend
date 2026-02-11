@@ -1,0 +1,141 @@
+name: Build & Deploy to VPS
+
+# Khi nào workflow chạy?
+# - Push code lên branch "dev" (bao gồm merge PR vào dev)
+# - Chỉ khi có thay đổi trong source code (bỏ qua thay đổi docs, README...)
+on:
+  push:
+    branches: [ dev ]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - '.gitignore'
+
+# Biến môi trường dùng chung cho toàn bộ workflow
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/cashbee-backend
+  JAVA_VERSION: '21'
+
+jobs:
+
+  # ============================================================
+  # JOB 1: Build & Test
+  # - Compile code
+  # - Chạy unit tests
+  # - Tạo JAR file
+  # ============================================================
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout source code từ GitHub repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Cài đặt Java 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # 3. Build + chạy tests
+      - name: Build and test with Maven
+        run: ./mvnw clean package -B
+
+      # 4. Lưu JAR file để job sau dùng
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: cashbee-presentation/target/*.jar
+          retention-days: 1
+
+  # ============================================================
+  # JOB 2: Build Docker Image & Push to Docker Hub
+  # - Dùng JAR từ job 1
+  # - Build Docker image (chỉ stage runtime, skip build stage)
+  # - Push lên Docker Hub
+  # ============================================================
+  docker-push:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: build-and-test  # Chờ job 1 pass mới chạy
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Tải JAR đã build từ job 1
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: cashbee-presentation/target/
+
+      # Login vào Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Tạo tag cho image: latest + short commit SHA
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.ci
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+
+  # ============================================================
+  # JOB 3: Deploy lên VPS
+  # - SSH vào server
+  # - Git pull code mới (cập nhật docker-compose.prod.yml, .env, ...)
+  # - Pull Docker image mới
+  # - Restart container
+  #
+  # VPS_APP_DIR: đường dẫn ABSOLUTE trên VPS
+  #   Ví dụ: /home/hieupc/cashbee/cashbee-backend
+  #   KHÔNG dùng ~ (tilde) vì có thể không expand đúng qua SSH
+  # ============================================================
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: docker-push  # Chờ image push xong mới deploy
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            echo "=== Updating repo (docker-compose, configs...) ==="
+            cd ${{ secrets.VPS_APP_DIR }}
+            git pull origin dev
+
+            echo "=== Pulling latest Docker image ==="
+            docker pull ${{ env.DOCKER_IMAGE }}:latest
+
+            echo "=== Stopping old container ==="
+            docker compose -f docker-compose.prod.yml down cashbee-backend
+
+            echo "=== Starting new container ==="
+            docker compose -f docker-compose.prod.yml up -d cashbee-backend
+
+            echo "=== Waiting for health check ==="
+            sleep 15
+            docker ps | grep cashbee-backend
+
+            echo "=== Cleaning up old images ==="
+            docker image prune -f
+
+            echo "=== Deploy completed! ==="

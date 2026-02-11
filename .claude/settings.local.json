@@ -126,7 +126,8 @@
       "Bash(.\\\\mvnw.cmd test:*)",
       "Bash(cmd /c \"mvnw.cmd test -pl cashbee-application -Dtest=ProcessReferralMilestoneUseCaseTest -q 2>&1\")",
       "Bash(cmd /c \"mvnw.cmd test -q 2>&1\")",
-      "Bash(cmd /c \"mvnw.cmd compile -q 2>&1\")"
+      "Bash(cmd /c \"mvnw.cmd compile -q 2>&1\")",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

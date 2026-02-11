@@ -5,6 +5,7 @@ import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.port.UserDtoMapper;
 import com.cashbee.application.service.ReferralCodeValidator;
+import com.cashbee.common.exception.DuplicateEntityException;
 import com.cashbee.domain.model.Bank;
 import com.cashbee.domain.model.User;
 import com.cashbee.domain.model.UserBankAccount;
@@ -122,6 +123,16 @@ public class UpdateUserUseCase {
         // Check if bank is active
         if (!bank.isActive()) {
             throw new RuntimeException("Bank is not active: " + bank.getBankCode());
+        }
+
+        // Check for duplicate bank account (fraud prevention)
+        boolean isDuplicate = userBankAccountRepository
+                .existsByBankCodeAndAccountNumberAndUserIdNot(
+                        command.getBankCode(), command.getAccountNumber(), user.getId());
+        if (isDuplicate) {
+            log.warn("Duplicate bank account detected: userId={}, bankCode={}",
+                    user.getId(), command.getBankCode());
+            throw DuplicateEntityException.bankAccount(command.getBankCode(), command.getAccountNumber());
         }
 
         // Find or create bank account

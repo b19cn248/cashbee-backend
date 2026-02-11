@@ -5,6 +5,7 @@ import com.cashbee.application.dto.user.UpdateUserProfileCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.port.UserDtoMapper;
 import com.cashbee.application.service.ReferralCodeValidator;
+import com.cashbee.common.exception.DuplicateEntityException;
 import com.cashbee.common.exception.NotFoundException;
 import com.cashbee.domain.model.User;
 import com.cashbee.domain.model.UserBankAccount;
@@ -148,6 +149,20 @@ public class UpdateUserProfileUseCase {
         }
         if (isNotBlank(command.getBankCode())) {
             bankAccount.setBankCode(command.getBankCode());
+        }
+
+        // Check for duplicate bank account (fraud prevention)
+        // Only check when both bankCode and accountNumber are available (merged values)
+        if (isNotBlank(bankAccount.getBankCode()) && isNotBlank(bankAccount.getAccountNumber())) {
+            boolean isDuplicate = userBankAccountRepository
+                    .existsByBankCodeAndAccountNumberAndUserIdNot(
+                            bankAccount.getBankCode(), bankAccount.getAccountNumber(), userId);
+            if (isDuplicate) {
+                log.warn("Duplicate bank account detected: userId={}, bankCode={}",
+                        userId, bankAccount.getBankCode());
+                throw DuplicateEntityException.bankAccount(
+                        bankAccount.getBankCode(), bankAccount.getAccountNumber());
+            }
         }
 
         // Save bank account

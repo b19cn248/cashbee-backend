@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Anti-fraud: Prevent multiple users from sharing the same bank account.
+
+        Problem: Users can exploit referral bonuses by creating multiple accounts
+        with the same bank account number to collect new-user rewards.
+
+        Fix: Add UNIQUE composite index on (bank_code, account_number).
+        Application-level check also added in UpdateUserUseCase and UpdateUserProfileUseCase.
+    -->
+
+    <!-- Step 1: Detect existing duplicates (warn only, does not block) -->
+    <changeSet id="053-01-detect-existing-duplicates" author="cashbee">
+        <comment>Detect duplicate bank accounts before adding unique constraint</comment>
+        <preConditions onFail="WARN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM (
+                    SELECT bank_code, account_number, COUNT(*) AS cnt
+                    FROM user_bank_account
+                    WHERE bank_code IS NOT NULL AND account_number IS NOT NULL
+                    GROUP BY bank_code, account_number
+                    HAVING COUNT(*) > 1
+                ) duplicates
+            </sqlCheck>
+        </preConditions>
+        <sql>SELECT 1</sql>
+    </changeSet>
+
+    <!-- Step 2: Add unique composite index on (bank_code, account_number) -->
+    <changeSet id="053-02-add-unique-bank-account-index" author="cashbee">
+        <comment>
+            Add UNIQUE constraint on (bank_code, account_number) to prevent
+            multiple users from registering the same bank account.
+        </comment>
+
+        <addUniqueConstraint
+                tableName="user_bank_account"
+                columnNames="bank_code, account_number"
+                constraintName="uk_bank_account_code_number"/>
+
+        <rollback>
+            <dropUniqueConstraint
+                    tableName="user_bank_account"
+                    constraintName="uk_bank_account_code_number"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

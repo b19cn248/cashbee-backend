@@ -44,4 +44,15 @@ public interface UserBankAccountRepository {
      * @param userId User ID
      */
     void deleteByUserId(Long userId);
+
+    /**
+     * Check if the given bank account (bankCode + accountNumber) is already used by another user.
+     * Used for duplicate bank account detection to prevent fraud.
+     *
+     * @param bankCode      Bank code (e.g., "VPBANK", "VCB")
+     * @param accountNumber Account number
+     * @param excludeUserId User ID to exclude from the check (the current user)
+     * @return true if another user already has this bank account
+     */
+    boolean existsByBankCodeAndAccountNumberAndUserIdNot(String bankCode, String accountNumber, Long excludeUserId);
 }
