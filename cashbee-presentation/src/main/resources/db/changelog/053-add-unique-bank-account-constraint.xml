@@ -17,7 +17,6 @@
 
     <!-- Step 1: Detect existing duplicates (warn only, does not block) -->
     <changeSet id="053-01-detect-existing-duplicates" author="cashbee">
-        <comment>Detect duplicate bank accounts before adding unique constraint</comment>
         <preConditions onFail="WARN">
             <sqlCheck expectedResult="0">
                 SELECT COUNT(*) FROM (
@@ -29,6 +28,7 @@
                 ) duplicates
             </sqlCheck>
         </preConditions>
+        <comment>Detect duplicate bank accounts before adding unique constraint</comment>
         <sql>SELECT 1</sql>
     </changeSet>
 
