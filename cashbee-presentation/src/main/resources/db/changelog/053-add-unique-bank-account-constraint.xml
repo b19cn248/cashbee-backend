@@ -7,43 +7,40 @@
 
     <!--
         Anti-fraud: Prevent multiple users from sharing the same bank account.
-
-        Problem: Users can exploit referral bonuses by creating multiple accounts
-        with the same bank account number to collect new-user rewards.
-
-        Fix: Add UNIQUE composite index on (bank_code, account_number).
-        Application-level check also added in UpdateUserUseCase and UpdateUserProfileUseCase.
+        Step 1: Delete older duplicate records (keep newest per bank_code + account_number).
+                Cannot SET NULL because account_number and account_name have NOT NULL constraints.
+                Affected users will need to re-enter their bank account info.
+        Step 2: Add UNIQUE constraint on (bank_code, account_number).
     -->
 
-    <!-- Step 1: Detect existing duplicates (warn only, does not block) -->
-    <changeSet id="053-01-detect-existing-duplicates" author="cashbee">
-        <preConditions onFail="WARN">
-            <sqlCheck expectedResult="0">
-                SELECT COUNT(*) FROM (
-                    SELECT bank_code, account_number, COUNT(*) AS cnt
+    <!-- Step 1: Delete older duplicate bank accounts before adding constraint -->
+    <changeSet id="053-01-cleanup-duplicate-bank-accounts" author="cashbee">
+        <comment>Delete older duplicate bank accounts, keep newest record per bank_code + account_number</comment>
+        <sql>
+            DELETE uba FROM user_bank_account uba
+            INNER JOIN (
+                SELECT dup.id
+                FROM user_bank_account dup
+                INNER JOIN (
+                    SELECT bank_code, account_number, MAX(id) AS max_id
                     FROM user_bank_account
                     WHERE bank_code IS NOT NULL AND account_number IS NOT NULL
                     GROUP BY bank_code, account_number
                     HAVING COUNT(*) > 1
-                ) duplicates
-            </sqlCheck>
-        </preConditions>
-        <comment>Detect duplicate bank accounts before adding unique constraint</comment>
-        <sql>SELECT 1</sql>
+                ) grp ON dup.bank_code = grp.bank_code
+                     AND dup.account_number = grp.account_number
+                     AND dup.id != grp.max_id
+            ) old_dups ON uba.id = old_dups.id;
+        </sql>
     </changeSet>
 
-    <!-- Step 2: Add unique composite index on (bank_code, account_number) -->
+    <!-- Step 2: Add UNIQUE constraint -->
     <changeSet id="053-02-add-unique-bank-account-index" author="cashbee">
-        <comment>
-            Add UNIQUE constraint on (bank_code, account_number) to prevent
-            multiple users from registering the same bank account.
-        </comment>
-
+        <comment>Add UNIQUE constraint on (bank_code, account_number) to prevent duplicate bank accounts</comment>
         <addUniqueConstraint
                 tableName="user_bank_account"
                 columnNames="bank_code, account_number"
                 constraintName="uk_bank_account_code_number"/>
-
         <rollback>
             <dropUniqueConstraint
                     tableName="user_bank_account"
