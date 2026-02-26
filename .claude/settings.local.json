@@ -127,7 +127,22 @@
       "Bash(cmd /c \"mvnw.cmd test -pl cashbee-application -Dtest=ProcessReferralMilestoneUseCaseTest -q 2>&1\")",
       "Bash(cmd /c \"mvnw.cmd test -q 2>&1\")",
       "Bash(cmd /c \"mvnw.cmd compile -q 2>&1\")",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git update-index:*)",
+      "Bash(cd:*)",
+      "WebFetch(domain:help.shopee.sg)",
+      "WebFetch(domain:help.shopee.ph)",
+      "WebFetch(domain:help.shopee.com.my)",
+      "WebFetch(domain:wecantrack.com)",
+      "WebFetch(domain:botize.com)",
+      "WebFetch(domain:doitac.shopee.vn)",
+      "WebFetch(domain:easydata.io.vn)",
+      "WebFetch(domain:www.styledoubler.com)",
+      "WebFetch(domain:seller.shopee.com.my)",
+      "WebFetch(domain:affiliate.shopee.com.br)",
+      "WebFetch(domain:www.affiliateshopee.com.br)",
+      "WebFetch(domain:help-center.affise.com)",
+      "WebFetch(domain:simplepage.vn)"
     ],
     "deny": [],
     "ask": []
