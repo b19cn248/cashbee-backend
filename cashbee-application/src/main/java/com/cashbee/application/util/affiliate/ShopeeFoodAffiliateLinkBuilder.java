@@ -3,8 +3,13 @@ package com.cashbee.application.util.affiliate;
 import org.springframework.stereotype.Component;
 
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * ShopeeFood-specific affiliate link builder.
@@ -35,7 +40,8 @@ public class ShopeeFoodAffiliateLinkBuilder {
     public String build(String originalUrl, String affiliateId, String trackingCode) {
         validateParameters(originalUrl, affiliateId, trackingCode);
 
-        String encodedUrl = urlEncode(originalUrl);
+        String cleanUrl = stripTrackingParams(originalUrl);
+        String encodedUrl = urlEncode(cleanUrl);
 
         return String.format(
             "%s?origin_link=%s&affiliate_id=%s&sub_id=%s",
@@ -53,6 +59,52 @@ public class ShopeeFoodAffiliateLinkBuilder {
      */
     public String getRedirectBase() {
         return SHOPEEFOOD_REDIRECT_BASE;
+    }
+
+    private static final Set<String> ALLOWED_PARAMS = Set.of("itemId", "restaurantId");
+
+    /**
+     * Strip tracking/affiliate params from a ShopeeFood URL, keeping only
+     * functional params (itemId, restaurantId) needed for the page to work.
+     *
+     * @param url Original ShopeeFood URL potentially containing tracking params
+     * @return Clean URL with only allowed query parameters
+     */
+    private String stripTrackingParams(String url) {
+        try {
+            URI uri = new URI(url);
+            String query = uri.getQuery();
+            if (query == null || query.isEmpty()) {
+                return url;
+            }
+
+            Map<String, String> kept = new LinkedHashMap<>();
+            for (String pair : query.split("&")) {
+                int eq = pair.indexOf('=');
+                String key = eq > 0 ? pair.substring(0, eq) : pair;
+                String value = eq > 0 ? pair.substring(eq + 1) : "";
+                if (ALLOWED_PARAMS.contains(key)) {
+                    kept.put(key, value);
+                }
+            }
+
+            String newQuery = null;
+            if (!kept.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                for (Map.Entry<String, String> entry : kept.entrySet()) {
+                    if (sb.length() > 0) {
+                        sb.append('&');
+                    }
+                    sb.append(entry.getKey()).append('=').append(entry.getValue());
+                }
+                newQuery = sb.toString();
+            }
+
+            return new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), newQuery, null).toString();
+        } catch (URISyntaxException e) {
+            int queryIndex = url.indexOf('?');
+            return queryIndex > 0 ? url.substring(0, queryIndex) : url;
+        }
     }
 
     /**
