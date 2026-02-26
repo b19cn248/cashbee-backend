@@ -3,6 +3,8 @@ package com.cashbee.application.util.affiliate;
 import org.springframework.stereotype.Component;
 
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
@@ -35,7 +37,8 @@ public class ShopeeAffiliateLinkBuilder {
     public String build(String originalUrl, String affiliateId, String trackingCode) {
         validateParameters(originalUrl, affiliateId, trackingCode);
 
-        String encodedUrl = urlEncode(originalUrl);
+        String cleanUrl = stripQueryParams(originalUrl);
+        String encodedUrl = urlEncode(cleanUrl);
 
         return String.format(
             "%s?origin_link=%s&affiliate_id=%s&sub_id=%s",
@@ -79,7 +82,8 @@ public class ShopeeAffiliateLinkBuilder {
         // Build sub_id with 5 hyphen-separated values
         String subId = buildSubId(subId1, subId2, subId3, subId4, subId5);
 
-        String encodedUrl = urlEncode(originalUrl);
+        String cleanUrl = stripQueryParams(originalUrl);
+        String encodedUrl = urlEncode(cleanUrl);
 
         return String.format(
             "%s?origin_link=%s&affiliate_id=%s&sub_id=%s",
@@ -97,6 +101,25 @@ public class ShopeeAffiliateLinkBuilder {
      */
     public String getRedirectBase() {
         return SHOPEE_REDIRECT_BASE;
+    }
+
+    /**
+     * Strip all query parameters from a Shopee URL.
+     *
+     * Shopee product info is always in the path (e.g., /Product-i.shopId.itemId),
+     * so all query params are tracking/marketing and can be safely removed.
+     *
+     * @param url Original Shopee URL potentially containing tracking params
+     * @return Clean URL with only scheme, host, and path
+     */
+    private String stripQueryParams(String url) {
+        try {
+            URI uri = new URI(url);
+            return new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), null, null).toString();
+        } catch (URISyntaxException e) {
+            int queryIndex = url.indexOf('?');
+            return queryIndex > 0 ? url.substring(0, queryIndex) : url;
+        }
     }
 
     /**
