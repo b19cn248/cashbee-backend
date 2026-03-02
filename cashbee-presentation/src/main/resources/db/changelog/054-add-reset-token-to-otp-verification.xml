@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="054-add-reset-token-to-otp-verification" author="cashbee-team">
+        <comment>Add reset_token column to otp_verifications table for password reset flow</comment>
+
+        <addColumn tableName="otp_verifications">
+            <column name="reset_token" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <createIndex tableName="otp_verifications" indexName="idx_otp_reset_token">
+            <column name="reset_token"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

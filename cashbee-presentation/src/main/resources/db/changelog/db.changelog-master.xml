@@ -123,4 +123,7 @@
     <!-- Anti-fraud: Prevent duplicate bank accounts across users -->
     <include file="db/changelog/053-add-unique-bank-account-constraint.xml"/>
 
+    <!-- Password Reset: Add reset_token to otp_verifications -->
+    <include file="db/changelog/054-add-reset-token-to-otp-verification.xml"/>
+
 </databaseChangeLog>

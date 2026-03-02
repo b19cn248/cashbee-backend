@@ -118,6 +118,18 @@ public class KeycloakIdentityProviderAdapter implements IdentityProviderPort {
         keycloakAdminService.updateUserAttributes(userId, attributes);
     }
 
+    @Override
+    public void resetPassword(String userId, String newPassword) {
+        log.debug("Adapter: Resetting password in Keycloak: userId={}", userId);
+        keycloakAdminService.resetPassword(userId, newPassword);
+    }
+
+    @Override
+    public boolean verifyPassword(String username, String password) {
+        log.debug("Adapter: Verifying password for username: {}", username);
+        return keycloakAdminService.verifyPassword(username, password);
+    }
+
     /**
      * Convert Keycloak UserRepresentation to IdentityUser.
      *

@@ -65,6 +65,35 @@ public class EmailServiceAdapter implements EmailPort {
     }
 
     @Override
+    public void sendPasswordResetOtpEmail(String to, String otpCode, int expiryMinutes) {
+        log.info("Sending password reset OTP email to: {}", to);
+
+        try {
+            // Prepare template context
+            Context context = new Context();
+            context.setVariable("otpCode", otpCode);
+            context.setVariable("expiryMinutes", expiryMinutes);
+            context.setVariable("appName", appName);
+            context.setVariable("appUrl", appUrl);
+
+            // Process template
+            String htmlContent = templateEngine.process("emails/password-reset-otp-email", context);
+
+            // Send email
+            sendHtmlEmail(
+                to,
+                appName + " - Ma xac thuc dat lai mat khau",
+                htmlContent
+            );
+
+            log.info("Password reset OTP email sent successfully to: {}", to);
+        } catch (Exception e) {
+            log.error("Failed to send password reset OTP email to: {}", to, e);
+            throw new EmailSendException("Failed to send password reset OTP email", e);
+        }
+    }
+
+    @Override
     public void sendWelcomeEmail(String to, String username, String fullName, String referralCode) {
         log.info("Sending welcome email to: {}", to);
 

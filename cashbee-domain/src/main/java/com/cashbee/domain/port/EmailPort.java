@@ -38,9 +38,7 @@ public interface EmailPort {
      * @param expiryMinutes How many minutes until OTP expires
      * @throws EmailSendException if email sending fails
      */
-    default void sendPasswordResetOtpEmail(String to, String otpCode, int expiryMinutes) {
-        throw new UnsupportedOperationException("Password reset OTP email not yet implemented");
-    }
+    void sendPasswordResetOtpEmail(String to, String otpCode, int expiryMinutes);
 
     /**
      * Send email change verification email (future feature)

@@ -15,7 +15,14 @@ import org.keycloak.admin.client.resource.UsersResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.List;
@@ -41,6 +48,12 @@ import java.util.Optional;
 public class KeycloakAdminService {
 
     private final KeycloakProperties keycloakProperties;
+
+    /**
+     * RestTemplate instance for HTTP calls (e.g., password verification).
+     * Created once and reused across method invocations.
+     */
+    private final RestTemplate restTemplate = new RestTemplate();
 
     /**
      * Keycloak Admin Client instance.
@@ -512,6 +525,75 @@ public class KeycloakAdminService {
         } catch (Exception e) {
             log.error("Failed to delete user {}", keycloakId, e);
             throw new RuntimeException("Failed to delete user", e);
+        }
+    }
+
+    // ============================================================
+    // PASSWORD MANAGEMENT METHODS
+    // ============================================================
+
+    /**
+     * Reset user password in Keycloak.
+     * Sets a new permanent (non-temporary) password.
+     *
+     * @param keycloakId  Keycloak user ID
+     * @param newPassword The new password to set
+     */
+    public void resetPassword(String keycloakId, String newPassword) {
+        log.info("Resetting password for user: {}", keycloakId);
+
+        try {
+            CredentialRepresentation credential = new CredentialRepresentation();
+            credential.setTemporary(false);
+            credential.setType(CredentialRepresentation.PASSWORD);
+            credential.setValue(newPassword);
+
+            getUsersResource().get(keycloakId).resetPassword(credential);
+            log.info("Password reset successfully for user: {}", keycloakId);
+
+        } catch (Exception e) {
+            log.error("Failed to reset password for user: {}", keycloakId, e);
+            throw new RuntimeException("Failed to reset password", e);
+        }
+    }
+
+    /**
+     * Verify a user's password by attempting a Resource Owner Password Grant
+     * against the Keycloak token endpoint.
+     *
+     * @param username Username to authenticate
+     * @param password Password to verify
+     * @return true if the password is correct, false otherwise
+     */
+    public boolean verifyPassword(String username, String password) {
+        log.debug("Verifying password for username: {}", username);
+
+        String tokenUrl = keycloakProperties.getServerUrl()
+                + "/realms/" + keycloakProperties.getRealm()
+                + "/protocol/openid-connect/token";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("grant_type", "password");
+        body.add("client_id", keycloakProperties.getClientId());
+        body.add("client_secret", keycloakProperties.getClientSecret());
+        body.add("username", username);
+        body.add("password", password);
+
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    tokenUrl,
+                    new HttpEntity<>(body, headers),
+                    String.class
+            );
+            boolean success = response.getStatusCode().is2xxSuccessful();
+            log.debug("Password verification result for {}: {}", username, success);
+            return success;
+        } catch (Exception e) {
+            log.debug("Password verification failed for {}: {}", username, e.getMessage());
+            return false;
         }
     }
 

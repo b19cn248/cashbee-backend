@@ -142,7 +142,9 @@
       "WebFetch(domain:affiliate.shopee.com.br)",
       "WebFetch(domain:www.affiliateshopee.com.br)",
       "WebFetch(domain:help-center.affise.com)",
-      "WebFetch(domain:simplepage.vn)"
+      "WebFetch(domain:simplepage.vn)",
+      "WebFetch(domain:help.trackier.com)",
+      "WebFetch(domain:seller.shopee.sg)"
     ],
     "deny": [],
     "ask": []

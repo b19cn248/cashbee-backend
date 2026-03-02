@@ -1,5 +1,6 @@
 package com.cashbee.presentation.controller;
 
+import com.cashbee.application.dto.auth.ChangePasswordRequest;
 import com.cashbee.application.dto.user.CheckEmailExistsResponse;
 import com.cashbee.application.dto.user.CheckFirstLoginResponse;
 import com.cashbee.application.dto.user.CheckPhoneExistsResponse;
@@ -10,6 +11,7 @@ import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UpdateUserLevelCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.dto.user.UserSyncCommand;
+import com.cashbee.application.usecase.auth.ChangePasswordUseCase;
 import com.cashbee.application.usecase.user.CheckFirstLoginUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByEmailUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByPhoneUseCase;
@@ -59,6 +61,7 @@ public class UserController {
 
   private static final Logger log = LoggerFactory.getLogger(UserController.class);
 
+  private final ChangePasswordUseCase changePasswordUseCase;
   private final SyncUserFromKeycloakUseCase syncUserFromKeycloakUseCase;
   private final GetUserByKeycloakIdUseCase getUserByKeycloakIdUseCase;
   private final UpdateUserUseCase updateUserUseCase;
@@ -262,6 +265,44 @@ public class UserController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(ApiResponse.success(user, "Profile updated successfully"));
+  }
+
+  /**
+   * Change the authenticated user's password.
+   * <p>
+   * The user must provide their current (old) password and a new password.
+   * The old password is verified against Keycloak before setting the new one.
+   * <p>
+   * Validation rules for new password:
+   * - Minimum 8 characters
+   * - Must contain at least one uppercase letter
+   * - Must contain at least one lowercase letter
+   * - Must contain at least one digit
+   * - Must differ from old password
+   *
+   * @param jwt     JWT token (auto-injected by Spring Security)
+   * @param request Change password request with old and new passwords
+   * @return API response with success message
+   */
+  @PutMapping("/change-password")
+  @Operation(summary = "Change password",
+      description = "Change the authenticated user's password by verifying the old password first")
+  public ResponseEntity<ApiResponse<Void>> changePassword(
+      @AuthenticationPrincipal Jwt jwt,
+      @Valid @RequestBody ChangePasswordRequest request) {
+
+    log.info("API: Change password request for current user");
+
+    String keycloakId = securityUtils.getKeycloakUserId(jwt);
+    String username = securityUtils.getCurrentUsername(jwt);
+
+    changePasswordUseCase.execute(keycloakId, username, request);
+
+    log.info("API: Password changed successfully for user: {}", username);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ApiResponse.success(null, "Doi mat khau thanh cong"));
   }
 
   /**

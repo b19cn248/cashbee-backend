@@ -122,4 +122,16 @@ public class OtpVerificationRepositoryAdapter implements OtpVerificationReposito
         var purposeEntity = mapper.mapPurpose(purpose);
         return jpaRepository.existsByEmailAndPurpose(email, purposeEntity);
     }
+
+    @Override
+    public Optional<OtpVerification> findByEmailAndResetTokenAndPurposeAndVerified(
+            String email, String resetToken, OtpPurpose purpose, boolean verified) {
+        log.debug("Finding OTP verification for email: {}, resetToken: ***, purpose: {}, verified: {}",
+                email, purpose, verified);
+
+        var purposeEntity = mapper.mapPurpose(purpose);
+        return jpaRepository.findByEmailAndResetTokenAndPurposeAndVerified(
+                email, resetToken, purposeEntity, verified)
+                .map(mapper::toDomain);
+    }
 }

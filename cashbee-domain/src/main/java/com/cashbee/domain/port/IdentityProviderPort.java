@@ -147,4 +147,24 @@ public interface IdentityProviderPort {
      * @throws RuntimeException if update fails
      */
     void updateUserAttributes(String userId, Map<String, String> attributes);
+
+    /**
+     * Reset user password in the identity provider.
+     * Sets a new permanent (non-temporary) password for the user.
+     *
+     * @param userId      User ID in identity provider
+     * @param newPassword The new password to set
+     * @throws RuntimeException if password reset fails
+     */
+    void resetPassword(String userId, String newPassword);
+
+    /**
+     * Verify a user's password by attempting authentication against
+     * the identity provider.
+     *
+     * @param username Username to authenticate
+     * @param password Password to verify
+     * @return true if the password is correct, false otherwise
+     */
+    boolean verifyPassword(String username, String password);
 }

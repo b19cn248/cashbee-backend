@@ -102,4 +102,16 @@ public interface OtpVerificationRepository {
      * @return true if OTP exists
      */
     boolean existsByEmailAndPurpose(String email, OtpPurpose purpose);
+
+    /**
+     * Find a verified OTP verification by email, reset token, and purpose.
+     * Used during password reset to validate the reset token.
+     *
+     * @param email      The email address
+     * @param resetToken The reset token (UUID)
+     * @param purpose    The OTP purpose
+     * @return Optional containing the OTP verification if found
+     */
+    Optional<OtpVerification> findByEmailAndResetTokenAndPurposeAndVerified(
+            String email, String resetToken, OtpPurpose purpose, boolean verified);
 }

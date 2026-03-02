@@ -51,6 +51,18 @@
     {
       "path": "/api/users/check-has-referrer",
       "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/auth/forgot-password",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/auth/verify-reset-otp",
+      "enforcement-mode": "DISABLED"
+    },
+    {
+      "path": "/api/auth/reset-password",
+      "enforcement-mode": "DISABLED"
     }
   ]
 }

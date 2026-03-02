@@ -67,4 +67,11 @@ public interface OtpVerificationJpaRepository extends JpaRepository<OtpVerificat
      * Check if OTP exists for email and purpose
      */
     boolean existsByEmailAndPurpose(String email, OtpPurposeEntity purpose);
+
+    /**
+     * Find a verified OTP verification by email, reset token, purpose, and verified status.
+     * Used during password reset to validate the reset token.
+     */
+    Optional<OtpVerificationEntity> findByEmailAndResetTokenAndPurposeAndVerified(
+            String email, String resetToken, OtpPurposeEntity purpose, boolean verified);
 }

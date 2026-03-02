@@ -1,14 +1,23 @@
 package com.cashbee.presentation.controller;
 
+import com.cashbee.application.dto.auth.ForgotPasswordRequest;
+import com.cashbee.application.dto.auth.ForgotPasswordResponse;
 import com.cashbee.application.dto.auth.RegisterRequest;
 import com.cashbee.application.dto.auth.RegisterResponse;
 import com.cashbee.application.dto.auth.ResendOtpRequest;
 import com.cashbee.application.dto.auth.ResendOtpResponse;
+import com.cashbee.application.dto.auth.ResetPasswordRequest;
+import com.cashbee.application.dto.auth.ResetPasswordResponse;
 import com.cashbee.application.dto.auth.VerifyOtpRequest;
 import com.cashbee.application.dto.auth.VerifyOtpResponse;
+import com.cashbee.application.dto.auth.VerifyResetOtpRequest;
+import com.cashbee.application.dto.auth.VerifyResetOtpResponse;
+import com.cashbee.application.usecase.auth.ForgotPasswordUseCase;
 import com.cashbee.application.usecase.auth.RegisterUserUseCase;
 import com.cashbee.application.usecase.auth.ResendOtpUseCase;
+import com.cashbee.application.usecase.auth.ResetPasswordUseCase;
 import com.cashbee.application.usecase.auth.VerifyOtpUseCase;
+import com.cashbee.application.usecase.auth.VerifyResetOtpUseCase;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -56,6 +65,9 @@ public class AuthController {
     private final RegisterUserUseCase registerUserUseCase;
     private final VerifyOtpUseCase verifyOtpUseCase;
     private final ResendOtpUseCase resendOtpUseCase;
+    private final ForgotPasswordUseCase forgotPasswordUseCase;
+    private final VerifyResetOtpUseCase verifyResetOtpUseCase;
+    private final ResetPasswordUseCase resetPasswordUseCase;
 
     /**
      * Register a new user.
@@ -198,6 +210,95 @@ public class AuthController {
         ResendOtpResponse response = resendOtpUseCase.execute(request);
 
         log.info("API: OTP resent successfully: email={}", request.email());
+
+        return ResponseEntity
+                .ok(ApiResponse.success(response, response.message()));
+    }
+
+    // ==================== Password Reset Endpoints ====================
+
+    /**
+     * Forgot password - send OTP to user's email (step 1).
+     * <p>
+     * User provides their email. If the email exists in the system,
+     * an OTP code is sent for password reset verification.
+     *
+     * @param request Forgot password request with email
+     * @return API response with masked email and OTP expiry info
+     */
+    @PostMapping("/forgot-password")
+    @Operation(
+        summary = "Forgot password - send reset OTP",
+        description = "Send a password reset OTP to the user's email address. " +
+                      "If the email exists in the system, an OTP code is sent. " +
+                      "This is a public endpoint - no authentication required."
+    )
+    public ResponseEntity<ApiResponse<ForgotPasswordResponse>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        log.info("API: Forgot password request received: email={}", request.email());
+
+        ForgotPasswordResponse response = forgotPasswordUseCase.execute(request);
+
+        log.info("API: Forgot password OTP sent successfully");
+
+        return ResponseEntity
+                .ok(ApiResponse.success(response, response.message()));
+    }
+
+    /**
+     * Verify reset OTP and obtain a reset token (step 2).
+     * <p>
+     * User provides the OTP code received via email.
+     * If valid, a reset token (UUID) is returned for step 3.
+     *
+     * @param request Verify reset OTP request with email and OTP code
+     * @return API response with reset token
+     */
+    @PostMapping("/verify-reset-otp")
+    @Operation(
+        summary = "Verify password reset OTP",
+        description = "Verify the OTP code sent for password reset. " +
+                      "Returns a reset token (UUID) that must be used in the next step. " +
+                      "This is a public endpoint - no authentication required."
+    )
+    public ResponseEntity<ApiResponse<VerifyResetOtpResponse>> verifyResetOtp(
+            @Valid @RequestBody VerifyResetOtpRequest request) {
+
+        log.info("API: Verify reset OTP request received: email={}", request.email());
+
+        VerifyResetOtpResponse response = verifyResetOtpUseCase.execute(request);
+
+        log.info("API: Reset OTP verified successfully");
+
+        return ResponseEntity
+                .ok(ApiResponse.success(response, response.message()));
+    }
+
+    /**
+     * Reset password using the reset token (step 3).
+     * <p>
+     * User provides the reset token and new password.
+     * The password is reset in Keycloak.
+     *
+     * @param request Reset password request with email, reset token, and new password
+     * @return API response with success message
+     */
+    @PostMapping("/reset-password")
+    @Operation(
+        summary = "Reset password",
+        description = "Reset the user's password using the reset token obtained from OTP verification. " +
+                      "The reset token must be used within 10 minutes of verification. " +
+                      "This is a public endpoint - no authentication required."
+    )
+    public ResponseEntity<ApiResponse<ResetPasswordResponse>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        log.info("API: Reset password request received: email={}", request.email());
+
+        ResetPasswordResponse response = resetPasswordUseCase.execute(request);
+
+        log.info("API: Password reset successfully");
 
         return ResponseEntity
                 .ok(ApiResponse.success(response, response.message()));
