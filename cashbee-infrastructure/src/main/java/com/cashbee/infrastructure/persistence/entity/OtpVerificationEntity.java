@@ -74,6 +74,9 @@ public class OtpVerificationEntity {
     @Column(name = "last_resend_at")
     private LocalDateTime lastResendAt;
 
+    @Column(name = "reset_token", length = 36)
+    private String resetToken;
+
     /**
      * Enum for OTP purpose - JPA entity level
      */

@@ -15,6 +15,7 @@ import org.keycloak.admin.client.resource.UsersResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -591,6 +592,67 @@ public class KeycloakAdminService {
         } catch (Exception e) {
             log.error("Failed to update user {} attributes", keycloakId, e);
             throw new RuntimeException("Failed to update user attributes", e);
+        }
+    }
+
+    // ============================================================
+    // PASSWORD MANAGEMENT METHODS
+    // ============================================================
+
+    /**
+     * Reset (set) a user's password in Keycloak.
+     *
+     * @param keycloakId Keycloak user ID
+     * @param newPassword New password (plain text, hashed by Keycloak)
+     */
+    public void setUserPassword(String keycloakId, String newPassword) {
+        log.info("Resetting password for user: {}", keycloakId);
+
+        try {
+            CredentialRepresentation credential = new CredentialRepresentation();
+            credential.setType(CredentialRepresentation.PASSWORD);
+            credential.setValue(newPassword);
+            credential.setTemporary(false);
+
+            getUsersResource().get(keycloakId).resetPassword(credential);
+            log.info("Password reset successfully for user: {}", keycloakId);
+
+        } catch (Exception e) {
+            log.error("Failed to reset password for user: {}", keycloakId, e);
+            throw new RuntimeException("Failed to reset user password", e);
+        }
+    }
+
+    /**
+     * Verify user credentials by requesting a token from Keycloak.
+     * Uses Resource Owner Password Credentials grant (grant_type=password).
+     *
+     * @param username Username to verify
+     * @param password Password to verify
+     * @return true if credentials are valid, false otherwise
+     */
+    public boolean verifyUserCredentials(String username, String password) {
+        log.debug("Verifying credentials for user: {}", username);
+
+        Keycloak testClient = KeycloakBuilder.builder()
+                .serverUrl(keycloakProperties.getServerUrl())
+                .realm(keycloakProperties.getRealm())
+                .grantType(OAuth2Constants.PASSWORD)
+                .clientId(keycloakProperties.getClientId())
+                .clientSecret(keycloakProperties.getClientSecret())
+                .username(username)
+                .password(password)
+                .build();
+        try {
+            // If token retrieval succeeds, credentials are valid
+            testClient.tokenManager().getAccessToken();
+            log.debug("Credentials verified successfully for user: {}", username);
+            return true;
+        } catch (Exception e) {
+            log.debug("Credential verification failed for user: {} - {}", username, e.getMessage());
+            return false;
+        } finally {
+            testClient.close();
         }
     }
 

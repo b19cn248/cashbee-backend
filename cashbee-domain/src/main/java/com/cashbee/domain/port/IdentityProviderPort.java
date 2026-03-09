@@ -147,4 +147,22 @@ public interface IdentityProviderPort {
      * @throws RuntimeException if update fails
      */
     void updateUserAttributes(String userId, Map<String, String> attributes);
+
+    /**
+     * Reset a user's password in the identity provider.
+     *
+     * @param keycloakId User ID in identity provider
+     * @param newPassword New password (will be hashed by identity provider)
+     * @throws RuntimeException if password reset fails
+     */
+    void resetUserPassword(String keycloakId, String newPassword);
+
+    /**
+     * Verify user credentials by attempting authentication.
+     *
+     * @param username Username to authenticate
+     * @param password Password to verify
+     * @return true if credentials are valid
+     */
+    boolean verifyUserCredentials(String username, String password);
 }

@@ -26,6 +26,13 @@ public final class ErrorCode {
     public static final String USER_BANNED = "ERR_USER_BANNED";
     public static final String INVALID_CREDENTIALS = "ERR_INVALID_CREDENTIALS";
 
+    // OTP / Password Reset
+    public static final String INVALID_OTP = "ERR_INVALID_OTP";
+    public static final String OTP_EXPIRED = "ERR_OTP_EXPIRED";
+    public static final String MAX_ATTEMPTS_EXCEEDED = "ERR_MAX_ATTEMPTS_EXCEEDED";
+    public static final String OTP_RESEND_COOLDOWN = "ERR_OTP_RESEND_COOLDOWN";
+    public static final String INVALID_RESET_TOKEN = "ERR_INVALID_RESET_TOKEN";
+
     // Wallet
     public static final String WALLET_NOT_FOUND = "ERR_WALLET_NOT_FOUND";
     public static final String INSUFFICIENT_BALANCE = "ERR_INSUFFICIENT_BALANCE";

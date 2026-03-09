@@ -98,6 +98,9 @@ public class SecurityConfig {
                 "/api/auth/register",
                 "/api/auth/verify-otp",
                 "/api/auth/resend-otp",
+                "/api/auth/forgot-password",
+                "/api/auth/verify-reset-otp",
+                "/api/auth/reset-password",
                 "/api/users/sync",
                 // Public API endpoints - No auth required
                 "/api/public/**",

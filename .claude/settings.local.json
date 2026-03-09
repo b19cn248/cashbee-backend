@@ -142,7 +142,17 @@
       "WebFetch(domain:affiliate.shopee.com.br)",
       "WebFetch(domain:www.affiliateshopee.com.br)",
       "WebFetch(domain:help-center.affise.com)",
-      "WebFetch(domain:simplepage.vn)"
+      "WebFetch(domain:simplepage.vn)",
+      "WebFetch(domain:www.oreateai.com)",
+      "WebFetch(domain:www.postman.com)",
+      "WebFetch(domain:www.francescatabor.com)",
+      "WebFetch(domain:docs.optimisemedia.com)",
+      "WebFetch(domain:tray.ai)",
+      "WebFetch(domain:scrapecreators.com)",
+      "WebFetch(domain:ads.tiktok.com)",
+      "WebFetch(domain:docs.tray.ai)",
+      "WebFetch(domain:blog.constacloud.com)",
+      "WebFetch(domain:www.dashboardly.io)"
     ],
     "deny": [],
     "ask": []

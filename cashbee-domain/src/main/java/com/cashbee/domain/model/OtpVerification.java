@@ -3,6 +3,7 @@ package com.cashbee.domain.model;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Domain entity representing an OTP (One-Time Password) verification record.
@@ -97,6 +98,12 @@ public class OtpVerification {
      */
     private LocalDateTime lastResendAt;
 
+    /**
+     * Reset token (UUID) issued after OTP is verified for PASSWORD_RESET flow.
+     * Used to authorize the final password reset step.
+     */
+    private String resetToken;
+
     // ==================== Business Logic Methods ====================
 
     /**
@@ -124,6 +131,16 @@ public class OtpVerification {
      * Mark this OTP as verified
      */
     public void markAsVerified() {
+        this.verified = true;
+        this.verifiedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Generate a UUID reset token after OTP is verified for PASSWORD_RESET flow.
+     * Sets verified=true, verifiedAt=now, and resetToken=UUID.
+     */
+    public void generateResetToken() {
+        this.resetToken = UUID.randomUUID().toString();
         this.verified = true;
         this.verifiedAt = LocalDateTime.now();
     }

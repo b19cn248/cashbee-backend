@@ -1,5 +1,6 @@
 package com.cashbee.presentation.controller;
 
+import com.cashbee.application.dto.auth.ChangePasswordRequest;
 import com.cashbee.application.dto.user.CheckEmailExistsResponse;
 import com.cashbee.application.dto.user.CheckFirstLoginResponse;
 import com.cashbee.application.dto.user.CheckPhoneExistsResponse;
@@ -10,6 +11,7 @@ import com.cashbee.application.dto.user.UpdateUserCommand;
 import com.cashbee.application.dto.user.UpdateUserLevelCommand;
 import com.cashbee.application.dto.user.UserResponse;
 import com.cashbee.application.dto.user.UserSyncCommand;
+import com.cashbee.application.usecase.auth.ChangePasswordUseCase;
 import com.cashbee.application.usecase.user.CheckFirstLoginUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByEmailUseCase;
 import com.cashbee.application.usecase.user.CheckUserExistsByPhoneUseCase;
@@ -59,6 +61,7 @@ public class UserController {
 
   private static final Logger log = LoggerFactory.getLogger(UserController.class);
 
+  private final ChangePasswordUseCase changePasswordUseCase;
   private final SyncUserFromKeycloakUseCase syncUserFromKeycloakUseCase;
   private final GetUserByKeycloakIdUseCase getUserByKeycloakIdUseCase;
   private final UpdateUserUseCase updateUserUseCase;
@@ -516,5 +519,32 @@ public class UserController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(ApiResponse.success(response));
+  }
+
+  /**
+   * Change password for the authenticated user.
+   *
+   * @param jwt     JWT token (auto-injected by Spring Security)
+   * @param request Change password request with old and new password
+   * @return Success response
+   */
+  @PutMapping("/change-password")
+  @Operation(summary = "Change password",
+      description = "Change the current user's password. Requires the current password for verification. " +
+                    "New password must be at least 8 characters with uppercase, lowercase, and digit.")
+  public ResponseEntity<ApiResponse<Void>> changePassword(
+      @AuthenticationPrincipal Jwt jwt,
+      @Valid @RequestBody ChangePasswordRequest request) {
+
+    log.info("API: Change password request received");
+
+    String keycloakId = securityUtils.getKeycloakUserId(jwt);
+    changePasswordUseCase.execute(keycloakId, request);
+
+    log.info("API: Password changed successfully for keycloakId: {}", keycloakId);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(ApiResponse.success(null, "Password changed successfully."));
   }
 }
