@@ -1,14 +1,22 @@
 package com.cashbee.presentation.controller;
 
+import com.cashbee.application.dto.auth.ForgotPasswordRequest;
+import com.cashbee.application.dto.auth.ForgotPasswordResponse;
 import com.cashbee.application.dto.auth.RegisterRequest;
 import com.cashbee.application.dto.auth.RegisterResponse;
 import com.cashbee.application.dto.auth.ResendOtpRequest;
 import com.cashbee.application.dto.auth.ResendOtpResponse;
+import com.cashbee.application.dto.auth.ResetPasswordRequest;
 import com.cashbee.application.dto.auth.VerifyOtpRequest;
 import com.cashbee.application.dto.auth.VerifyOtpResponse;
+import com.cashbee.application.dto.auth.VerifyResetOtpRequest;
+import com.cashbee.application.dto.auth.VerifyResetOtpResponse;
+import com.cashbee.application.usecase.auth.ForgotPasswordUseCase;
 import com.cashbee.application.usecase.auth.RegisterUserUseCase;
 import com.cashbee.application.usecase.auth.ResendOtpUseCase;
+import com.cashbee.application.usecase.auth.ResetPasswordUseCase;
 import com.cashbee.application.usecase.auth.VerifyOtpUseCase;
+import com.cashbee.application.usecase.auth.VerifyResetOtpUseCase;
 import com.cashbee.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -56,6 +64,9 @@ public class AuthController {
     private final RegisterUserUseCase registerUserUseCase;
     private final VerifyOtpUseCase verifyOtpUseCase;
     private final ResendOtpUseCase resendOtpUseCase;
+    private final ForgotPasswordUseCase forgotPasswordUseCase;
+    private final VerifyResetOtpUseCase verifyResetOtpUseCase;
+    private final ResetPasswordUseCase resetPasswordUseCase;
 
     /**
      * Register a new user.
@@ -194,12 +205,79 @@ public class AuthController {
 
         log.info("API: Resend OTP request received: email={}", request.email());
 
-        // Execute resend OTP use case
         ResendOtpResponse response = resendOtpUseCase.execute(request);
 
         log.info("API: OTP resent successfully: email={}", request.email());
 
         return ResponseEntity
                 .ok(ApiResponse.success(response, response.message()));
+    }
+
+    /**
+     * Initiate forgot password flow.
+     * Sends a password reset OTP to the user's email address.
+     */
+    @PostMapping("/forgot-password")
+    @Operation(
+        summary = "Initiate forgot password",
+        description = "Send a 6-digit OTP to the user's email for password reset. " +
+                      "Returns masked email and OTP expiry in seconds. " +
+                      "Subject to resend cooldown."
+    )
+    public ResponseEntity<ApiResponse<ForgotPasswordResponse>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        log.info("API: Forgot password request received: email={}", request.email());
+
+        ForgotPasswordResponse response = forgotPasswordUseCase.execute(request);
+
+        log.info("API: Password reset OTP sent: maskedEmail={}", response.maskedEmail());
+
+        return ResponseEntity.ok(ApiResponse.success(response,
+            "A password reset code has been sent to your email address."));
+    }
+
+    /**
+     * Verify the password reset OTP and obtain a reset token.
+     */
+    @PostMapping("/verify-reset-otp")
+    @Operation(
+        summary = "Verify password reset OTP",
+        description = "Verify the OTP sent for password reset. " +
+                      "Returns a one-time reset token to be used in the reset-password step."
+    )
+    public ResponseEntity<ApiResponse<VerifyResetOtpResponse>> verifyResetOtp(
+            @Valid @RequestBody VerifyResetOtpRequest request) {
+
+        log.info("API: Verify reset OTP request received: email={}", request.email());
+
+        VerifyResetOtpResponse response = verifyResetOtpUseCase.execute(request);
+
+        log.info("API: Reset OTP verified successfully: email={}", request.email());
+
+        return ResponseEntity.ok(ApiResponse.success(response,
+            "OTP verified successfully. Use the reset token to set your new password."));
+    }
+
+    /**
+     * Reset password using the token obtained after OTP verification.
+     */
+    @PostMapping("/reset-password")
+    @Operation(
+        summary = "Reset password",
+        description = "Set a new password using the reset token obtained after OTP verification. " +
+                      "Password must be at least 8 characters with uppercase, lowercase, and digit."
+    )
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        log.info("API: Reset password request received: email={}", request.email());
+
+        resetPasswordUseCase.execute(request);
+
+        log.info("API: Password reset successfully: email={}", request.email());
+
+        return ResponseEntity.ok(ApiResponse.success(null,
+            "Password has been reset successfully. You can now log in with your new password."));
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 /**
  * Global exception handler for REST API.
@@ -108,6 +109,32 @@ public class GlobalExceptionHandler {
         log.error("File processing error: {}", ex.getMessage());
         return ResponseEntity
             .status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
+    }
+
+    /**
+     * Handle OtpValidationException.
+     * Returns 400 BAD REQUEST with attemptsRemaining in data.
+     */
+    @ExceptionHandler(OtpValidationException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleOtpValidationException(OtpValidationException ex) {
+        log.warn("OTP validation failed: {}", ex.getMessage());
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("attemptsRemaining", ex.getAttemptsRemaining());
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage(), data));
+    }
+
+    /**
+     * Handle TooManyRequestsException.
+     * Returns 429 TOO MANY REQUESTS.
+     */
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTooManyRequestsException(TooManyRequestsException ex) {
+        log.warn("Too many requests: {}", ex.getMessage());
+        return ResponseEntity
+            .status(HttpStatus.TOO_MANY_REQUESTS)
             .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
     }
 

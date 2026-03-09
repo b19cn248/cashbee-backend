@@ -23,4 +23,8 @@ public class BadRequestException extends BusinessException {
     public BadRequestException(String message, Throwable cause) {
         super(DEFAULT_ERROR_CODE, message, cause);
     }
+
+    public BadRequestException(String errorCode, String message, Object... args) {
+        super(errorCode, message, args);
+    }
 }

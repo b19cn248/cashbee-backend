@@ -31,16 +31,14 @@ public interface EmailPort {
     void sendWelcomeEmail(String to, String username, String fullName, String referralCode);
 
     /**
-     * Send password reset OTP email (future feature)
+     * Send password reset OTP email.
      *
      * @param to Recipient email address
      * @param otpCode The 6-digit OTP code
      * @param expiryMinutes How many minutes until OTP expires
      * @throws EmailSendException if email sending fails
      */
-    default void sendPasswordResetOtpEmail(String to, String otpCode, int expiryMinutes) {
-        throw new UnsupportedOperationException("Password reset OTP email not yet implemented");
-    }
+    void sendPasswordResetOtpEmail(String to, String otpCode, int expiryMinutes);
 
     /**
      * Send email change verification email (future feature)
