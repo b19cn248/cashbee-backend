@@ -50,7 +50,7 @@ services:
 
       # Mail configuration
       MAIL_USERNAME: hieunm123.ptit@gmail.com
-      MAIL_PASSWORD: mauh rsak uxpc kbpo
+      MAIL_PASSWORD: ncmp xksc ggmu wlag
 
       # Liquibase Configuration
       SPRING_LIQUIBASE_ENABLED: true
