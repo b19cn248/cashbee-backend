@@ -1,132 +1,147 @@
-# CLAUDE.md
+# CashBee Backend
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Java 21 / Spring Boot 3.4.1 backend for the CashBee cashback/affiliate marketing platform.
 
-## Build & Run Commands
+## Development Commands
 
 ```bash
-# Build all modules
-./mvnw clean install
+# Build & compile
+./mvnw clean compile
 
-# Run application (default port 8080)
-./mvnw spring-boot:run -pl cashbee-presentation
-
-# Run tests
+# Run all tests
 ./mvnw test
 
-# Run single test class
-./mvnw test -pl cashbee-application -Dtest=AddPendingBalanceUseCaseTest
+# Build skipping tests
+./mvnw clean install -DskipTests
 
-# Run tests with coverage report
+# Run the application
+./mvnw spring-boot:run -pl cashbee-presentation
+
+# Run specific test
+./mvnw test -pl cashbee-application -Dtest=WalletUseCaseTest
+
+# Code coverage
 ./mvnw clean test jacoco:report
-
-# Compile only (faster for checking compilation errors)
-./mvnw compile
-
-# Docker (includes MySQL + Backend)
-docker-compose up -d
 ```
 
-## Architecture Overview
+## Architecture: Hexagonal (Ports & Adapters)
 
-This is a **Hexagonal Architecture (Ports & Adapters)** multi-module Maven project for a cashback platform.
-
-### Module Structure & Dependencies
+Multi-module Maven project with strict layer separation:
 
 ```
-cashbee-presentation  (REST Controllers, Main App, Liquibase migrations)
-         |
-         v
-cashbee-application   (Use Cases, DTOs, Application Services)
-         |
-         v
-cashbee-domain        (Pure domain models, Repository interfaces - NO infrastructure deps)
-         ^
-         |
-cashbee-infrastructure (JPA Entities, Repository Adapters, Mappers)
-         |
-    cashbee-common    (Exceptions, Constants, Utilities - shared by all)
+cashbee-common/         → Exceptions, constants, utilities
+cashbee-domain/         → Pure domain models, repository interfaces (Ports), enums
+cashbee-infrastructure/ → JPA entities, repository adapters, mappers, Keycloak
+cashbee-application/    → Use cases, DTOs, port interfaces
+cashbee-presentation/   → REST controllers, exception handlers, security config
 ```
 
-### Key Architecture Rules
-
-**Domain Layer (cashbee-domain):**
-- Pure POJOs with NO JPA annotations, NO Spring dependencies
-- Repository interfaces define ports (contracts)
-- Foreign keys as primitive types (`Long userId`, NOT `User user`)
-- Business logic lives here (e.g., `wallet.addPendingBalance()`)
-
-**Infrastructure Layer (cashbee-infrastructure):**
-- JPA entities with `@Entity`, `@Table` annotations
-- Repository adapters implement domain interfaces
-- MapStruct mappers convert Domain <-> JPA Entity
-- Pattern: `*JpaEntity.java`, `*JpaRepository.java`, `*RepositoryAdapter.java`, `*Mapper.java`
-
-**Application Layer (cashbee-application):**
-- Use cases orchestrate business workflows
-- Each use case = one class with `execute()` method
-- Annotated with `@Service` and `@Transactional`
-- Returns DTOs, never domain models directly
-
-**Presentation Layer (cashbee-presentation):**
-- REST Controllers call use cases
-- All endpoints return `ApiResponse<T>` wrapper
-- Database migrations in `src/main/resources/db/changelog/`
-
-## Technology Stack
-
-- Java 21, Spring Boot 3.4.1
-- MySQL 8.3.0 with Liquibase migrations
-- Keycloak for OAuth2/OIDC authentication
-- MapStruct 1.6.3 + Lombok 1.18.36 for mapping/boilerplate
-- JUnit 5 + Mockito + Testcontainers for testing
-
-## Common Patterns
-
-### Use Case Pattern
-```java
-@Service
-@RequiredArgsConstructor
-@Transactional
-public class SomeActionUseCase {
-    private final SomeRepository repository;
-    private final SomeMapper mapper;
-
-    public ResponseDto execute(CommandDto command) {
-        // 1. Find domain entity
-        // 2. Call domain business method
-        // 3. Save via repository
-        // 4. Map to response DTO
-    }
-}
+### Module Dependencies
+```
+presentation → application, common
+application → domain, common
+infrastructure → domain, common (implements domain interfaces)
+domain → common
+common → (none)
 ```
 
-### Repository Adapter Pattern
-```java
-@Component
-public class SomeRepositoryAdapter implements SomeRepository {
-    private final SomeJpaRepository jpaRepository;
-    private final SomeMapper mapper;
+### Critical Architecture Rules
 
-    @Override
-    public DomainModel save(DomainModel model) {
-        JpaEntity entity = mapper.toEntity(model);
-        JpaEntity saved = jpaRepository.save(entity);
-        return mapper.toDomain(saved);
-    }
+1. **Domain layer is PURE** — zero framework dependencies, no JPA annotations, no Spring imports
+2. **Domain models use primitive foreign keys** — `Long userId`, NOT `User user`
+3. **Infrastructure JPA entities are separate** from domain models — mappers convert between them
+4. **Use cases** are `@Service @Transactional` classes with constructor injection
+5. **Controllers** use `@RestController @RequestMapping`
+6. **Authorization** is handled by Keycloak Policy Enforcer (no `@PreAuthorize`)
+
+## Package Structure
+
+```
+com.cashbee.common.
+  exception/        → BusinessException, NotFoundException, BadRequestException, etc.
+  constant/         → AppConstants, ErrorCode
+  util/             → MoneyUtils, DateTimeUtils, StringUtils
+  validation/       → Custom validators
+
+com.cashbee.domain.
+  model/            → User, UserWallet, Transaction, PayoutRequest, AffiliateOrder, etc.
+  repository/       → Repository interfaces (Ports)
+  enums/            → UserStatus, OrderStatus, PayoutStatus, etc.
+
+com.cashbee.infrastructure.
+  entity/           → JPA entities (@Entity, @Table)
+  persistence/
+    entity/         → Legacy JPA entities
+    repository/     → Spring Data JpaRepository interfaces
+    adapter/        → Repository implementations (Adapters)
+    mapper/         → Domain ↔ JPA entity mappers
+  keycloak/         → Keycloak admin API integration
+  config/           → Infrastructure configuration
+
+com.cashbee.application.
+  usecase/{feature}/ → Use case classes (@Service, @Transactional)
+  dto/              → Request/Response DTOs (prefer records)
+  port/             → Domain ↔ DTO mapper interfaces (MapStruct)
+  util/             → Application utilities
+
+com.cashbee.presentation.
+  controller/       → REST controllers
+  handler/          → Global exception handlers
+  config/           → SecurityConfig, OpenAPI config
+  dto/              → ApiResponse wrapper
+```
+
+## API Response Format
+
+All endpoints return `ApiResponse<T>`:
+```json
+{
+  "success": true,
+  "message": "Operation successful",
+  "data": { ... },
+  "errorCode": null,
+  "timestamp": "2025-01-01T00:00:00"
 }
 ```
 
 ## Database
 
-- Schema managed by Liquibase (never use `ddl-auto: create/update`)
-- Changelog files: `cashbee-presentation/src/main/resources/db/changelog/`
-- Main changelog: `db.changelog-master.xml`
-- Naming: `NNN-description.xml` (e.g., `024-refactor-cashback-per-item.xml`)
+- **MySQL 8.3.0** via Spring Data JPA
+- **Liquibase 4.31.0** for schema migrations
+- Migration files: `cashbee-presentation/src/main/resources/db/changelog/`
+- Master file: `db.changelog-master.xml`
+- Naming convention: `{NNN}-{description}.xml`
+- `spring.jpa.ddl-auto=validate` (Liquibase manages schema, JPA validates)
 
-## Keycloak Integration
+## Authentication & Security
 
-- Backend validates JWT tokens from Keycloak
-- Users sync from Keycloak to local database via `/api/users/sync`
-- Backend does NOT store passwords - Keycloak handles all auth
-- Config in `application.yml` under `keycloak:` and `spring.security.oauth2.resourceserver`
+- **Keycloak 26.0.7** — OAuth2/OIDC identity provider
+- JWT tokens validated via JWK Set URI
+- **Keycloak Policy Enforcer** for fine-grained authorization
+- Resources and scopes defined in Keycloak Admin Console
+- Stateless sessions (`SessionCreationPolicy.STATELESS`)
+- CORS: localhost:3000, localhost:3007, cashbee.nguocchieuvangle.io.vn
+
+## Key Dependencies
+
+| Dependency | Version | Purpose |
+|-----------|---------|---------|
+| Spring Boot | 3.4.1 | Framework |
+| Spring Data JPA | (managed) | Data access |
+| Keycloak | 26.0.7 | Auth |
+| Liquibase | 4.31.0 | DB migrations |
+| MapStruct | 1.6.3 | Object mapping |
+| SpringDoc OpenAPI | 2.7.0 | Swagger/API docs |
+| Apache POI | 5.3.0 | Excel processing |
+| Testcontainers | 1.20.4 | Integration tests |
+| JaCoCo | (managed) | Code coverage (80% min) |
+
+## Conventions
+
+- Use `record` for DTOs
+- Constructor injection only (no @Autowired on fields)
+- `@Transactional` on use case methods, not repository methods
+- Money operations: `MoneyUtils` (BigDecimal with proper scale)
+- Dates: `java.time.LocalDateTime`
+- Exception hierarchy: `BusinessException` base → `NotFoundException`, `BadRequestException`, `ValidationException`, `InsufficientBalanceException`, `DuplicateEntityException`, `ForbiddenException`, `UnauthorizedException`
+- Domain entity scanning: both `infrastructure.entity` and `infrastructure.persistence.entity`
