@@ -37,7 +37,7 @@ import java.util.Map;
 
 /**
  * REST Controller for Admin Dashboard.
- *
+ * <p>
  * Provides endpoints for:
  * - System statistics and overview
  * - User management
@@ -75,13 +75,13 @@ public class AdminController {
 
     /**
      * Get comprehensive system statistics.
-     *
+     * <p>
      * Returns overview of the entire system including:
      * - User and wallet counts
      * - Balance statistics (total, locked, pending, earned, withdrawn)
      * - Payout statistics by status
      * - Transaction counts
-     *
+     * <p>
      * Useful for admin dashboard homepage.
      *
      * @return System statistics response
@@ -121,13 +121,13 @@ public class AdminController {
 
     /**
      * Get all users with pagination and filtering.
-     *
+     * <p>
      * This endpoint allows Admin to:
      * - View all users in the system with pagination
      * - Filter users by status (ACTIVE, SUSPENDED, BANNED)
      * - Search users by email or username
      * - Filter users who have orders in a specific date range
-     *
+     * <p>
      * Example requests:
      * - GET /api/admin/users                                    → All users, page 0, size 20
      * - GET /api/admin/users?page=1&size=50                     → Page 1 with 50 items
@@ -206,13 +206,13 @@ public class AdminController {
 
     /**
      * Get all affiliate clicks (tracking links) with pagination and filtering.
-     *
+     * <p>
      * This endpoint allows Admin to:
      * - View all tracking links created by users
      * - Filter by specific user, platform, status
      * - Search by tracking code or product name
      * - Paginate through results
-     *
+     * <p>
      * Example requests:
      * - GET /api/admin/affiliate-clicks                    → All clicks, page 0, size 20
      * - GET /api/admin/affiliate-clicks?userId=1           → Clicks by user 1
@@ -293,14 +293,14 @@ public class AdminController {
 
     /**
      * Recalculate wallet balances for a specific user.
-     *
+     * <p>
      * This endpoint recalculates wallet balances from cashback data (source of truth):
      * - pending_balance = SUM(cashback_amount) WHERE status = PENDING
      * - balance = SUM(cashback_amount) WHERE status = CONFIRMED
      * - total_earned = SUM(cashback_amount) WHERE status IN (CONFIRMED, PAID)
-     *
+     * <p>
      * Use this to fix wallet inconsistencies after import issues or data corruption.
-     *
+     * <p>
      * Example: POST /api/admin/wallets/recalculate?userId=20
      *
      * @param userId User ID to recalculate wallet for
@@ -344,14 +344,14 @@ public class AdminController {
 
     /**
      * Sync total_completed_orders for all users.
-     *
+     * <p>
      * This endpoint recalculates the total_completed_orders count for all users
      * based on distinct orders with CONFIRMED or PAID cashback status.
-     *
+     * <p>
      * Use this to fix data after:
      * - Re-import causing double counting
      * - Orders imported before milestone tracking was implemented
-     *
+     * <p>
      * Example: POST /api/admin/users/sync-completed-orders
      *
      * @return Number of users updated
@@ -385,13 +385,13 @@ public class AdminController {
 
     /**
      * Grant missing referrer commissions (Retroactive Fix).
-     *
+     * <p>
      * This endpoint processes all CONFIRMED referrer commissions that were
      * recorded in the database but never paid to referrers' wallets.
-     *
+     * <p>
      * This is a ONE-TIME fix for historical data due to a bug where the 5%
      * referrer commission was tracked but never actually added to wallet balance.
-     *
+     * <p>
      * Example: POST /api/admin/referral/grant-missing-commissions
      *
      * @return Summary of the retroactive fix operation
@@ -428,14 +428,14 @@ public class AdminController {
 
     /**
      * Re-process milestones for all users with qualifying orders.
-     *
+     * <p>
      * This endpoint finds all users who have at least one order with product_price > 100k
      * and re-processes their milestones according to the new MVP configuration.
-     *
+     * <p>
      * Use this after:
      * - Migration 050 (MVP referral milestones) to grant new bonuses
      * - Any milestone configuration changes
-     *
+     * <p>
      * Example: POST /api/admin/referral/reprocess-milestones
      *
      * @return Summary of the re-processing operation
