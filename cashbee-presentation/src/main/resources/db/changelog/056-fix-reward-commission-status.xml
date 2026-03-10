@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 056: Fix referrer_commission and referral_reward status after batch payment
+        Author: CashBee Team
+        Date: 2026-03-10
+
+        Bug: markAsPaidByBatch() in both repositories only set paidBatchId and paidAt
+        but never updated the status field.
+        - referrer_commission: status stays CONFIRMED instead of PAID (34 records)
+        - referral_reward: status stays GRANTED instead of PAID (65 records)
+
+        Fix: Update status for all records that have paid_batch_id but wrong status.
+        Code fix applied in ReferrerCommissionJpaRepository and ReferralRewardJpaRepository.
+    -->
+
+    <!-- Step 1: Fix referrer_commission status -->
+    <changeSet id="056-01-fix-referrer-commission-status" author="cashbee">
+        <comment>
+            Fix referrer_commission records that were paid in a batch
+            but status was not updated from CONFIRMED to PAID.
+            Affects 34 records in batches 22 and 24.
+        </comment>
+
+        <sql>
+            UPDATE referrer_commission
+            SET status = 'PAID'
+            WHERE paid_batch_id IS NOT NULL AND status = 'CONFIRMED';
+        </sql>
+    </changeSet>
+
+    <!-- Step 2: Fix referral_reward status -->
+    <changeSet id="056-02-fix-referral-reward-status" author="cashbee">
+        <comment>
+            Fix referral_reward records that were paid in a batch
+            but status was not updated from GRANTED to PAID.
+            Affects 65 records in batches 22 and 24.
+        </comment>
+
+        <sql>
+            UPDATE referral_reward
+            SET status = 'PAID'
+            WHERE paid_batch_id IS NOT NULL AND status = 'GRANTED';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

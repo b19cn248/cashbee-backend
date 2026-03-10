@@ -83,7 +83,7 @@ public interface ReferralRewardJpaRepository extends JpaRepository<ReferralRewar
      */
     @Modifying
     @Query("UPDATE ReferralRewardJpaEntity r " +
-           "SET r.paidBatchId = :batchId, r.paidAt = CURRENT_TIMESTAMP " +
+           "SET r.status = 'PAID', r.paidBatchId = :batchId, r.paidAt = CURRENT_TIMESTAMP " +
            "WHERE r.id IN :rewardIds")
     int markAsPaidByBatch(@Param("rewardIds") List<Long> rewardIds, @Param("batchId") Long batchId);
 

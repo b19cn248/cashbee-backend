@@ -15,5 +15,10 @@ public enum ReferralRewardStatus {
     /**
      * Reward has been granted to the user.
      */
-    GRANTED
+    GRANTED,
+
+    /**
+     * Reward has been paid out in a batch transfer.
+     */
+    PAID
 }

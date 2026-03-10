@@ -480,7 +480,156 @@ class GeneratePaymentInvoiceUseCaseTest {
     }
 
     // ============================================================
-    // TEST GROUP 4: Invoice Number Generation from DB
+    // TEST GROUP 4: Platform Cashback Validation
+    // ============================================================
+
+    @Nested
+    @DisplayName("Platform Cashback Validation")
+    class PlatformCashbackValidation {
+
+        @Test
+        @DisplayName("Should correct totalCashbackAmount when platform sum mismatches transfer amount")
+        void execute_CorrectedTotalCashback_WhenPlatformSumMismatches() {
+            // Given: amount=3547 but platform orders sum to 128866 (batch 24 bug scenario)
+            GenerateInvoiceCommand.PlatformOrderDetail shopeeDetail =
+                    GenerateInvoiceCommand.PlatformOrderDetail.builder()
+                            .platformCode("shopee")
+                            .orderCount(9)
+                            .totalAmount(new BigDecimal("128866"))
+                            .build();
+
+            GenerateInvoiceCommand command = GenerateInvoiceCommand.builder()
+                    .userId(USER_ID)
+                    .batchId(BATCH_ID)
+                    .batchItemId(BATCH_ITEM_ID)
+                    .amount(new BigDecimal("3547"))
+                    .currency("VND")
+                    .transferStatus("SUCCESS")
+                    .totalOrders(3)
+                    .platformOrders(Collections.singletonList(shopeeDetail))
+                    .bonusAmount(BigDecimal.ZERO)
+                    .referrerCommissionAmount(BigDecimal.ZERO)
+                    .build();
+
+            ArgumentCaptor<PaymentInvoice> captor = ArgumentCaptor.forClass(PaymentInvoice.class);
+            when(invoiceRepository.save(captor.capture())).thenAnswer(invocation -> {
+                PaymentInvoice input = invocation.getArgument(0);
+                return PaymentInvoice.builder()
+                        .id(1L)
+                        .invoiceNumber(input.getInvoiceNumber())
+                        .userId(input.getUserId())
+                        .batchId(input.getBatchId())
+                        .amount(input.getAmount())
+                        .totalCashbackAmount(input.getTotalCashbackAmount())
+                        .createdAt(input.getCreatedAt())
+                        .build();
+            });
+
+            // When
+            generatePaymentInvoiceUseCase.execute(command);
+
+            // Then: totalCashbackAmount should be corrected to 3547 (from amount), not 128866
+            PaymentInvoice savedInvoice = captor.getValue();
+            assertThat(savedInvoice.getTotalCashbackAmount())
+                    .isEqualByComparingTo(new BigDecimal("3547"));
+        }
+
+        @Test
+        @DisplayName("Should not change totalCashbackAmount when platform sum matches")
+        void execute_KeepsTotalCashback_WhenPlatformSumMatches() {
+            // Given: amount=80000, platform sum=80000 (no mismatch)
+            GenerateInvoiceCommand.PlatformOrderDetail shopeeDetail =
+                    GenerateInvoiceCommand.PlatformOrderDetail.builder()
+                            .platformCode("shopee")
+                            .orderCount(3)
+                            .totalAmount(new BigDecimal("80000"))
+                            .build();
+
+            GenerateInvoiceCommand command = GenerateInvoiceCommand.builder()
+                    .userId(USER_ID)
+                    .batchId(BATCH_ID)
+                    .amount(new BigDecimal("80000"))
+                    .currency("VND")
+                    .transferStatus("SUCCESS")
+                    .totalOrders(3)
+                    .platformOrders(Collections.singletonList(shopeeDetail))
+                    .bonusAmount(BigDecimal.ZERO)
+                    .referrerCommissionAmount(BigDecimal.ZERO)
+                    .build();
+
+            ArgumentCaptor<PaymentInvoice> captor = ArgumentCaptor.forClass(PaymentInvoice.class);
+            when(invoiceRepository.save(captor.capture())).thenAnswer(invocation -> {
+                PaymentInvoice input = invocation.getArgument(0);
+                return PaymentInvoice.builder()
+                        .id(1L)
+                        .invoiceNumber(input.getInvoiceNumber())
+                        .userId(input.getUserId())
+                        .batchId(input.getBatchId())
+                        .amount(input.getAmount())
+                        .totalCashbackAmount(input.getTotalCashbackAmount())
+                        .createdAt(input.getCreatedAt())
+                        .build();
+            });
+
+            // When
+            generatePaymentInvoiceUseCase.execute(command);
+
+            // Then: totalCashbackAmount stays at 80000 (correct)
+            PaymentInvoice savedInvoice = captor.getValue();
+            assertThat(savedInvoice.getTotalCashbackAmount())
+                    .isEqualByComparingTo(new BigDecimal("80000"));
+        }
+
+        @Test
+        @DisplayName("Should account for bonus and commission in mismatch check")
+        void execute_CorrectedTotalCashback_AccountsForBonusAndCommission() {
+            // Given: amount=10000, bonus=2000, commission=1000 → expected cashback=7000
+            // But platform sum = 9000 (wrong)
+            GenerateInvoiceCommand.PlatformOrderDetail shopeeDetail =
+                    GenerateInvoiceCommand.PlatformOrderDetail.builder()
+                            .platformCode("shopee")
+                            .orderCount(5)
+                            .totalAmount(new BigDecimal("9000"))
+                            .build();
+
+            GenerateInvoiceCommand command = GenerateInvoiceCommand.builder()
+                    .userId(USER_ID)
+                    .batchId(BATCH_ID)
+                    .amount(new BigDecimal("10000"))
+                    .currency("VND")
+                    .transferStatus("SUCCESS")
+                    .totalOrders(5)
+                    .platformOrders(Collections.singletonList(shopeeDetail))
+                    .bonusAmount(new BigDecimal("2000"))
+                    .referrerCommissionAmount(new BigDecimal("1000"))
+                    .build();
+
+            ArgumentCaptor<PaymentInvoice> captor = ArgumentCaptor.forClass(PaymentInvoice.class);
+            when(invoiceRepository.save(captor.capture())).thenAnswer(invocation -> {
+                PaymentInvoice input = invocation.getArgument(0);
+                return PaymentInvoice.builder()
+                        .id(1L)
+                        .invoiceNumber(input.getInvoiceNumber())
+                        .userId(input.getUserId())
+                        .batchId(input.getBatchId())
+                        .amount(input.getAmount())
+                        .totalCashbackAmount(input.getTotalCashbackAmount())
+                        .createdAt(input.getCreatedAt())
+                        .build();
+            });
+
+            // When
+            generatePaymentInvoiceUseCase.execute(command);
+
+            // Then: totalCashbackAmount should be corrected to 7000 (10000 - 2000 - 1000)
+            PaymentInvoice savedInvoice = captor.getValue();
+            assertThat(savedInvoice.getTotalCashbackAmount())
+                    .isEqualByComparingTo(new BigDecimal("7000"));
+        }
+    }
+
+    // ============================================================
+    // TEST GROUP 5: Invoice Number Generation from DB
     // ============================================================
 
     @Nested

@@ -124,7 +124,7 @@ public interface ReferrerCommissionJpaRepository extends JpaRepository<ReferrerC
      */
     @Modifying
     @Query("UPDATE ReferrerCommissionJpaEntity c " +
-           "SET c.paidBatchId = :batchId, c.paidAt = CURRENT_TIMESTAMP " +
+           "SET c.status = 'PAID', c.paidBatchId = :batchId, c.paidAt = CURRENT_TIMESTAMP " +
            "WHERE c.id IN :commissionIds")
     int markAsPaidByBatch(@Param("commissionIds") List<Long> commissionIds, @Param("batchId") Long batchId);
 
