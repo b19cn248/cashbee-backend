@@ -129,4 +129,7 @@
     <!-- Bugfix: Recalculate invoice platform breakdown from actual cashback records -->
     <include file="db/changelog/055-fix-invoice-platform-data.xml"/>
 
+    <!-- Bugfix: Fix referrer_commission and referral_reward status after batch payment -->
+    <include file="db/changelog/056-fix-reward-commission-status.xml"/>
+
 </databaseChangeLog>

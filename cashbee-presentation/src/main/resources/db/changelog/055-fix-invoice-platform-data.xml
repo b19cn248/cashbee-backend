@@ -84,42 +84,4 @@
         </sql>
     </changeSet>
 
-    <!--
-        Bug: referrer_commission.markAsPaidByBatch() only set paidBatchId/paidAt
-        but never updated status from CONFIRMED to PAID.
-        Fix: Update status for records that have paid_batch_id but wrong status.
-    -->
-    <changeSet id="055-04-fix-referrer-commission-status" author="cashbee">
-        <comment>
-            Fix referrer_commission records that were paid in a batch
-            but status was not updated from CONFIRMED to PAID.
-            Affects 34 records in batches 22 and 24.
-        </comment>
-
-        <sql>
-            UPDATE referrer_commission
-            SET status = 'PAID'
-            WHERE paid_batch_id IS NOT NULL AND status = 'CONFIRMED';
-        </sql>
-    </changeSet>
-
-    <!--
-        Bug: referral_reward.markAsPaidByBatch() only set paidBatchId/paidAt
-        but never updated status from GRANTED to PAID.
-        Fix: Update status for records that have paid_batch_id but wrong status.
-    -->
-    <changeSet id="055-05-fix-referral-reward-status" author="cashbee">
-        <comment>
-            Fix referral_reward records that were paid in a batch
-            but status was not updated from GRANTED to PAID.
-            Affects 65 records in batches 22 and 24.
-        </comment>
-
-        <sql>
-            UPDATE referral_reward
-            SET status = 'PAID'
-            WHERE paid_batch_id IS NOT NULL AND status = 'GRANTED';
-        </sql>
-    </changeSet>
-
 </databaseChangeLog>
