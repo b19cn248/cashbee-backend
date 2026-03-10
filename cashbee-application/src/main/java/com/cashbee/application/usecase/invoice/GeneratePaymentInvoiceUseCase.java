@@ -99,6 +99,17 @@ public class GeneratePaymentInvoiceUseCase {
                 .add(tiktokAmount)
                 .add(otherAmount);
 
+        // Validate: platform cashback total should match transfer amount minus bonus/commission
+        BigDecimal bonusAmt = command.getBonusAmount() != null ? command.getBonusAmount() : BigDecimal.ZERO;
+        BigDecimal commissionAmt = command.getReferrerCommissionAmount() != null ? command.getReferrerCommissionAmount() : BigDecimal.ZERO;
+        BigDecimal expectedCashback = command.getAmount().subtract(bonusAmt).subtract(commissionAmt);
+
+        if (totalCashbackAmount.compareTo(expectedCashback) != 0) {
+            log.warn("Invoice platform cashback mismatch: platform_sum={}, expected={}, userId={}, batchId={}",
+                    totalCashbackAmount, expectedCashback, command.getUserId(), command.getBatchId());
+            totalCashbackAmount = expectedCashback;
+        }
+
         // Create domain model
         PaymentInvoice invoice = PaymentInvoice.builder()
                 .invoiceNumber(invoiceNumber)

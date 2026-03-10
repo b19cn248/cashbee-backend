@@ -126,4 +126,7 @@
     <!-- Password Reset: Add reset_token to otp_verifications -->
     <include file="db/changelog/054-add-reset-token-to-otp-verification.xml"/>
 
+    <!-- Bugfix: Recalculate invoice platform breakdown from actual cashback records -->
+    <include file="db/changelog/055-fix-invoice-platform-data.xml"/>
+
 </databaseChangeLog>

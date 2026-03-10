@@ -76,9 +76,8 @@ public class InvoiceSummaryResponse {
             return null;
         }
 
-        // Tính cashback từ tổng các platform amounts (source of truth)
-        // Không dùng totalCashbackAmount vì dữ liệu cũ có thể = 0
-        BigDecimal cashback = calculateTotalCashbackFromPlatforms(invoice);
+        // Use actual transfer amount as source of truth (not platform breakdown which can be wrong)
+        BigDecimal total = invoice.getAmount() != null ? invoice.getAmount() : BigDecimal.ZERO;
 
         BigDecimal bonus = invoice.getBonusAmount() != null
                 ? invoice.getBonusAmount()
@@ -88,8 +87,12 @@ public class InvoiceSummaryResponse {
                 ? invoice.getReferrerCommissionAmount()
                 : BigDecimal.ZERO;
 
-        // Total = cashback + bonus + referrerCommission
-        BigDecimal total = cashback.add(bonus).add(referrerCommission);
+        // Derive cashback = total - bonus - commission (reliable since amount is always correct)
+        // Guard against negative: some legacy invoices have commission not included in transfer amount
+        BigDecimal cashback = total.subtract(bonus).subtract(referrerCommission);
+        if (cashback.compareTo(BigDecimal.ZERO) < 0) {
+            cashback = BigDecimal.ZERO;
+        }
 
         return InvoiceSummaryResponse.builder()
                 .id(invoice.getId())

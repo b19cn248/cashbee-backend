@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Changeset 055: Fix invoice platform breakdown data
+        Author: CashBee Team
+        Date: 2026-03-10
+
+        Bug: 7 invoices in batch 24 have wrong total_orders, platform amounts,
+        and total_cashback_amount. The invoice list shows wrong order count and amount.
+
+        Fix: Recalculate platform breakdown from actual cashback records.
+        Applied to ALL invoices for safety (correct data stays correct).
+    -->
+
+    <!-- Step 1: Create temp table with correct aggregated data from cashback records -->
+    <changeSet id="055-01-create-temp-invoice-cashback-aggregation" author="cashbee">
+        <comment>
+            Create temporary table with correct platform breakdown aggregated
+            from cashback records joined with affiliate_platform.
+        </comment>
+
+        <sql>
+            CREATE TEMPORARY TABLE tmp_invoice_cashback AS
+            SELECT
+                pi.id AS invoice_id,
+                COUNT(DISTINCT c.order_id) AS correct_total_orders,
+                SUM(c.cashback_amount) AS correct_total_cashback,
+                COALESCE(SUM(CASE WHEN ap.code = 'shopee' THEN 1 ELSE 0 END), 0) AS correct_shopee_orders,
+                COALESCE(SUM(CASE WHEN ap.code = 'shopee' THEN c.cashback_amount ELSE 0 END), 0) AS correct_shopee_amount,
+                COALESCE(SUM(CASE WHEN ap.code = 'lazada' THEN 1 ELSE 0 END), 0) AS correct_lazada_orders,
+                COALESCE(SUM(CASE WHEN ap.code = 'lazada' THEN c.cashback_amount ELSE 0 END), 0) AS correct_lazada_amount,
+                COALESCE(SUM(CASE WHEN ap.code = 'tiki' THEN 1 ELSE 0 END), 0) AS correct_tiki_orders,
+                COALESCE(SUM(CASE WHEN ap.code = 'tiki' THEN c.cashback_amount ELSE 0 END), 0) AS correct_tiki_amount,
+                COALESCE(SUM(CASE WHEN ap.code = 'tiktok' THEN 1 ELSE 0 END), 0) AS correct_tiktok_orders,
+                COALESCE(SUM(CASE WHEN ap.code = 'tiktok' THEN c.cashback_amount ELSE 0 END), 0) AS correct_tiktok_amount,
+                COALESCE(SUM(CASE WHEN ap.code NOT IN ('shopee', 'lazada', 'tiki', 'tiktok') THEN 1 ELSE 0 END), 0) AS correct_other_orders,
+                COALESCE(SUM(CASE WHEN ap.code NOT IN ('shopee', 'lazada', 'tiki', 'tiktok') THEN c.cashback_amount ELSE 0 END), 0) AS correct_other_amount
+            FROM payment_invoice pi
+            INNER JOIN cashback c ON c.paid_batch_id = pi.batch_id AND c.user_id = pi.user_id
+            INNER JOIN affiliate_platform ap ON ap.id = c.platform_id
+            WHERE c.status = 'PAID'
+            GROUP BY pi.id;
+        </sql>
+    </changeSet>
+
+    <!-- Step 2: Update payment_invoice with correct data from temp table -->
+    <changeSet id="055-02-update-invoice-platform-data" author="cashbee">
+        <comment>
+            Update payment_invoice platform breakdown fields from correct aggregated data.
+            Only updates invoices that have matching cashback records.
+        </comment>
+
+        <sql>
+            UPDATE payment_invoice pi
+            INNER JOIN tmp_invoice_cashback t ON t.invoice_id = pi.id
+            SET
+                pi.total_orders = t.correct_total_orders,
+                pi.total_cashback_amount = t.correct_total_cashback,
+                pi.shopee_orders = t.correct_shopee_orders,
+                pi.shopee_amount = t.correct_shopee_amount,
+                pi.lazada_orders = t.correct_lazada_orders,
+                pi.lazada_amount = t.correct_lazada_amount,
+                pi.tiki_orders = t.correct_tiki_orders,
+                pi.tiki_amount = t.correct_tiki_amount,
+                pi.tiktok_orders = t.correct_tiktok_orders,
+                pi.tiktok_amount = t.correct_tiktok_amount,
+                pi.other_orders = t.correct_other_orders,
+                pi.other_amount = t.correct_other_amount,
+                pi.updated_at = CURRENT_TIMESTAMP;
+        </sql>
+    </changeSet>
+
+    <!-- Step 3: Drop temp table -->
+    <changeSet id="055-03-drop-temp-table" author="cashbee">
+        <comment>Clean up temporary table</comment>
+
+        <sql>
+            DROP TEMPORARY TABLE IF EXISTS tmp_invoice_cashback;
+        </sql>
+    </changeSet>
+
+    <!--
+        Bug: referrer_commission.markAsPaidByBatch() only set paidBatchId/paidAt
+        but never updated status from CONFIRMED to PAID.
+        Fix: Update status for records that have paid_batch_id but wrong status.
+    -->
+    <changeSet id="055-04-fix-referrer-commission-status" author="cashbee">
+        <comment>
+            Fix referrer_commission records that were paid in a batch
+            but status was not updated from CONFIRMED to PAID.
+            Affects 34 records in batches 22 and 24.
+        </comment>
+
+        <sql>
+            UPDATE referrer_commission
+            SET status = 'PAID'
+            WHERE paid_batch_id IS NOT NULL AND status = 'CONFIRMED';
+        </sql>
+    </changeSet>
+
+    <!--
+        Bug: referral_reward.markAsPaidByBatch() only set paidBatchId/paidAt
+        but never updated status from GRANTED to PAID.
+        Fix: Update status for records that have paid_batch_id but wrong status.
+    -->
+    <changeSet id="055-05-fix-referral-reward-status" author="cashbee">
+        <comment>
+            Fix referral_reward records that were paid in a batch
+            but status was not updated from GRANTED to PAID.
+            Affects 65 records in batches 22 and 24.
+        </comment>
+
+        <sql>
+            UPDATE referral_reward
+            SET status = 'PAID'
+            WHERE paid_batch_id IS NOT NULL AND status = 'GRANTED';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
