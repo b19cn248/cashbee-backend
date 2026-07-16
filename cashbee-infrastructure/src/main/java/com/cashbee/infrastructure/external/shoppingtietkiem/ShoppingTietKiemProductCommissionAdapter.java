@@ -3,7 +3,6 @@ package com.cashbee.infrastructure.external.shoppingtietkiem;
 import com.cashbee.domain.service.ProductCommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -20,9 +19,10 @@ import java.util.Optional;
  * - shopeeCommissionRate = ZERO (avoids incorrect 50k shopee cap on total rate)
  * - commission = STK estimatedCashback
  * - commissionRate = STK commissionRate
+ *
+ * Used as fallback #2 by {@code CascadingProductCommissionAdapter} (after Peeback).
  */
 @Component
-@Primary
 @RequiredArgsConstructor
 @Slf4j
 public class ShoppingTietKiemProductCommissionAdapter implements ProductCommissionService {

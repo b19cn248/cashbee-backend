@@ -20,6 +20,13 @@ import java.util.Optional;
  *
  * API: {@code POST /api/affiliate/product-info}
  * Body: {@code { "shopeeUrl": "..." }}
+ *
+ * Auth routing on 401/403:
+ * <pre>
+ *   product-info with acc1 token fail → route acc2 → retry
+ *   product-info with acc2 token fail → route acc3 → retry
+ *   ... until all accounts tried
+ * </pre>
  */
 @Service
 @RequiredArgsConstructor
@@ -27,7 +34,6 @@ import java.util.Optional;
 public class ShoppingTietKiemService {
 
     private static final String PRODUCT_INFO_PATH = "/api/affiliate/product-info";
-    private static final int MAX_AUTH_RETRIES = 2;
 
     private final RestTemplate restTemplate;
     private final ShoppingTietKiemAuthService authService;
@@ -36,7 +42,7 @@ public class ShoppingTietKiemService {
     /**
      * Fetch product commission info from STK.
      *
-     * On HTTP 401, invalidates token, rotates account, and retries a limited number of times.
+     * On HTTP 401/403: routes to next account and retries up to account count times.
      *
      * @param shopeeProductUrl Shopee product URL (short or full)
      * @return product info if successful
@@ -44,10 +50,13 @@ public class ShoppingTietKiemService {
     public Optional<ShoppingTietKiemProductInfo> getProductInfo(String shopeeProductUrl) {
         log.info("ShoppingTietKiemService: Fetching product info for URL: {}", shopeeProductUrl);
 
-        for (int attempt = 1; attempt <= MAX_AUTH_RETRIES; attempt++) {
+        int maxAttempts = Math.max(1, authService.getAccountCount());
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             Optional<String> tokenOpt = authService.getAccessToken();
             if (tokenOpt.isEmpty()) {
-                log.error("ShoppingTietKiemService: Unable to obtain STK access token");
+                log.error("ShoppingTietKiemService: Unable to obtain STK access token "
+                    + "(all accounts failed login routing)");
                 return Optional.empty();
             }
 
@@ -72,7 +81,8 @@ public class ShoppingTietKiemService {
                 ShoppingTietKiemProductInfo productInfo = response.getBody();
                 if (response.getStatusCode().is2xxSuccessful()
                     && productInfo != null
-                    && productInfo.getProductName() != null) {
+                    && productInfo.getProductName() != null
+                    && !productInfo.getProductName().isBlank()) {
 
                     log.info("ShoppingTietKiemService: OK - product={}, price={}, commissionRate={}, cashback={}",
                         productInfo.getProductName(),
@@ -87,15 +97,16 @@ public class ShoppingTietKiemService {
                 return Optional.empty();
 
             } catch (HttpStatusCodeException e) {
-                if (e.getStatusCode().value() == HttpStatus.UNAUTHORIZED.value()
-                    || e.getStatusCode().value() == HttpStatus.FORBIDDEN.value()) {
-                    log.warn("ShoppingTietKiemService: Auth failed ({}), attempt {}/{} - rotating account",
-                        e.getStatusCode().value(), attempt, MAX_AUTH_RETRIES);
-                    authService.invalidateToken(true);
+                int status = e.getStatusCode().value();
+                if (status == HttpStatus.UNAUTHORIZED.value()
+                    || status == HttpStatus.FORBIDDEN.value()) {
+                    log.warn("ShoppingTietKiemService: Auth failed (HTTP {}), attempt {}/{} — route next account",
+                        status, attempt, maxAttempts);
+                    authService.routeToNextAccount();
                     continue;
                 }
                 log.error("ShoppingTietKiemService: HTTP {} for URL {}: {}",
-                    e.getStatusCode().value(), shopeeProductUrl, e.getResponseBodyAsString());
+                    status, shopeeProductUrl, e.getResponseBodyAsString());
                 return Optional.empty();
             } catch (RestClientException e) {
                 log.error("ShoppingTietKiemService: Failed to call product-info for URL: {}",
@@ -107,6 +118,8 @@ public class ShoppingTietKiemService {
             }
         }
 
+        log.error("ShoppingTietKiemService: Exhausted {} account routes for URL: {}",
+            maxAttempts, shopeeProductUrl);
         return Optional.empty();
     }
 }

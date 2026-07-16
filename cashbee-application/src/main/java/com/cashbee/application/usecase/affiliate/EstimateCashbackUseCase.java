@@ -59,20 +59,39 @@ public class EstimateCashbackUseCase {
     public EstimateCashbackResponse execute(EstimateCashbackRequest request) {
         log.info("EstimateCashbackUseCase: Estimating cashback for URL: {}", request.getShopeeUrl());
 
-        // Step 1: Validate and parse URL
-        String productUrl = request.getShopeeUrl();
+        // Step 1: Validate URL. Prefer clean product URL when parse succeeds.
+        // If expand/parse fails (Shopee block, timeout) but URL still looks like Shopee,
+        // continue with original — Peeback/STK accept short links directly.
+        String originalUrl = request.getShopeeUrl();
+        if (originalUrl == null || originalUrl.isBlank()) {
+            throw new BusinessException("Invalid Shopee URL: empty");
+        }
+        String productUrl = originalUrl.trim();
         try {
             ShopeeUrlParser.ParsedShopeeUrl parsedUrl = shopeeUrlParser.parse(productUrl);
-            productUrl = parsedUrl.getUrlForAffiliateLink();
-            log.info("EstimateCashbackUseCase: Parsed URL - Shop ID: {}, Item ID: {}",
-                parsedUrl.getShopId(), parsedUrl.getItemId());
+            if (parsedUrl.hasShopId() && parsedUrl.getItemId() != null && !parsedUrl.getItemId().isBlank()) {
+                productUrl = "https://shopee.vn/product/" + parsedUrl.getShopId() + "/" + parsedUrl.getItemId();
+            }
+            log.info("EstimateCashbackUseCase: Parsed URL - Shop ID: {}, Item ID: {}, commissionUrl={}",
+                parsedUrl.getShopId(), parsedUrl.getItemId(), productUrl);
         } catch (IllegalArgumentException e) {
-            log.error("EstimateCashbackUseCase: Invalid Shopee URL: {}", request.getShopeeUrl(), e);
-            throw new BusinessException("Invalid Shopee URL: " + e.getMessage());
+            if (looksLikeShopeeUrl(originalUrl)) {
+                log.warn("EstimateCashbackUseCase: Parse/expand failed, using original URL. cause={}",
+                    e.getMessage());
+                productUrl = originalUrl.trim();
+            } else {
+                log.error("EstimateCashbackUseCase: Invalid Shopee URL: {}", originalUrl, e);
+                throw new BusinessException("Invalid Shopee URL: " + e.getMessage());
+            }
         }
 
-        // Step 2: Call external API via port
+        // Step 2: Call external API via port (cascade: Peeback → STK → ChietKhau)
+        // Try clean product URL first, then original short link if different.
         Optional<ProductCommissionInfo> productInfoOpt = productCommissionService.getProductCommission(productUrl);
+        if (productInfoOpt.isEmpty() && !productUrl.equals(originalUrl.trim())) {
+            log.info("EstimateCashbackUseCase: Retry commission with original URL: {}", originalUrl);
+            productInfoOpt = productCommissionService.getProductCommission(originalUrl.trim());
+        }
 
         if (productInfoOpt.isEmpty()) {
             log.warn("EstimateCashbackUseCase: Failed to get commission for URL: {}", productUrl);
@@ -102,8 +121,17 @@ public class EstimateCashbackUseCase {
             }
         }
 
-        // Total estimated cashback
+        // Total estimated cashback from rate split
         BigDecimal estimatedCashback = sellerCommission.add(shopeeCommission);
+
+        // Fallback when provider only returns total commission (e.g. ChietKhau, some STK responses)
+        if (estimatedCashback.compareTo(BigDecimal.ZERO) == 0
+            && productInfo.commission() != null
+            && productInfo.commission().compareTo(BigDecimal.ZERO) > 0) {
+            estimatedCashback = productInfo.commission();
+            log.info("EstimateCashbackUseCase: Using provider commission amount as cashback: {}",
+                estimatedCashback);
+        }
 
         // Convert rates to percentage for display (0.05 -> 5.0%)
         BigDecimal sellerRatePercent = toPercent(sellerRate);
@@ -155,5 +183,17 @@ public class EstimateCashbackUseCase {
         }
         return rate.multiply(BigDecimal.valueOf(100))
             .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private boolean looksLikeShopeeUrl(String url) {
+        if (url == null) {
+            return false;
+        }
+        String lower = url.toLowerCase(Locale.ROOT);
+        return lower.contains("shopee.vn")
+            || lower.contains("s.shopee.")
+            || lower.contains("shp.ee")
+            || lower.contains("shope.ee")
+            || lower.contains("shopeefood");
     }
 }

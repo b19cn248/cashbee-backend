@@ -20,13 +20,19 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Authenticates against ShoppingTietKiem with multi-account fallback.
+ * STK multi-account auth with sequential routing.
  *
- * Behaviour:
- * - Caches access token until near JWT expiry
- * - Tries accounts in order; if login fails, moves to the next account
- * - Remembers last successful account index for subsequent requests
- * - {@link #invalidateToken()} forces re-login (e.g. after HTTP 401 on product-info)
+ * Routing rule (không "chọn" account cứng):
+ * <pre>
+ *   acc1 fail → route acc2
+ *   acc2 fail → route acc3
+ *   ...
+ *   hết list  → empty
+ * </pre>
+ *
+ * - Token cache theo account đang active
+ * - Login fail: tự route sang account kế tiếp trong cùng lần gọi
+ * - Product-info 401/403: {@link #routeToNextAccount()} rồi login lại
  */
 @Service
 @RequiredArgsConstructor
@@ -39,15 +45,31 @@ public class ShoppingTietKiemAuthService {
     private final ShoppingTietKiemProperties properties;
 
     private final Object tokenLock = new Object();
-    private final AtomicInteger accountCursor = new AtomicInteger(0);
+
+    /**
+     * Index of the account currently preferred for login (0-based).
+     * Starts at 0 = acc1; advances only on route after failure.
+     */
+    private final AtomicInteger activeAccountIndex = new AtomicInteger(0);
 
     private volatile String cachedAccessToken;
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
+    private volatile int tokenAccountIndex = -1;
 
     /**
-     * Returns a valid STK access token, logging in with account fallback if needed.
-     *
-     * @return access token, or empty if all accounts failed
+     * Number of configured STK accounts (for retry bounds in product-info).
+     */
+    public int getAccountCount() {
+        List<ShoppingTietKiemProperties.Account> accounts = properties.getAccounts();
+        return accounts == null ? 0 : accounts.size();
+    }
+
+    /**
+     * Returns a valid STK access token.
+     * <p>
+     * If cached token is still valid → reuse.
+     * Else login starting from {@link #activeAccountIndex}; on fail route to next account
+     * until one succeeds or all accounts are exhausted.
      */
     public Optional<String> getAccessToken() {
         if (isTokenValid()) {
@@ -58,27 +80,60 @@ public class ShoppingTietKiemAuthService {
             if (isTokenValid()) {
                 return Optional.of(cachedAccessToken);
             }
-            return loginWithFallback();
+            return loginWithAccountRouting();
         }
     }
 
     /**
-     * Clears cached token so the next call re-authenticates (optionally on next account).
-     *
-     * @param rotateAccount if true, advance account cursor before next login
+     * Force re-login with the next account (after product-info 401/403).
+     * <p>
+     * Clears cache and advances active index: acc1 → acc2 → acc3 → acc1 ...
      */
-    public void invalidateToken(boolean rotateAccount) {
+    public void routeToNextAccount() {
         synchronized (tokenLock) {
-            cachedAccessToken = null;
-            tokenExpiresAt = Instant.EPOCH;
-            if (rotateAccount) {
-                advanceAccountCursor();
+            clearTokenCache();
+            int size = getAccountCount();
+            if (size <= 0) {
+                return;
             }
-            log.info("ShoppingTietKiemAuth: Token invalidated (rotateAccount={})", rotateAccount);
+            int from = Math.floorMod(activeAccountIndex.get(), size);
+            int to = (from + 1) % size;
+            activeAccountIndex.set(to);
+            log.info("ShoppingTietKiemAuth: Route account {} → {} (acc{} → acc{})",
+                from, to, from + 1, to + 1);
         }
     }
 
-    private Optional<String> loginWithFallback() {
+    /**
+     * Clears cached token without changing active account (e.g. expiry refresh).
+     */
+    public void invalidateToken() {
+        synchronized (tokenLock) {
+            clearTokenCache();
+            log.info("ShoppingTietKiemAuth: Token invalidated (same account)");
+        }
+    }
+
+    /**
+     * @param rotateAccount if true, same as {@link #routeToNextAccount()}; else {@link #invalidateToken()}
+     * @deprecated Prefer {@link #routeToNextAccount()} for explicit routing semantics
+     */
+    @Deprecated
+    public void invalidateToken(boolean rotateAccount) {
+        if (rotateAccount) {
+            routeToNextAccount();
+        } else {
+            invalidateToken();
+        }
+    }
+
+    /**
+     * Try login from active account, then route sequentially through the full list once.
+     *
+     * Example with 3 accounts, active=0:
+     * try acc1 → fail → try acc2 → fail → try acc3 → fail → empty
+     */
+    private Optional<String> loginWithAccountRouting() {
         List<ShoppingTietKiemProperties.Account> accounts = properties.getAccounts();
         if (accounts == null || accounts.isEmpty()) {
             log.error("ShoppingTietKiemAuth: No STK accounts configured");
@@ -86,32 +141,44 @@ public class ShoppingTietKiemAuthService {
         }
 
         int size = accounts.size();
-        int start = Math.floorMod(accountCursor.get(), size);
+        int start = Math.floorMod(activeAccountIndex.get(), size);
 
-        for (int attempt = 0; attempt < size; attempt++) {
-            int index = (start + attempt) % size;
+        log.info("ShoppingTietKiemAuth: Login routing starts at acc{} (index {}), total={}",
+            start + 1, start, size);
+
+        for (int offset = 0; offset < size; offset++) {
+            int index = (start + offset) % size;
             ShoppingTietKiemProperties.Account account = accounts.get(index);
 
-            if (account == null
-                || account.getEmail() == null || account.getEmail().isBlank()
-                || account.getPassword() == null || account.getPassword().isBlank()) {
-                log.warn("ShoppingTietKiemAuth: Skipping invalid account config at index {}", index);
+            if (!isAccountConfigured(account)) {
+                log.warn("ShoppingTietKiemAuth: acc{} (index {}) not configured — route next",
+                    index + 1, index);
                 continue;
             }
 
+            log.info("ShoppingTietKiemAuth: Trying login acc{} ({})",
+                index + 1, maskEmail(account.getEmail()));
+
             Optional<String> token = login(account.getEmail(), account.getPassword());
             if (token.isPresent()) {
-                accountCursor.set(index);
-                log.info("ShoppingTietKiemAuth: Login success with account index {} ({})",
-                    index, maskEmail(account.getEmail()));
+                activeAccountIndex.set(index);
+                tokenAccountIndex = index;
+                log.info("ShoppingTietKiemAuth: Login OK on acc{} ({})",
+                    index + 1, maskEmail(account.getEmail()));
                 return token;
             }
 
-            log.warn("ShoppingTietKiemAuth: Login failed for account index {} ({}), trying next",
-                index, maskEmail(account.getEmail()));
+            int next = (index + 1) % size;
+            if (offset < size - 1) {
+                log.warn("ShoppingTietKiemAuth: Login FAILED acc{} ({}) — route → acc{}",
+                    index + 1, maskEmail(account.getEmail()), next + 1);
+            } else {
+                log.warn("ShoppingTietKiemAuth: Login FAILED acc{} ({}) — no more accounts",
+                    index + 1, maskEmail(account.getEmail()));
+            }
         }
 
-        log.error("ShoppingTietKiemAuth: All {} STK accounts failed to login", size);
+        log.error("ShoppingTietKiemAuth: All {} STK accounts failed login routing", size);
         return Optional.empty();
     }
 
@@ -158,6 +225,12 @@ public class ShoppingTietKiemAuthService {
         }
     }
 
+    private void clearTokenCache() {
+        cachedAccessToken = null;
+        tokenExpiresAt = Instant.EPOCH;
+        tokenAccountIndex = -1;
+    }
+
     private boolean isTokenValid() {
         if (cachedAccessToken == null || cachedAccessToken.isBlank()) {
             return false;
@@ -166,12 +239,10 @@ public class ShoppingTietKiemAuthService {
         return tokenExpiresAt != null && tokenExpiresAt.isAfter(threshold);
     }
 
-    private void advanceAccountCursor() {
-        List<ShoppingTietKiemProperties.Account> accounts = properties.getAccounts();
-        if (accounts == null || accounts.isEmpty()) {
-            return;
-        }
-        accountCursor.updateAndGet(i -> (i + 1) % accounts.size());
+    private static boolean isAccountConfigured(ShoppingTietKiemProperties.Account account) {
+        return account != null
+            && account.getEmail() != null && !account.getEmail().isBlank()
+            && account.getPassword() != null && !account.getPassword().isBlank();
     }
 
     /**
@@ -184,7 +255,6 @@ public class ShoppingTietKiemAuthService {
                 return Optional.empty();
             }
             String payloadJson = new String(Base64.getUrlDecoder().decode(padBase64(parts[1])));
-            // Minimal parse to avoid pulling in full JWT lib: look for "exp":NUMBER
             int expIdx = payloadJson.indexOf("\"exp\"");
             if (expIdx < 0) {
                 return Optional.empty();

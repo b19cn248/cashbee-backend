@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -50,12 +51,16 @@ class ShoppingTietKiemAuthServiceTest {
         a2.setEmail("a2@example.com");
         a2.setPassword("good");
 
-        properties.setAccounts(List.of(a1, a2));
+        ShoppingTietKiemProperties.Account a3 = new ShoppingTietKiemProperties.Account();
+        a3.setEmail("a3@example.com");
+        a3.setPassword("also-good");
+
+        properties.setAccounts(List.of(a1, a2, a3));
         authService = new ShoppingTietKiemAuthService(restTemplate, properties);
     }
 
     @Test
-    void fallsBackToNextAccountWhenFirstLoginFails() {
+    void routesAcc1FailToAcc2OnLogin() {
         when(restTemplate.exchange(
             eq("https://api.shoppingtietkiem.com/api/auth/login"),
             eq(HttpMethod.POST),
@@ -75,6 +80,7 @@ class ShoppingTietKiemAuthServiceTest {
                     StandardCharsets.UTF_8
                 );
             }
+            // acc2 / acc3 succeed
             long exp = (System.currentTimeMillis() / 1000L) + 900;
             String token = fakeJwt(exp);
             ShoppingTietKiemLoginResponse ok = ShoppingTietKiemLoginResponse.builder()
@@ -87,6 +93,7 @@ class ShoppingTietKiemAuthServiceTest {
         Optional<String> token = authService.getAccessToken();
 
         assertTrue(token.isPresent());
+        // acc1 fail + acc2 success = 2 login calls
         verify(restTemplate, times(2)).exchange(
             eq("https://api.shoppingtietkiem.com/api/auth/login"),
             eq(HttpMethod.POST),
@@ -103,6 +110,84 @@ class ShoppingTietKiemAuthServiceTest {
             any(HttpEntity.class),
             eq(ShoppingTietKiemLoginResponse.class)
         );
+    }
+
+    @Test
+    void routesAcc1AndAcc2FailToAcc3() {
+        AtomicInteger loginCalls = new AtomicInteger();
+        when(restTemplate.exchange(
+            eq("https://api.shoppingtietkiem.com/api/auth/login"),
+            eq(HttpMethod.POST),
+            any(HttpEntity.class),
+            eq(ShoppingTietKiemLoginResponse.class)
+        )).thenAnswer(invocation -> {
+            loginCalls.incrementAndGet();
+            HttpEntity<?> entity = invocation.getArgument(2);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, String> body = (java.util.Map<String, String>) entity.getBody();
+            String email = body.get("email");
+            if ("a3@example.com".equals(email)) {
+                long exp = (System.currentTimeMillis() / 1000L) + 900;
+                return ResponseEntity.ok(ShoppingTietKiemLoginResponse.builder()
+                    .accessToken(fakeJwt(exp))
+                    .message("ok")
+                    .build());
+            }
+            throw HttpClientErrorException.create(
+                HttpStatus.UNAUTHORIZED,
+                "Unauthorized",
+                null,
+                "{\"message\":\"bad\"}".getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8
+            );
+        });
+
+        Optional<String> token = authService.getAccessToken();
+
+        assertTrue(token.isPresent());
+        // acc1 fail + acc2 fail + acc3 ok
+        assertEquals(3, loginCalls.get());
+    }
+
+    @Test
+    void routeToNextAccountAdvancesForProductInfoRetry() {
+        when(restTemplate.exchange(
+            eq("https://api.shoppingtietkiem.com/api/auth/login"),
+            eq(HttpMethod.POST),
+            any(HttpEntity.class),
+            eq(ShoppingTietKiemLoginResponse.class)
+        )).thenAnswer(invocation -> {
+            HttpEntity<?> entity = invocation.getArgument(2);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, String> body = (java.util.Map<String, String>) entity.getBody();
+            String email = body.get("email");
+            // only acc2 works
+            if (!"a2@example.com".equals(email)) {
+                throw HttpClientErrorException.create(
+                    HttpStatus.UNAUTHORIZED,
+                    "Unauthorized",
+                    null,
+                    "{}".getBytes(StandardCharsets.UTF_8),
+                    StandardCharsets.UTF_8
+                );
+            }
+            long exp = (System.currentTimeMillis() / 1000L) + 900;
+            return ResponseEntity.ok(ShoppingTietKiemLoginResponse.builder()
+                .accessToken(fakeJwt(exp))
+                .message("ok")
+                .build());
+        });
+
+        // First getAccessToken: acc1 fail → acc2 ok
+        assertTrue(authService.getAccessToken().isPresent());
+
+        // Simulate product-info 401 → route to acc3
+        authService.routeToNextAccount();
+
+        // Next login starts at acc3 (fails) then wraps? After success we were on acc2 (index 1).
+        // routeToNext → index 2 = acc3. acc3 fails, then (start+1)%3 = acc1 fails, then acc2 ok.
+        assertTrue(authService.getAccessToken().isPresent());
+        assertEquals(3, authService.getAccountCount());
     }
 
     private static String fakeJwt(long expEpochSeconds) {
