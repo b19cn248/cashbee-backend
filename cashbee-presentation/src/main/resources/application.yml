@@ -219,3 +219,22 @@ cashbee:
       # Format: second minute hour day-of-month month day-of-week
       # 0 0 8 * * MON = At 08:00 on Monday
       cron: ${BATCH_TRANSFER_SCHEDULER_CRON:0 0 8 * * MON}
+
+  # External product commission source for estimate-cashback
+  external:
+    shopping-tiet-kiem:
+      base-url: ${STK_BASE_URL:https://api.shoppingtietkiem.com}
+      api-key: ${STK_API_KEY:bcb4ffe3266b39822cab4b3ab99a17bb0fd14cb051ddc2709c961cb5f0ffb5ac}
+      app-platform: ${STK_APP_PLATFORM:android}
+      app-version: ${STK_APP_VERSION:2.0.12}
+      device-id: ${STK_DEVICE_ID:cashbee-backend-01}
+      # Refresh token this many seconds before JWT exp
+      token-refresh-skew-seconds: 60
+      # Multi-account login fallback (tried in order)
+      accounts:
+        - email: ${STK_ACCOUNT1_EMAIL:dominhtien8410b28@gmail.com}
+          password: ${STK_ACCOUNT1_PASSWORD:Z08UWMYmi4FV}
+        - email: ${STK_ACCOUNT2_EMAIL:trinhtuantrungthuy1424f0e@gmail.com}
+          password: ${STK_ACCOUNT2_PASSWORD:x71R8DFAR9Vs}
+        - email: ${STK_ACCOUNT3_EMAIL:maithuhuyen57346cf@gmail.com}
+          password: ${STK_ACCOUNT3_PASSWORD:4M0yXKUqnS4v}

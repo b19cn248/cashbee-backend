@@ -3,7 +3,6 @@ package com.cashbee.infrastructure.external.tui3gang;
 import com.cashbee.domain.service.ProductCommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -21,13 +20,12 @@ import java.util.Optional;
  * - commissionRate = sellerCommissionRate + shopeeCommissionRate
  * - commission = commissionRate * price
  *
- * @Primary annotation makes this adapter the default choice when
- * ProductCommissionService is injected (replacing ChietKhauProductCommissionAdapter).
+ * Note: No longer {@code @Primary}. Default commission source is
+ * ShoppingTietKiemProductCommissionAdapter (Tui3Gang API is unavailable).
  *
  * @author CashBee Team
  */
 @Component
-@Primary
 @RequiredArgsConstructor
 @Slf4j
 public class Tui3GangProductCommissionAdapter implements ProductCommissionService {
